@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+dist/
+build/
+
+# Node / web
+node_modules/
+web/dist/
+.vite/
+
+# Terraform / OpenTofu: never commit state (it contains account details)
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+.terraform.lock.hcl.bak
+override.tf
+override.tf.json
+*_override.tf
+
+# Lambda build artefacts
+*.zip
+.build/
+
+# Secrets & local config
+.env
+.env.*
+!.env.example
+*.pem
+.aws/
+
+# Claude Code: personal settings stay local; shared settings.json is committed
+.claude/settings.local.json
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
