@@ -26,6 +26,7 @@ from verity_core.model.enums import (
     StrmType,
     Sufficiency,
     SystemKind,
+    VerifiedAgainst,
 )
 from verity_core.model.nodes import (
     AISystem,
@@ -113,6 +114,7 @@ def _requirement(framework: str, ref: str, label: str) -> Requirement:
         source_url="https://example.invalid/test-fixture",
         source_version="test fixture",
         last_verified=date(2026, 11, 5),
+        verified_against=VerifiedAgainst.PUBLIC_LISTING,
         **COMMON,
     )
 
