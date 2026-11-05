@@ -104,3 +104,78 @@ class EvidenceKind(StrEnum):
 class RunMode(StrEnum):
     FULL = "full"
     INCREMENTAL = "incremental"
+
+
+class EdgeType(StrEnum):
+    MEMBER_OF = "MEMBER_OF"
+    PART_OF = "PART_OF"
+    OWNS = "OWNS"
+    DEVELOPS = "DEVELOPS"
+    APPROVES_RISK_FOR = "APPROVES_RISK_FOR"
+    RUNS_ON = "RUNS_ON"
+    ASSUMES = "ASSUMES"
+    CALLS = "CALLS"
+    USES_MODEL = "USES_MODEL"
+    PROVIDED_BY = "PROVIDED_BY"
+    PROCESSES = "PROCESSES"
+    TRAINED_ON = "TRAINED_ON"
+    DERIVED_FROM = "DERIVED_FROM"
+    PROMOTED_TO = "PROMOTED_TO"
+    HAS_RISK = "HAS_RISK"
+    MITIGATED_BY = "MITIGATED_BY"
+    MAPS_TO = "MAPS_TO"
+    APPLIES_TO = "APPLIES_TO"
+    ASSESSES = "ASSESSES"
+    SCOPED_TO = "SCOPED_TO"
+    ASSESSED = "ASSESSED"
+    SUPPORTS = "SUPPORTS"
+    ABOUT = "ABOUT"
+    COLLECTED_FROM = "COLLECTED_FROM"
+    IMPLEMENTS = "IMPLEMENTS"
+    OBSERVED = "OBSERVED"
+    AFFECTS = "AFFECTS"
+
+
+class Direction(StrEnum):
+    OUT = "out"
+    IN = "in"
+
+
+class Role(StrEnum):
+    """Role under the EU AI Act. `any` is for requirements that are not role-based."""
+
+    PROVIDER = "provider"
+    DEPLOYER = "deployer"
+    IMPORTER = "importer"
+    DISTRIBUTOR = "distributor"
+    ANY = "any"
+
+
+class Purpose(StrEnum):
+    """Why a system processes a dataset. `training` means this system itself runs training;
+    `TRAINED_ON` is model lineage (ADR 0012)."""
+
+    INFERENCE = "inference"
+    TRAINING = "training"
+    RETRIEVAL = "retrieval"
+
+
+class StrmType(StrEnum):
+    """NIST IR 8477 set theory relationship types."""
+
+    EQUAL = "equal"
+    SUBSET_OF = "subset_of"
+    SUPERSET_OF = "superset_of"
+    INTERSECTS_WITH = "intersects_with"
+    NO_RELATIONSHIP = "no_relationship"
+
+
+class RationaleType(StrEnum):
+    SYNTACTIC = "syntactic"
+    SEMANTIC = "semantic"
+    FUNCTIONAL = "functional"
+
+
+class Sufficiency(StrEnum):
+    FULL = "full"
+    PARTIAL = "partial"
