@@ -11,6 +11,7 @@ The organisation, people and companies under `org/` are fictional. The mappings 
 | `mappings/` | Requirement to control, with an STRM type |
 | `rules/obligation_dates.yaml` | When EU AI Act obligations apply |
 | `org/` | Kestrel Cloud Ltd and its AI estate |
+| `decisions/` | Human decisions, one file each: risk tier, attestation, verification, document. The approving PR is the approval record ([ADR 0019](../docs/adr/0019-m5-rules-and-assessment.md)). The demo ones are all simulated sign-offs |
 
 ## A curated subset
 

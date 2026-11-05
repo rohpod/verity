@@ -12,8 +12,10 @@ from dataclasses import dataclass
 from urllib.parse import urlparse
 
 from verity_core.content.loader import Content
+from verity_core.model import ids
 from verity_core.model.edges import MapsToEdge
 from verity_core.model.enums import (
+    SCOPE_NODE_TYPE,
     EdgeType,
     RationaleType,
     Source,
@@ -21,7 +23,7 @@ from verity_core.model.enums import (
     Sufficiency,
     VerifiedAgainst,
 )
-from verity_core.model.nodes import Model, Organisation, Provider
+from verity_core.model.nodes import Control, Model, Organisation, Person, Provider
 
 EU_FRAMEWORK = "euaia"
 EU_SOURCE_VERSION = "2024/1689 as amended by 2026/1744"
@@ -36,6 +38,7 @@ _QUOTES = ('"', "“", "”")
 _SHALL = re.compile(r"\bshall\b", re.IGNORECASE)
 _YEAR = re.compile(r"\b(?:19|20)\d\d\b")
 _ACCOUNT_ID = re.compile(r"(?<!\d)\d{12}(?!\d)")
+_SHA256 = re.compile(r"^[0-9a-f]{64}$")  # a digest is not text, and can hold 12 digits by chance
 # Real AI vendors and products. Only a simulated provider or model may carry such a name, and
 # then only with its provenance saying so (CLAUDE.md, honesty rules). A small list, not a
 # complete one: it catches the likely slips, and the owner reads the estate files.
@@ -71,6 +74,7 @@ def lint(content: Content, limits: LintLimits = LintLimits()) -> list[LintIssue]
         *_mappings(content),
         *_coverage(content, limits),
         *_estate(content),
+        *_decisions(content),
         *_honesty(content),
     ]
     return sorted(issues, key=lambda i: (i.subject, i.code))
@@ -228,12 +232,43 @@ def _estate(content: Content) -> Iterator[LintIssue]:
                 )
 
 
+def _decisions(content: Content) -> Iterator[LintIssue]:
+    """A decision must name a real person, a real control and a scope of the right level, and a
+    demo sign-off must say it is simulated (D11)."""
+    estate = {n.id for n in content.estate}
+    people = {n.id for n in content.estate if isinstance(n, Person)}
+    controls = {c.id: c for c in content.controls if isinstance(c, Control)}
+    for ev in content.decisions:
+        subject = f"{ev.content['decision_id']}"
+        if ev.collector not in people:
+            yield LintIssue("decision_unknown_person", subject, f"{ev.collector!r} is not a person")
+        if ev.subject not in estate:
+            yield LintIssue("decision_unknown_scope", subject, f"{ev.subject!r} does not exist")
+        if "control" in ev.content:
+            control = controls.get(ev.content["control"])
+            if control is None:
+                yield LintIssue("decision_unknown_control", subject, "no such control")
+            elif ids.node_type_of(ev.subject) is not SCOPE_NODE_TYPE[control.scope_level]:
+                yield LintIssue(
+                    "decision_scope_mismatch",
+                    subject,
+                    f"{control.id} is assessed at {control.scope_level} level",
+                )
+        if ev.source is Source.SIMULATED and "simulated sign-off" not in (
+            ev.content["statement"].lower()
+        ):
+            yield LintIssue(
+                "simulated_not_labelled", subject, "statement must say 'simulated sign-off'"
+            )
+
+
 def _strings(content: Content) -> Iterator[tuple[str, str]]:
     """Every piece of free text in the content, with the record it belongs to."""
 
     def walk(subject: str, value: object) -> Iterator[tuple[str, str]]:
         if isinstance(value, str):
-            yield subject, value
+            if not _SHA256.fullmatch(value):
+                yield subject, value
         elif isinstance(value, dict):
             for item in value.values():
                 yield from walk(subject, item)

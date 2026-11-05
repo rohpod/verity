@@ -13,6 +13,7 @@ from pydantic import Field, TypeAdapter, model_validator
 
 from verity_core.model.base import Envelope, UtcDatetime
 from verity_core.model.enums import (
+    AppliesCondition,
     EdgeType,
     Purpose,
     RationaleType,
@@ -100,6 +101,8 @@ class AppliesToEdge(EdgeBase):
     rule_id: NonEmpty
     reason: NonEmpty
     in_force_from: date | None = None
+    # Not part of the edge's identity: a changed condition updates the edge (ADR 0019).
+    condition: AppliesCondition | None = None
 
     @property
     def qualifier(self) -> str:

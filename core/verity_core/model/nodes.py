@@ -63,6 +63,8 @@ class AISystem(NodeBase):
     interacts_with_people: bool | None = None
     generates_synthetic_content: bool | None = None
     first_placed_on_market: date | None = None
+    # The last significant design change, for Art. 111(2) (ADR 0019). Unknown or never: None.
+    significant_change_on: date | None = None
 
     @field_validator("roles")
     @classmethod
