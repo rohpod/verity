@@ -592,7 +592,7 @@ requires-dist = [{ name = "verity-core", editable = "core" }]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "moto", extras = ["dynamodb"], specifier = ">=5" },
+    { name = "moto", extras = ["dynamodb"], specifier = ">=5.2.5" },
     { name = "pytest", specifier = ">=8" },
     { name = "python-hcl2", specifier = ">=8.1.4" },
     { name = "ruff", specifier = ">=0.8" },
