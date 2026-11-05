@@ -2,14 +2,14 @@
 
 **AI governance, risk and compliance: discover the AI you run, map it to obligations, and prove it with evidence.**
 
-Verity is an open-source portfolio project exploring what an *AI-specific* GRC platform built around AI systems. For a single AWS account it:
+Verity is an open-source portfolio project exploring what an *AI-specific* GRC platform could look like. For a single AWS account it:
 
 - **discovers** AI workloads, scores how confident it is that each is AI, and explains why;
 - maintains an **AI system registry** (owners, purpose, models, providers, data, risk tier);
 - maps systems to **ISO/IEC 42001, ISO/IEC 27001, the EU AI Act and the NIST AI RMF** through a typed crosswalk (NIST IR 8477 set-theory relationships), backed by a **knowledge graph**;
 - separates *mapped*, *implemented*, *evidenced*, *tested* and *verified*, so a single configuration check never turns an obligation green.
 
-> **Status:** Stage 3 (architecture). No application code yet. See [`docs/`](docs/).
+> **Status:** Stage 4 (milestone plan approved). No application code yet. See [`docs/`](docs/).
 
 ## Real vs simulated
 
@@ -29,7 +29,14 @@ Verity is built under a strict **zero-cost, AWS-only** constraint, so some thing
 - [Stage 1: Product discovery](docs/stage-1-discovery.md)
 - [Stage 2: Feasibility & zero-cost verification](docs/stage-2-feasibility.md)
 - [Architecture](docs/architecture.md)
+- [Stage 4: Milestone plan](docs/stage-4-milestones.md)
 - [Architecture Decision Records](docs/adr/)
+
+## Contributing
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the branch, commit and pull request standards.
+
+## License
+[MIT](LICENSE) © 2026 Rohan Poddar. The license covers this project's own code and documentation, not the third-party standards and regulations it references.
 
 ## Disclaimer
 Verity is a learning project, not legal advice. Framework mappings are the author's own interpretation. ISO standards are referenced by clause ID with original summaries only; no ISO text is reproduced.
