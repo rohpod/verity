@@ -6,7 +6,7 @@ other edge type has no qualifier. Which node types an edge may connect is checke
 write (`validation.py`), not here, because that needs the nodes.
 """
 
-from datetime import date
+from datetime import date, datetime
 from typing import Annotated, Literal, NamedTuple
 
 from pydantic import Field, TypeAdapter, model_validator
@@ -51,6 +51,19 @@ class EdgeBase(Envelope):
             if end < start:
                 raise ValueError("a closed interval ends before it starts")
         return self
+
+    def is_active(self, as_of: datetime | None = None) -> bool:
+        """Open now (`as_of=None`), or existing at `as_of` in its current or any closed
+        interval. Intervals are half-open: `[from, to)`."""
+        if as_of is None:
+            return self.valid_to is None
+        if as_of.tzinfo is None:
+            raise ValueError("as_of must be timezone-aware")
+        if (self.valid_from is None or self.valid_from <= as_of) and (
+            self.valid_to is None or as_of < self.valid_to
+        ):
+            return True
+        return any(start <= as_of < end for start, end in self.closed_intervals)
 
     @property
     def qualifier(self) -> str | None:
