@@ -8,7 +8,7 @@ fields, so for example a `Person` can never carry an email address (D10).
 from datetime import date
 from typing import Annotated, Literal
 
-from pydantic import Field, TypeAdapter, model_validator
+from pydantic import Field, TypeAdapter, field_validator, model_validator
 
 from verity_core.model.base import NodeBase, UtcDatetime
 from verity_core.model.enums import (
@@ -19,15 +19,18 @@ from verity_core.model.enums import (
     ImplementationStatus,
     ModelOrigin,
     NodeType,
+    Role,
     RunMode,
     ScopeLevel,
     SystemKind,
+    VerifiedAgainst,
 )
 from verity_core.model.evidence import Evidence
 from verity_core.model.ids import check_id
 
 NonEmpty = Annotated[str, Field(min_length=1)]
 EnvVarName = Annotated[str, Field(pattern=r"^[A-Za-z_][A-Za-z0-9_]*$")]
+UseDomain = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]*$")]
 
 
 class Organisation(NodeBase):
@@ -53,6 +56,20 @@ class AISystem(NodeBase):
     name: NonEmpty
     purpose: NonEmpty
     kind: SystemKind
+    # Facts the applicability rules read (ADR 0017). Unknown unless stated, and never a risk
+    # tier: that is an output of M5 and a human decision (ADR 0008).
+    roles: list[Role] = Field(default_factory=list)
+    use_domains: list[UseDomain] = Field(default_factory=list)
+    interacts_with_people: bool | None = None
+    generates_synthetic_content: bool | None = None
+    first_placed_on_market: date | None = None
+
+    @field_validator("roles")
+    @classmethod
+    def _roles_are_specific(cls, roles: list[Role]) -> list[Role]:
+        if Role.ANY in roles:
+            raise ValueError("`any` is for requirements; a system has a specific role")
+        return roles
 
 
 class Candidate(NodeBase):
@@ -148,6 +165,7 @@ class Requirement(NodeBase):
     # which is the record revision counter on every node.
     source_version: NonEmpty
     last_verified: date
+    verified_against: VerifiedAgainst
 
 
 class Framework(NodeBase):

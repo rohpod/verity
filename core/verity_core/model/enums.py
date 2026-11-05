@@ -136,6 +136,14 @@ class EdgeType(StrEnum):
     AFFECTS = "AFFECTS"
 
 
+class VerifiedAgainst(StrEnum):
+    """What a requirement's wording was checked against (ADR 0017). ISO entries are always
+    `public_listing`, so nothing implies a check against the standard itself."""
+
+    PRIMARY_TEXT = "primary_text"
+    PUBLIC_LISTING = "public_listing"
+
+
 class Direction(StrEnum):
     OUT = "out"
     IN = "in"

@@ -16,6 +16,7 @@ from verity_core.model.enums import (
     ScopeLevel,
     Source,
     SystemKind,
+    VerifiedAgainst,
 )
 from verity_core.model.evidence import Evidence
 from verity_core.model.nodes import (
@@ -128,6 +129,7 @@ def one_of_each() -> dict[NodeType, object]:
             source_url="https://example.invalid/test-fixture",
             source_version="test fixture",
             last_verified=date(2026, 11, 5),
+            verified_against=VerifiedAgainst.PUBLIC_LISTING,
             **COMMON,
         ),
         Framework(
