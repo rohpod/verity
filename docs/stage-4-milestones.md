@@ -36,6 +36,7 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/). Decisions by the owner:
 | D18 | M2's results: throttling retries, measured costs and the evidence cap. See [ADR 0014](adr/0014-m2-measurements-and-evidence-cap.md) |
 | D19 | How the account is set up and guarded. See [ADR 0015](adr/0015-account-baseline.md) |
 | D20 | What the real table showed. See [ADR 0016](adr/0016-m3-live-results.md) |
+| D21 | Mapping direction, strength, `sufficiency: full`, obligation dates and ISO provenance. See [ADR 0017](adr/0017-m4-content-semantics.md) |
 
 ## Milestones
 
@@ -48,7 +49,7 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/). Decisions by the owner:
 | **AWS baseline** | | | | |
 | M3 | Account baseline: non-root admin with MFA, region eu-north-1, `infra/` root, $0.01 budget, `verity-graph` | Opus (IAM), Sonnet | **yes, approval first** | 🔄 |
 | **Governance logic (local)** | | | | |
-| M4 | Content: hub controls, ~35 requirements, STRM mappings, Kestrel org, synthetic systems, `verity seed` | Opus | no | ⬜ |
+| M4 | Content: hub controls, ~35 requirements, STRM mappings, Kestrel org, synthetic systems, `verity seed` | Sonnet builds the loader, linter, CLI and org data; Opus writes the regulatory content | no | 🔄 |
 | M5 | Rules and assessment: applicability, status, assurance, satisfaction, `verity assess`, `verity attest` | Opus, then Sonnet | no | ⬜ |
 | M6 | Discovery pipeline (8 stages), `ai_signals.yaml`, `verity crawl --local` | Sonnet | no | ⬜ |
 | M7 | Demo estate code: mocks, `verity_ai` with SigV4 hook, 5 apps, local talent model | Sonnet | no | ⬜ |
@@ -74,6 +75,20 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/). Decisions by the owner:
 - **M10:** typecheck and build pass; `snapshot.json` is the only data source; every view shows provenance and timestamp; works at phone width; Pages URL works.
 - **M11:** every §L and ❓ item is closed or explicitly deferred; the README real-vs-simulated table matches what was built.
 
+## M4 re-verification (2026-11-05)
+
+The M4 criterion says STRM, EU AI Act dates and ISO 27001 Amendment 1 are re-verified first. Results:
+
+| Item | Result | Source | Status |
+|---|---|---|---|
+| STRM types and rationales | The 5 types and 3 rationales match `enums.py`. Type and rationale "must be used together" | NIST IR 8477 final, February 2024, read in full | ✅ Closes the ADR 0004 ❓ |
+| STRM strength | Not defined by NIST. The 1 to 10 scale is Secure Controls Framework practice | NIST IR 8477, full text | ⚠️ Corrected in [ADR 0017](adr/0017-m4-content-semantics.md) |
+| STRM direction | "A subset of B" means B contains everything A does and more. Our documents never fixed which side is A | NIST IR 8477 | ⚠️ Fixed in ADR 0017 |
+| EU AI Act dates | 2 Dec 2027 (Annex III), 2 Aug 2028 (Annex I), 2 Dec 2026 (Art. 50(2), systems already on the market), in force 27 Jul 2026. These match Stage 2 | Secondary commentary only. EUR-Lex returned an empty page to automated fetches | ⛔ Needs a primary read before any date enters `obligation_dates.yaml` |
+| ISO/IEC 27001:2022 Amendment 1:2024 | "Climate action changes", February 2024. Adds to clauses 4.1 and 4.2. No sign of Annex A changes | Public preview of the amendment and a national adoption listing. iso.org returns 403 | ✅ Enough for our use, and recorded as `public_listing` |
+| NIST AI RMF | 1.0 is still current. A revision is in progress with no public draft found | nist.gov | ✅ |
+| ISO/IEC 42001 sub-control IDs | Public listings disagree | Secondary only | ⚠️ An ID needs two agreeing public sources, or it is dropped |
+
 ## Notes for later milestones
 
 Found while building and reviewing M1. Each is open until the named milestone closes it.
@@ -85,6 +100,9 @@ Found while building and reviewing M1. Each is open until the named milestone cl
 | M6 | `load_graph` reads every `U#` usage record in the table and discards it. If usage grows large, load without a scan: list nodes through the type index and read each node's partition |
 | M6 | Estimated in M2: 150 daily crawls of 15 to 30 resources reach 19,000 to 35,000 items and a 2.5 to 4.5 minute scan, mostly from Evidence rather than `OBSERVED` ([ADR 0014](adr/0014-m2-measurements-and-evidence-cap.md)). It stays free, but decide how to limit it, for example writing evidence only on a change |
 | M6 | The 16 KB evidence cap comes from fixtures only. Measure real crawl evidence, including role policies, and decide what happens over the cap: `content_ref` is a git file, which a Lambda cannot write, so today the write fails |
+| M5 | Applicability rules read `content/rules/obligation_dates.yaml` ([ADR 0017](adr/0017-m4-content-semantics.md)). Loading `content/decisions/` stays in M5 |
+| M6 | The crawler must not overwrite the `AISystem` facts seeded in M4 (`roles`, `use_domains` and the others in ADR 0017) |
+| M8 | Re-seeding removes nothing, so a mapping deleted from YAML stays open in the graph. Decide on pruning before the first live re-seed |
 | M5 | Art. 9 shows `unmapped` when only its sub-clause is mapped. Decide whether a parent inherits from its children |
 | M5 | `unmapped` covers both "never mapped" and "reviewed, `no_relationship`". Decide whether *Not addressed* (D2) treats them alike |
 | M5 | `provider_unknown` must be a finding, never *Not applicable* |
