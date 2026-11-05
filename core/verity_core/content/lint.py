@@ -29,6 +29,7 @@ ISO_SUMMARY_LIMIT = 200
 MIN_RATIONALE_LENGTH = 40
 MIN_EQUAL_STRENGTH = 9
 MIN_LISTING_SITES = 2
+MAX_UNREAD_STRENGTH = 5  # a mapping judged from a public title alone (ADR 0018)
 
 _PLACEHOLDERS = ("example.invalid", "test fixture")
 _QUOTES = ('"', "“", "”")
@@ -129,8 +130,18 @@ def _iso_entries(content: Content) -> Iterator[LintIssue]:
 def _mappings(content: Content) -> Iterator[LintIssue]:
     mappings = [e for e in content.edges if isinstance(e, MapsToEdge)]
     full_per_requirement = Counter(m.src for m in mappings if m.sufficiency is Sufficiency.FULL)
+    unread = {
+        r.id for r in content.requirements if r.verified_against is VerifiedAgainst.PUBLIC_LISTING
+    }
     for m in mappings:
         subject = f"{m.src}->{m.dst}"
+        if m.src in unread and not _claims_only_what_a_title_shows(m):
+            yield LintIssue(
+                "unread_mapping_overclaims",
+                subject,
+                "without the text, use intersects_with, partial, strength "
+                f"{MAX_UNREAD_STRENGTH} or less (ADR 0018)",
+            )
         if m.rationale_type is RationaleType.SYNTACTIC:
             yield LintIssue("syntactic_rationale", subject, "the hub has no wording to compare")
         if len(m.rationale.strip()) < MIN_RATIONALE_LENGTH:
@@ -153,6 +164,16 @@ def _mappings(content: Content) -> Iterator[LintIssue]:
                 subject,
                 f"{m.strm} is full only alongside another full mapping",
             )
+
+
+def _claims_only_what_a_title_shows(m: MapsToEdge) -> bool:
+    if m.strm is StrmType.NO_RELATIONSHIP:
+        return False  # "no overlap" is as much a claim about the text as "subset of"
+    return (
+        m.strm is StrmType.INTERSECTS_WITH
+        and m.sufficiency is Sufficiency.PARTIAL
+        and (m.strength or 0) <= MAX_UNREAD_STRENGTH
+    )
 
 
 def _coverage(content: Content, limits: LintLimits) -> Iterator[LintIssue]:

@@ -5,6 +5,7 @@ and every record named before any edge is built. An edge takes the provenance of
 that declares it, so a simulated model's `PROVIDED_BY` edge is simulated too.
 """
 
+from collections.abc import Collection
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -45,7 +46,10 @@ class _Slugs:
         return self.ids[slug]
 
 
-def load_estate(root: Path, tenant: str) -> tuple[list[Node], list[Edge]]:
+def load_estate(
+    root: Path, tenant: str, control_ids: Collection[str] = ()
+) -> tuple[list[Node], list[Edge]]:
+    """`control_ids` are the hub controls that risks and policies may link to."""
     files = [(p, parse(p, OrgFile)) for p in sorted((root / "org").glob("*.yaml"))]
     kinds = {
         name: _Slugs(name, {})
@@ -160,6 +164,12 @@ def load_estate(root: Path, tenant: str) -> tuple[list[Node], list[Edge]]:
     def edge(edge_type: EdgeType, src: str, dst: str, source: Source) -> None:
         edges.append(PlainEdge(src=src, dst=dst, type=edge_type, tenant=tenant, source=source))
 
+    def control(path: Path, code: str, owner: str) -> str:
+        control_id = ids.control_id(code)
+        if control_id not in control_ids:
+            raise ContentError(path, f"{owner} refers to unknown control {code!r}")
+        return control_id
+
     for path, f in files:
         with reading(path):
             for d in f.departments:
@@ -184,6 +194,13 @@ def load_estate(root: Path, tenant: str) -> tuple[list[Node], list[Edge]]:
                 if r.owner is not None:
                     owner = kinds["person"].find(path, r.owner, f"risk {r.slug!r}")
                     edge(EdgeType.OWNS, owner, ids.risk_id(r.slug), source_of(f, r))
+                for code in r.mitigated_by:
+                    target = control(path, code, f"risk {r.slug!r}")
+                    edge(EdgeType.MITIGATED_BY, ids.risk_id(r.slug), target, source_of(f, r))
+            for pol in f.policies:
+                for code in pol.implements:
+                    target = control(path, code, f"policy {pol.slug!r}")
+                    edge(EdgeType.IMPLEMENTS, ids.policy_id(pol.slug), target, source_of(f, pol))
             for s in f.systems:
                 _system_edges(path, s, source_of(f, s), kinds, edge, tenant, edges)
 

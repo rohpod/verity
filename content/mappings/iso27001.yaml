@@ -1,0 +1,94 @@
+# Direction: the requirement is concept A and the control is concept B, so subset_of means the
+# control covers the whole requirement and more (ADR 0017). These are our interpretation, not
+# legal advice, and not an official mapping. See content/README.md for the strength rubric.
+# The ISO text was not read, so every mapping here is intersects_with, partial, strength 5 or
+# less. An ISO requirement can therefore never show as Satisfied (ADR 0018).
+framework: iso27001
+mappings:
+- requirement: '4.1'
+  control: VC-005
+  strm: intersects_with
+  strength: 2
+  rationale_type: semantic
+  rationale: 'From the public title only, the ISO text was not read: both look outward at what affects
+    the organisation. Nothing in the library covers the climate question that Amendment 1 adds.'
+  sufficiency: partial
+- requirement: A.5.19
+  control: VC-051
+  strm: intersects_with
+  strength: 4
+  rationale_type: semantic
+  rationale: 'From the public title only, the ISO text was not read: both concern suppliers, though the
+    ISO control is about information security in general.'
+  sufficiency: partial
+- requirement: A.5.20
+  control: VC-050
+  strm: intersects_with
+  strength: 4
+  rationale_type: semantic
+  rationale: 'From the public title only, the ISO text was not read: a data processing agreement is one
+    kind of supplier agreement term.'
+  sufficiency: partial
+- requirement: A.5.20
+  control: VC-052
+  strm: intersects_with
+  strength: 4
+  rationale_type: semantic
+  rationale: 'From the public title only, the ISO text was not read: both concern what a supplier agreement
+    must cover.'
+  sufficiency: partial
+- requirement: A.5.21
+  control: VC-061
+  strm: intersects_with
+  strength: 3
+  rationale_type: semantic
+  rationale: 'From the public title only, the ISO text was not read: restricting where data may go is
+    one way of managing the ICT supply chain.'
+  sufficiency: partial
+- requirement: A.5.23
+  control: VC-062
+  strm: intersects_with
+  strength: 4
+  rationale_type: semantic
+  rationale: 'From the public title only, the ISO text was not read: both concern security for cloud services.'
+  sufficiency: partial
+- requirement: A.5.34
+  control: VC-053
+  strm: intersects_with
+  strength: 3
+  rationale_type: semantic
+  rationale: 'From the public title only, the ISO text was not read: a transfer check is one part of protecting
+    personal data.'
+  sufficiency: partial
+- requirement: A.5.34
+  control: VC-063
+  strm: intersects_with
+  strength: 5
+  rationale_type: semantic
+  rationale: 'From the public title only, the ISO text was not read: both concern protecting personal
+    data.'
+  sufficiency: partial
+- requirement: A.8.2
+  control: VC-060
+  strm: intersects_with
+  strength: 4
+  rationale_type: semantic
+  rationale: 'From the public title only, the ISO text was not read: both limit powerful access, though
+    the control is only about AI permissions.'
+  sufficiency: partial
+- requirement: A.8.15
+  control: VC-030
+  strm: intersects_with
+  strength: 4
+  rationale_type: semantic
+  rationale: 'From the public title only, the ISO text was not read: both concern logging, and the control
+    is only about AI systems.'
+  sufficiency: partial
+- requirement: A.8.16
+  control: VC-031
+  strm: intersects_with
+  strength: 4
+  rationale_type: semantic
+  rationale: 'From the public title only, the ISO text was not read: both concern monitoring, and the
+    control is only about AI systems.'
+  sufficiency: partial

@@ -28,14 +28,17 @@ risks:
     title: Chatbot gives wrong answers
     description: The assistant states something false about the product or a customer's account, and the customer acts on it.
     owner: m-okafor
+    mitigated_by: [VC-022, VC-031]
   - slug: screening-bias
     title: Ranking is biased
     description: The ranking scores applicants differently by a protected characteristic, directly or through a proxy.
     owner: a-singh
+    mitigated_by: [VC-014, VC-032]
   - slug: vendor-data-transfer
     title: Contract data leaves the EU
     description: Contract text, which includes personal data, reaches an AI supplier without a data processing agreement or transfer check.
     owner: l-ivanova
+    mitigated_by: [VC-050, VC-053]
 
 systems:
   - slug: support-assistant

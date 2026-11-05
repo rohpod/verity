@@ -63,7 +63,8 @@ CASES = {
     "rationale_too_short": lambda f: mapping(f, "euaia", "art4").update(rationale="Similar."),
     "equal_strength_low": lambda f: mapping(f, "euaia", "art4").update(strm="equal", strength=8),
     "sufficiency_must_be_full": lambda f: mapping(f, "euaia", "art4").update(sufficiency="partial"),
-    "full_needs_cover": lambda f: mapping(f, "iso42001", "A.8.2").update(sufficiency="full"),
+    "full_needs_cover": lambda f: mapping(f, "euaia", "art4").update(strm="intersects_with"),
+    "unread_mapping_overclaims": lambda f: mapping(f, "iso42001", "A.8.2").update(strength=6),
     "unmapped_requirement": lambda f: _drop_mapping(f, "euaia", "art50-1"),
     "unmapped_control": lambda f: f["controls.yaml"]["controls"].append(
         {
@@ -119,17 +120,37 @@ def test_a_control_mapped_only_negatively_is_unmapped(tmp_path):
 
 def test_a_partial_overlap_is_full_with_a_second_full_mapping(tmp_path):
     def mutate(files):
-        mapping(files, "iso42001", "A.8.2").update(sufficiency="full")
-        files["mappings/iso42001.yaml"]["mappings"].append(
+        mapping(files, "euaia", "art4").update(strm="intersects_with")
+        files["mappings/euaia.yaml"]["mappings"].append(
             {
-                **mapping(files, "iso42001", "A.8.2"),
-                "control": "VC-001",
+                **mapping(files, "euaia", "art4"),
+                "control": "VC-014",
                 "strm": "subset_of",
                 "strength": 6,
             }
         )
 
     assert "full_needs_cover" not in codes(issues_for(tmp_path, broken(mutate)))
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"strm": "subset_of", "strength": 5, "sufficiency": "full"},
+        {"strm": "superset_of", "strength": 5, "sufficiency": "partial"},
+        {"strm": "equal", "strength": 9, "sufficiency": "full"},
+        {"strm": "intersects_with", "strength": 5, "sufficiency": "full"},
+        {"strm": "no_relationship", "strength": None, "sufficiency": None},
+    ],
+)
+def test_a_requirement_nobody_read_cannot_claim_more_than_an_overlap(tmp_path, change):
+    files = broken(lambda f: mapping(f, "iso42001", "A.8.2").update(change))
+    assert "unread_mapping_overclaims" in codes(issues_for(tmp_path, files))
+
+
+def test_the_same_claim_is_fine_on_a_requirement_that_was_read(tmp_path):
+    files = broken(lambda f: mapping(f, "euaia", "art4").update(strength=9, strm="equal"))
+    assert "unread_mapping_overclaims" not in codes(issues_for(tmp_path, files))
 
 
 def test_the_default_limits_expect_25_to_35_controls(tmp_path):

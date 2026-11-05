@@ -321,6 +321,7 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
 | [0015](adr/0015-account-baseline.md) | Account baseline: identity outside OpenTofu, deny policy, `credential_process`, budget excludes credits |
 | [0016](adr/0016-m3-live-results.md) | M3 live results: capacity, GSI delay, how throttling is reported |
 | [0017](adr/0017-m4-content-semantics.md) | M4 content semantics: mapping direction, strength convention, `full` sufficiency, obligation dates, ISO provenance |
+| [0018](adr/0018-unread-standards.md) | Mappings from a standard nobody read claim only an overlap, so ISO requirements never show as Satisfied |
 
 ## L. Schema validation walkthrough
 

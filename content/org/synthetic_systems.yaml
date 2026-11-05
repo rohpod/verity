@@ -44,34 +44,42 @@ risks:
     title: Retired bot gives outdated answers
     description: The old FAQ bot keeps answering from documentation nobody maintains.
     owner: b-adeyemi
+    mitigated_by: [VC-031]
   - slug: customer-data-in-prompts
     title: Customer data in prompts
     description: Staff or tools send customer personal data to an AI supplier that has no agreement to receive it.
     owner: s-brennan
+    mitigated_by: [VC-050, VC-063]
   - slug: cv-parsing-errors
     title: CV parsing drops or misreads candidate details
     description: Extraction errors disadvantage candidates before any person looks at them.
     owner: p-ferreira
+    mitigated_by: [VC-022, VC-032]
   - slug: id-check-false-rejects
     title: Identity check rejects genuine customers
     description: Genuine customers are refused, unevenly across groups, with no quick route to a person.
     owner: j-oyelaran
+    mitigated_by: [VC-014, VC-033]
   - slug: recording-consent
     title: Recorded calls lack a consent basis
     description: Calls are transcribed or reused without a clear basis for the recording.
     owner: s-brennan
+    mitigated_by: [VC-063]
   - slug: forecast-overreliance
     title: Forecast taken as fact
     description: A forecast drives hiring or spending decisions without a human check on its assumptions.
     owner: d-kowalski
+    mitigated_by: [VC-032]
   - slug: ocr-misclassification
     title: Invoices booked to the wrong account
     description: A misread invoice is booked and paid before anyone notices.
     owner: d-kowalski
+    mitigated_by: [VC-022]
   - slug: churn-model-drift
     title: Churn model drifts
     description: The model's accuracy falls as products and customers change, and nobody notices.
     owner: k-nilsson
+    mitigated_by: [VC-031]
 
 systems:
   # --- on the simulated Bedrock -----------------------------------------------------------

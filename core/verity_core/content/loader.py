@@ -174,7 +174,7 @@ def load_content(root: Path | str, *, tenant: str = DEFAULT_TENANT) -> Content:
         if duplicate is not None:
             raise ContentError(dates_path, f"date {duplicate!r} is defined twice")
 
-    estate, estate_edges = load_estate(root, tenant)
+    estate, estate_edges = load_estate(root, tenant, control_ids)
 
     return Content(
         tenant=tenant,
