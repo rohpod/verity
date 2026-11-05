@@ -39,7 +39,20 @@ Write the summary in the imperative mood, in lower case, under about 72 characte
 - The milestone's validation criteria in [`docs/stage-4-milestones.md`](docs/stage-4-milestones.md) pass, if the PR completes one.
 - Docs are updated. A significant decision gets a new ADR in [`docs/adr/`](docs/adr/).
 
-The exact commands are added to this file in milestone M0.
+### Local checks
+
+Run these from the repository root. CI runs the same commands, so a green local run should mean a green PR. You need [`uv`](https://docs.astral.sh/uv/), which installs Python 3.12 for you.
+
+```
+uv sync                        # create .venv and install locked dependencies
+uv run ruff check .            # lint
+uv run ruff format --check .   # formatting (run `uv run ruff format .` to fix)
+uv run pytest                  # tests
+```
+
+### Claude Code guardrail
+
+`.claude/settings.json` registers a hook (`.claude/hooks/confirm-mutating-aws.py`) that makes Claude Code ask for confirmation before `tofu`/`terraform` `apply`, `destroy`, `import` or state edits, and before any `aws` command that is not a known read-only call. It is tested in `tests/test_aws_hook.py`. It guards the AI tool only; it is not an AWS permission.
 
 ## Project rules
 
