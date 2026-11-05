@@ -1,4 +1,5 @@
 import copy
+import dataclasses
 import hashlib
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -547,3 +548,28 @@ def test_evidence_that_is_not_a_decision_is_ignored_by_the_guard(tmp_path, repo,
         )
     )
     seed(repo, load_content(root), clock)
+
+
+# --- lint: unfinished statements and hash-like IDs (ADR 0020) ---------------------------------
+
+
+def test_a_statement_with_a_todo_fails_lint(tmp_path):
+    content = load(tmp_path, decision(statement=STATEMENT + " TODO: finish this."))
+    assert "decision_todo" in codes(content)
+
+
+def test_the_word_todo_inside_another_word_is_fine(tmp_path):
+    content = load(tmp_path, decision(statement=STATEMENT + " The mastodon policy applies."))
+    assert "decision_todo" not in codes(content)
+
+
+def test_an_evidence_id_with_twelve_digits_in_a_row_is_not_an_account_id(tmp_path):
+    content = load(tmp_path, decision())
+    (ev,) = content.decisions
+    lookalike = ev.model_copy(update={"id": "ev:123456789012" + "ab" * 10})
+    assert "account_id_like" not in codes(dataclasses.replace(content, decisions=(lookalike,)))
+
+
+def test_a_twelve_digit_number_in_a_statement_still_fails(tmp_path):
+    content = load(tmp_path, decision(statement=STATEMENT + " Account 123456789012."))
+    assert "account_id_like" in codes(content)

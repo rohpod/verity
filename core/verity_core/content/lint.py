@@ -39,7 +39,9 @@ _QUOTES = ('"', "“", "”")
 _SHALL = re.compile(r"\bshall\b", re.IGNORECASE)
 _YEAR = re.compile(r"\b(?:19|20)\d\d\b")
 _ACCOUNT_ID = re.compile(r"(?<!\d)\d{12}(?!\d)")
-_SHA256 = re.compile(r"^[0-9a-f]{64}$")  # a digest is not text, and can hold 12 digits by chance
+# A digest or an Evidence ID is not text, and can hold 12 digits in a row by chance.
+_HASH_LIKE = re.compile(r"^(?:[0-9a-f]{64}|ev:[0-9a-f]{32})$")
+_TODO = re.compile(r"\bTODO\b")
 # Real AI vendors and products. Only a simulated provider or model may carry such a name, and
 # then only with its provenance saying so (CLAUDE.md, honesty rules). A small list, not a
 # complete one: it catches the likely slips, and the owner reads the estate files.
@@ -259,6 +261,8 @@ def _decisions(content: Content) -> Iterator[LintIssue]:
                     f"{control.id} is assessed at {control.scope_level} level",
                 )
         yield from _supersession(ev, by_id)
+        if _TODO.search(ev.content["statement"]):
+            yield LintIssue("decision_todo", subject, "the statement still has a TODO to finish")
         if ev.source is Source.SIMULATED and "simulated sign-off" not in (
             ev.content["statement"].lower()
         ):
@@ -331,7 +335,7 @@ def _strings(content: Content) -> Iterator[tuple[str, str]]:
 
     def walk(subject: str, value: object) -> Iterator[tuple[str, str]]:
         if isinstance(value, str):
-            if not _SHA256.fullmatch(value):
+            if not _HASH_LIKE.fullmatch(value):
                 yield subject, value
         elif isinstance(value, dict):
             for item in value.values():

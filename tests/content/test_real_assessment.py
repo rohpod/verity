@@ -154,3 +154,9 @@ def test_assessing_twice_writes_nothing_the_second_time(content):
     second = apply_assessment(repo, content.rules, content.dates, AS_OF, lambda: clock[0])
     assert second.total_written == 0
     assert second.unchanged_assessments == len(second.results)
+
+
+def test_every_satisfied_requirement_in_the_demo_rests_on_a_simulated_sign_off(run):
+    satisfied = [s for s in run[1].statuses if s.state is RequirementState.SATISFIED]
+    assert satisfied
+    assert all(s.simulated for s in satisfied)

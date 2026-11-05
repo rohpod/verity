@@ -36,6 +36,10 @@ from verity_core.rules.applicability import applicable_edges
 from verity_core.rules.finding import Finding
 
 
+class UnknownSystemError(ValueError):
+    """`system_id` is not an AISystem in the graph."""
+
+
 @dataclass(frozen=True)
 class ApplyResult:
     written: Counter[str]  # records written, by kind
@@ -73,7 +77,7 @@ def apply_assessment(
     graph = repo.load_graph()
     systems = _ids_of(graph, NodeType.AI_SYSTEM)
     if system_id is not None and system_id not in systems:
-        raise ValueError(f"{system_id!r} is not a system in the graph")
+        raise UnknownSystemError(f"{system_id!r} is not a system in the graph")
     organisation = next(iter(_ids_of(graph, NodeType.ORGANISATION)), None)
     in_scope = {system_id, organisation} if system_id else {*systems, organisation}
     in_scope.discard(None)

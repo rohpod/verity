@@ -19,7 +19,7 @@ from verity_core.assess.controls import ControlAssessor, ControlResult
 from verity_core.graph.loader import in_edges, node_record, out_edges
 from verity_core.graph.traversals import Resolution, _organisation, obligations_for
 from verity_core.model.edges import AppliesToEdge
-from verity_core.model.enums import AssuranceLevel, EdgeType, StrmType, Sufficiency
+from verity_core.model.enums import AssuranceLevel, EdgeType, Source, StrmType, Sufficiency
 from verity_core.model.nodes import Control
 from verity_core.rules.status import ApplicabilityStatus, applicability_status
 
@@ -65,6 +65,9 @@ class RequirementStatus:
     reason: str | None
     targets: tuple[Target, ...]
     applicability: ApplicabilityStatus | None  # the strongest of its APPLIES_TO edges
+    # Whether a met control (or, for a parent, a child) rests on a simulated sign-off. A demo
+    # result must never look like a real one (CLAUDE.md, honesty rules).
+    simulated: bool = False
 
 
 def requirement_statuses(
@@ -99,9 +102,9 @@ def _evaluate(
 ) -> RequirementStatus:
     applicability = _applicability(graph, requirement_id, system_id, organisation_id, assessor)
 
-    def status(state, reason=None, targets=()) -> RequirementStatus:
+    def status(state, reason=None, targets=(), simulated=False) -> RequirementStatus:
         return RequirementStatus(
-            requirement_id, system_id, state, reason, tuple(targets), applicability
+            requirement_id, system_id, state, reason, tuple(targets), applicability, simulated
         )
 
     if all(r.resolution is Resolution.NOT_APPLICABLE for r in rows):  # 1
@@ -116,8 +119,13 @@ def _evaluate(
     if children and not mappings:  # 2: a parent is never Satisfied from its children
         done = [evaluate_child(c) for c in sorted(children)]
         addressed = {RequirementState.SATISFIED, RequirementState.PARTIALLY_ADDRESSED}
-        if any(c is not None and c.state in addressed for c in done):
-            return status(RequirementState.PARTIALLY_ADDRESSED, ROLLUP)
+        counted = [c for c in done if c is not None and c.state in addressed]
+        if counted:
+            return status(
+                RequirementState.PARTIALLY_ADDRESSED,
+                ROLLUP,
+                simulated=any(c.simulated for c in counted),
+            )
         return status(RequirementState.NOT_MET, ROLLUP)
 
     if all(r.control_id is None for r in rows):  # 3
@@ -161,14 +169,23 @@ def _evaluate(
         control = node_record(graph, control_id)
         return not isinstance(control, Control) or control.automatable
 
+    def simulated() -> bool:
+        return any(
+            r is not None and r.met and r.source is Source.SIMULATED
+            for c in targets
+            for r in results(c)
+        )
+
     full = [c for c in targets if mapping_of[c].sufficiency is Sufficiency.FULL]
     if full and all(met(c) for c in full):
         # Automated checks alone never satisfy a requirement (ADR 0019, decision 1).
         if any(not automatable(c) or verified(c) for c in full):  # 4
-            return status(RequirementState.SATISFIED, None, all_targets)
-        return status(RequirementState.PARTIALLY_ADDRESSED, AUTOMATED_ONLY, all_targets)  # 5
+            return status(RequirementState.SATISFIED, None, all_targets, simulated())
+        return status(
+            RequirementState.PARTIALLY_ADDRESSED, AUTOMATED_ONLY, all_targets, simulated()
+        )  # 5
     if any(met(c) for c in targets):  # 6
-        return status(RequirementState.PARTIALLY_ADDRESSED, PARTIAL_ONLY, all_targets)
+        return status(RequirementState.PARTIALLY_ADDRESSED, PARTIAL_ONLY, all_targets, simulated())
     return status(RequirementState.NOT_MET, None, all_targets)  # 7
 
 

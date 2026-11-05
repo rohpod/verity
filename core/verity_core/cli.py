@@ -11,7 +11,12 @@ from pathlib import Path
 import yaml
 from pydantic import ValidationError
 
-from verity_core.assess.apply import ApplyResult, apply_assessment, estimate_apply
+from verity_core.assess.apply import (
+    ApplyResult,
+    UnknownSystemError,
+    apply_assessment,
+    estimate_apply,
+)
 from verity_core.assess.requirements import RequirementState
 from verity_core.content.lint import lint
 from verity_core.content.loader import Content, ContentError, load_content
@@ -25,6 +30,7 @@ from verity_core.content.seed import (
 )
 from verity_core.graph.memory import InMemoryRepository
 from verity_core.model.enums import ImplementationStatus
+from verity_core.rules.status import ApplicabilityStatus
 
 OK, LINT_FAILED, UNREADABLE, REFUSED = 0, 1, 2, 3
 PROGRESS_EVERY = 25
@@ -121,10 +127,23 @@ def _print_assessment(
     result: ApplyResult, as_of: datetime, *, verb: str, verbose: bool = False
 ) -> None:
     states = Counter(s.state for s in result.statuses)
+    simulated = Counter(s.state for s in result.statuses if s.simulated)
     print(f"as of {as_of.date()}: {len(result.results)} control assessments")
     print(
         "requirements: "
-        + ", ".join(f"{states[state]} {state.value}" for state in RequirementState if states[state])
+        + ", ".join(
+            f"{states[state]} {state.value}"
+            + (f" ({simulated[state]} on simulated sign-offs)" if simulated[state] else "")
+            for state in RequirementState
+            if states[state]
+        )
+    )
+    applicability = Counter(s.applicability for s in result.statuses if s.applicability)
+    print(
+        "applicability: "
+        + ", ".join(
+            f"{applicability[a]} {a.value}" for a in ApplicabilityStatus if applicability[a]
+        )
     )
     if verbose:
         for finding in result.findings:
@@ -154,9 +173,13 @@ def cmd_assess(args: argparse.Namespace) -> int:
         # Seeds a fresh in-memory graph, then assesses it. Nothing reaches AWS.
         repo = InMemoryRepository(args.tenant, _utc_now)
         seed(repo, loaded, _utc_now)
-        result = apply_assessment(
-            repo, loaded.rules, loaded.dates, as_of, _utc_now, system_id=args.system
-        )
+        try:
+            result = apply_assessment(
+                repo, loaded.rules, loaded.dates, as_of, _utc_now, system_id=args.system
+            )
+        except UnknownSystemError as exc:
+            print(f"refused: {exc}", file=sys.stderr)
+            return REFUSED
         _print_assessment(result, as_of, verb="stored in memory", verbose=args.verbose)
         print(
             "dry run only: nothing was written to AWS. Use --target dynamodb to assess the table."
@@ -178,9 +201,13 @@ def cmd_assess(args: argparse.Namespace) -> int:
     if not graph.nodes:
         print("the table is empty: run `verity seed --target dynamodb` first", file=sys.stderr)
         return REFUSED
-    plan = estimate_apply(
-        graph, loaded.rules, loaded.dates, as_of, _utc_now, args.tenant, system_id=args.system
-    )
+    try:
+        plan = estimate_apply(
+            graph, loaded.rules, loaded.dates, as_of, _utc_now, args.tenant, system_id=args.system
+        )
+    except UnknownSystemError as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return REFUSED
     new_nodes = plan.written["assessments"]
     records = plan.total_written
     units = TABLE_UNITS_PER_RECORD * records + INDEX_UNITS_PER_NODE * new_nodes
@@ -209,8 +236,11 @@ def cmd_attest(args: argparse.Namespace) -> int:
         "decided_on": today,
         "by": args.by,
         "valid_until": today + timedelta(days=365),
-        "simulated": False,
-        "statement": f"TODO: say what {args.by} attests about {args.control} for {args.scope}.",
+        "simulated": True,  # a scaffold is a demo sign-off until the owner says otherwise
+        "statement": (
+            "Simulated sign-off by a fictional person. "
+            f"TODO: say what {args.by} attests about {args.control} for {args.scope}."
+        ),
         "control": args.control,
         "scope": args.scope,
         "status": args.status,
@@ -227,7 +257,9 @@ def cmd_attest(args: argparse.Namespace) -> int:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
     print(f"wrote {path}")
-    print("Edit the statement, run `verity lint`, and open a pull request: the PR is the approval.")
+    print(
+        "Finish the statement, run `verity lint`, and open a pull request: the PR is the approval."
+    )
     return OK
 
 
