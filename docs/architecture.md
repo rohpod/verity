@@ -1,6 +1,6 @@
 # Verity — Architecture
 
-_Stage 3 deliverable · 2026-11-05 · Status: accepted, amended in Stage 4 (see [milestone plan](stage-4-milestones.md), [ADR 0009](adr/0009-mock-openai-iam-auth.md), [ADR 0010](adr/0010-assessment-and-crosswalk-semantics.md), [ADR 0012](adr/0012-graph-schema-refinements.md))._
+_Stage 3 deliverable · 2026-11-05 · Status: accepted, amended in Stage 4 (see [milestone plan](stage-4-milestones.md), [ADR 0009](adr/0009-mock-openai-iam-auth.md), [ADR 0010](adr/0010-assessment-and-crosswalk-semantics.md), [ADR 0012](adr/0012-graph-schema-refinements.md), [ADR 0013](adr/0013-dynamodb-write-model.md))._
 Inputs: [Stage 1 discovery](stage-1-discovery.md) · [Stage 2 feasibility](stage-2-feasibility.md) · decisions in [`adr/`](adr/).
 
 **Locked constraints:** AWS Free plan · single region `eu-north-1` · Terraform/OpenTofu · Python 3.12 backend · React + TS frontend · DynamoDB + NetworkX graph · no S3 · Bedrock/OpenAI mock-only · public demo = static snapshot on GitHub Pages · target customer = mid-size EU SaaS company acting as both AI provider and deployer.
@@ -208,7 +208,7 @@ Every node and edge carries `tenant`, `source` (discovered · declared · seeded
 - `subject`: the node it is about, matched by an `ABOUT` edge
 - `collector`: `crawler@<ver>`, `cli@<ver>` or `person:<id>`
 - `collected_at` and `valid_until`
-- `content`: inline JSON up to 50 KB, *or* `content_ref` pointing to a git-versioned file under `evidence/`
+- `content`: inline JSON up to a cap set from M2 measurements (D14; 50 KB until then), *or* `content_ref` pointing to a git-versioned file under `evidence/`
 - `sha256`
 
 Re-collecting evidence creates a new node and never overwrites the old one.
@@ -250,7 +250,9 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
 | Usage record | `T#{tenant}#N#{system}` | `U#{iso_ts}#{usage_id}` |
 
 - The qualifier is `role` on `APPLIES_TO` and `purpose` on `PROCESSES`; other edge types have none ([ADR 0012](adr/0012-graph-schema-refinements.md)).
-- **GSI1** (`GSI1PK=T#{tenant}#TYPE#{type}`, `GSI1SK=id`) lists nodes by type.
+- Every item holds the whole record as a JSON string in `doc`. Evidence has no `H#` items, because it never changes ([ADR 0013](adr/0013-dynamodb-write-model.md)).
+- `E#` and `R#` are written together in one transaction, as are `META` and `H#`.
+- **GSI1** (`GSI1PK=T#{tenant}#TYPE#{type}`, `GSI1SK=id`) lists nodes by type. It holds keys only and is eventually consistent.
 - Reverse lookups use the mirrored `R#` items instead of a second GSI, which keeps the design inside the 25-unit capacity budget.
 - **Repository pattern:** the `GraphRepository` protocol exposes `get_node`, `upsert_node`, `upsert_edge`, `neighbors(direction, type)`, `nodes_by_type`, `history`, `append_usage`, `usage_records`, `close_edge` and `load_graph(as_of) → networkx.MultiDiGraph`. Each repository is bound to one tenant. `as_of` uses the node versions held at that time.
   - Implementations are `InMemoryRepository` (tests and local development) and `DynamoDBRepository`.
@@ -312,6 +314,7 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
 | [0010](adr/0010-assessment-and-crosswalk-semantics.md) | Assessment and crosswalk semantics |
 | [0011](adr/0011-region-eu-north-1.md) | Single region is eu-north-1 |
 | [0012](adr/0012-graph-schema-refinements.md) | Graph schema refinements: edge qualifier, closed intervals, tenant is the organisation, staleness cutoff |
+| [0013](adr/0013-dynamodb-write-model.md) | DynamoDB write model: transactions, JSON records, version checks |
 
 ## L. Schema validation walkthrough
 

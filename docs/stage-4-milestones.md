@@ -32,6 +32,7 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/). Decisions by the owner:
 | D14 | GSI projects keys only; `H#` written only on real change; writes retry with backoff; inline evidence cap set from M2 measurements |
 | D15 | All 18 node types are kept, because the §L traversals need them |
 | D16 | Schema refinements found while planning M1. See [ADR 0012](adr/0012-graph-schema-refinements.md) |
+| D17 | How `DynamoDBRepository` writes and reads. See [ADR 0013](adr/0013-dynamodb-write-model.md) |
 
 ## Milestones
 
@@ -40,7 +41,7 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/). Decisions by the owner:
 | **Core engine (local)** | | | | |
 | M0 | Foundations: uv workspace, ruff, pytest, CI without AWS credentials, Dependabot, mutating-command hook | Sonnet | no | ✅ |
 | M1 | Graph core: models, IDs, `GraphRepository`, `InMemoryRepository`, NetworkX loader, traversals | Opus, then Sonnet | no | ✅ |
-| M2 | `DynamoDBRepository` (moto), shared contract suite | Sonnet | no | ⬜ |
+| M2 | `DynamoDBRepository` (moto), shared contract suite | Sonnet | no | 🔄 |
 | **AWS baseline** | | | | |
 | M3 | Account baseline: non-root admin with MFA, region eu-north-1, `infra/` root, $0.01 budget, `verity-graph` | Opus (IAM), Sonnet | **yes, approval first** | ⬜ |
 | **Governance logic (local)** | | | | |
@@ -76,8 +77,8 @@ Found while building and reviewing M1. Each is open until the named milestone cl
 
 | Milestone | Note |
 |---|---|
-| M2 | Store Evidence `content` as a JSON string. boto3 returns numbers as `Decimal`, which `canonical_json` refuses, and a changed number would break `sha256` |
-| M2 | `close_edge`, reopening and the node-end cascade must update `E#` and `R#` together. `load_graph(as_of)` must read `H#` items through `version_at` |
+| M2 | Measure what `load_graph` costs, since its Scan also reads `H#` and `U#` items |
+| M3 | The real round trip must check what moto cannot: GSI delay, and transaction capacity |
 | M2, M6 | Daily `OBSERVED` edges could reach thousands of items by April 2027 and strain §H's size assumption. Measure it |
 | M5 | Art. 9 shows `unmapped` when only its sub-clause is mapped. Decide whether a parent inherits from its children |
 | M5 | `unmapped` covers both "never mapped" and "reviewed, `no_relationship`". Decide whether *Not addressed* (D2) treats them alike |
