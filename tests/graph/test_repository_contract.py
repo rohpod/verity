@@ -250,6 +250,17 @@ def test_neighbors_by_direction_and_type(repo):
     assert repo.neighbors("sys:nope", Direction.OUT) == []
 
 
+def test_incoming_edges_are_ordered_by_type_then_source(repo):
+    # Both repositories return the order of the reverse sort keys: type first, then the source.
+    # Sorting by source first would put the person's OWNS before the system's HAS_RISK.
+    repo.upsert_node(PERSON)
+    repo.upsert_node(SYSTEM)
+    repo.upsert_node(RISK)
+    owns_risk = repo.upsert_edge(make_edge(EdgeType.OWNS, PERSON.id, RISK.id))
+    has_risk = repo.upsert_edge(make_edge(EdgeType.HAS_RISK, SYSTEM.id, RISK.id))
+    assert repo.neighbors(RISK.id, Direction.IN) == [has_risk, owns_risk]
+
+
 def test_neighbors_respect_validity_at_as_of(repo):
     repo.upsert_node(PERSON)
     repo.upsert_node(SYSTEM)

@@ -187,3 +187,16 @@ def test_only_models_and_resources_look_at_a_nodes_edges():
         if node_type in (NodeType.MODEL, NodeType.AWS_RESOURCE):
             continue
         validate_node_change(node, open_edges=every_edge)
+
+
+def test_only_edge_types_with_a_limit_look_at_the_sources_other_edges():
+    # DynamoDBRepository reads a source's other edges only for these types. If another rule
+    # started to depend on them, that repository would miss it, and this fails first.
+    for edge_type, rule in EDGE_RULES.items():
+        if rule.max_out is not None:
+            continue
+        src_type, dst_type = sorted(rule.pairs, key=str)[0]
+        src, dst = endpoints(src_type, dst_type)
+        edge = make_edge(edge_type, src.id, dst.id)
+        crowd = [make_edge(edge_type, src.id, f"{dst.id}-{n}") for n in range(3)]
+        validate_edge(edge, src, dst, open_out_edges=crowd)

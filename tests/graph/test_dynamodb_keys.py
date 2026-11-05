@@ -5,7 +5,7 @@ import pytest
 from factories import make_edge
 from verity_core.graph.dynamodb import keys
 from verity_core.model.edges import EdgeKey
-from verity_core.model.enums import EdgeType, NodeType, Purpose, Role
+from verity_core.model.enums import Direction, EdgeType, NodeType, Purpose, Role
 
 T0 = datetime(2026, 11, 5, 9, 0, tzinfo=UTC)
 OWNS = EdgeKey("person:a", EdgeType.OWNS, "sys:b", None)
@@ -127,3 +127,27 @@ def test_estate_keys_split_unambiguously_on_the_delimiter(estate):
 def test_plain_edges_have_no_trailing_separator():
     edge = make_edge(EdgeType.OWNS, "person:a", "sys:b")
     assert not keys.edge_sk(edge.key).endswith("#")
+
+
+def test_neighbour_order_is_exactly_the_sort_key_order():
+    from verity_core.graph.planning import neighbor_sort_key
+
+    # Ids and qualifiers where one is a prefix of another, and with every separator character
+    # an id may contain. If the tuple order and the key order disagreed, the two repositories
+    # would return edges in different orders.
+    nodes = ["a:b", "a:b-c", "a:b.c", "a:b_c", "a:b1", "a:bb", "a:b:c", "c:a"]
+    all_keys = [
+        EdgeKey(src, type_, dst, qualifier)
+        for type_ in (EdgeType.OWNS, EdgeType.APPLIES_TO, EdgeType.ASSESSED, EdgeType.ASSESSES)
+        for src in nodes[:4]
+        for dst in nodes
+        for qualifier in (None, "deployer", "provider")
+        if src != dst
+    ]
+    out = sorted(all_keys, key=keys.edge_sk)
+    assert out == sorted(all_keys, key=lambda k: neighbor_sort_key(k, Direction.OUT))
+    incoming = sorted(all_keys, key=keys.reverse_sk)
+    assert [(k.type, k.src, k.qualifier or "") for k in incoming] == [
+        (k.type, k.src, k.qualifier or "")
+        for k in sorted(all_keys, key=lambda k: neighbor_sort_key(k, Direction.IN))
+    ]

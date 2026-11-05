@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 
 import boto3
 import pytest
@@ -80,3 +81,12 @@ def estate(repo):
 @pytest.fixture
 def estate_graph(estate):
     return estate.load_graph()
+
+
+@pytest.fixture
+def table():
+    """A fresh moto table with its own clock, for tests that look inside DynamoDB."""
+    with mock_aws():
+        client = boto3.client("dynamodb", region_name="eu-north-1")
+        client.create_table(**table_definition())
+        yield SimpleNamespace(client=client, clock=FakeClock())

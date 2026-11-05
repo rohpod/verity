@@ -14,7 +14,8 @@ from typing import Any
 from pydantic import BaseModel
 
 from verity_core.graph.errors import ImmutableNodeError, TenantMismatchError
-from verity_core.model.edges import Edge
+from verity_core.model.edges import Edge, EdgeKey
+from verity_core.model.enums import Direction
 from verity_core.model.evidence import Evidence
 from verity_core.model.hashing import content_hash
 from verity_core.model.nodes import Node
@@ -162,6 +163,15 @@ def edges_to_close(node: Node, open_edges: Iterable[Edge]) -> list[tuple[Edge, d
     """An ended node takes its open edges with it. Each closes when the node ended, or when
     the edge began if that is later, so no edge ends before it starts."""
     return [(edge, max(node.valid_to, edge.valid_from)) for edge in open_edges]
+
+
+def neighbor_sort_key(key: EdgeKey, direction: Direction) -> tuple[str, str, str]:
+    """The order `neighbors` returns edges in, for both repositories: by type, then the node at
+    the other end, then the qualifier. It is the order of the sort keys within a node's
+    partition (`E#type#dst#q` going out, `R#type#src#q` coming in), so DynamoDB returns it
+    without sorting."""
+    other = key.dst if direction is Direction.OUT else key.src
+    return (key.type.value, other, key.qualifier or "")
 
 
 # --- usage ---------------------------------------------------------------------------------
