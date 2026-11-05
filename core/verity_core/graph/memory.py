@@ -5,9 +5,11 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 
+import networkx as nx
 from pydantic import BaseModel
 
 from verity_core.graph.errors import EdgeNotFoundError, ImmutableNodeError, TenantMismatchError
+from verity_core.graph.loader import build_graph
 from verity_core.model.edges import Edge, EdgeKey
 from verity_core.model.enums import Direction, EdgeType, NodeType
 from verity_core.model.evidence import Evidence
@@ -188,6 +190,9 @@ class InMemoryRepository:
 
     def _open_edges_touching(self, node_id: str) -> list[Edge]:
         return self.neighbors(node_id, Direction.OUT) + self.neighbors(node_id, Direction.IN)
+
+    def load_graph(self, *, as_of: datetime | None = None) -> nx.MultiDiGraph:
+        return build_graph(self._nodes.values(), self._edges.values(), as_of=as_of)
 
     # --- usage ---------------------------------------------------------------------------
 
