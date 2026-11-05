@@ -7,17 +7,14 @@ written anywhere: `seed.py` does that, through `GraphRepository`.
 Layout under the root; every file is optional:
 
     frameworks/*.yaml  controls.yaml  mappings/*.yaml  rules/obligation_dates.yaml
+    org/*.yaml
 """
 
-from collections.abc import Iterator
-from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-import yaml
-from pydantic import BaseModel, ValidationError
-
+from verity_core.content.org import load_estate
 from verity_core.content.schema import (
     ControlsFile,
     FrameworkFile,
@@ -25,20 +22,13 @@ from verity_core.content.schema import (
     ObligationDate,
     ObligationDatesFile,
 )
+from verity_core.content.yamlio import ContentError, parse, reading
 from verity_core.model import ids
 from verity_core.model.edges import Edge, MapsToEdge, PlainEdge
 from verity_core.model.enums import EdgeType, Source
 from verity_core.model.nodes import Control, Framework, Node, Requirement
 
 DEFAULT_TENANT = "kestrel"
-
-
-class ContentError(ValueError):
-    """A content file that cannot be read. The message names the file."""
-
-    def __init__(self, path: Path, message: str):
-        super().__init__(f"{path}: {message}")
-        self.path = path
 
 
 @dataclass(frozen=True)
@@ -49,50 +39,15 @@ class Content:
     controls: tuple[Control, ...] = ()
     edges: tuple[Edge, ...] = ()
     dates: tuple[ObligationDate, ...] = ()
+    # The fictional organisation and its AI estate, from `org/*.yaml`.
+    estate: tuple[Node, ...] = ()
     # Framework slugs whose text is copyrighted (ISO): IDs and original summaries only.
     copyrighted: frozenset[str] = frozenset()
     # Public pages that agree on each requirement's ID, by requirement ID.
     listing_sources: dict[str, tuple[str, ...]] = field(default_factory=dict)
 
     def nodes(self) -> list[Node]:
-        return [*self.frameworks, *self.requirements, *self.controls]
-
-
-class _UniqueKeyLoader(yaml.SafeLoader):
-    """`yaml.safe_load` silently keeps the last of two equal keys. In content that would drop
-    a mapping without a trace, so it is an error."""
-
-    def construct_mapping(self, node: yaml.MappingNode, deep: bool = False) -> dict[Any, Any]:
-        seen: set[Any] = set()
-        for key_node, _ in node.value:
-            key = self.construct_object(key_node, deep=deep)
-            if key in seen:
-                raise yaml.constructor.ConstructorError(
-                    None, None, f"duplicate key {key!r}", key_node.start_mark
-                )
-            seen.add(key)
-        return super().construct_mapping(node, deep)
-
-
-@contextmanager
-def _reading(path: Path) -> Iterator[None]:
-    try:
-        yield
-    except ContentError:
-        raise
-    except ValidationError as exc:
-        details = "; ".join(
-            f"{'.'.join(str(p) for p in e['loc']) or 'file'}: {e['msg']}" for e in exc.errors()
-        )
-        raise ContentError(path, details) from exc
-    except (ValueError, yaml.YAMLError) as exc:
-        raise ContentError(path, str(exc)) from exc
-
-
-def _parse[M: BaseModel](path: Path, model: type[M]) -> M:
-    with _reading(path):
-        data = yaml.load(path.read_text(encoding="utf-8"), Loader=_UniqueKeyLoader)  # noqa: S506
-        return model.model_validate(data)
+        return [*self.frameworks, *self.requirements, *self.controls, *self.estate]
 
 
 def load_content(root: Path | str, *, tenant: str = DEFAULT_TENANT) -> Content:
@@ -107,9 +62,9 @@ def load_content(root: Path | str, *, tenant: str = DEFAULT_TENANT) -> Content:
     requirement_ids: dict[str, dict[str, str]] = {}  # framework slug -> {requirement slug: ID}
 
     for path in sorted((root / "frameworks").glob("*.yaml")):
-        parsed = _parse(path, FrameworkFile)
+        parsed = parse(path, FrameworkFile)
         fw = parsed.framework
-        with _reading(path):
+        with reading(path):
             if fw.slug in requirement_ids:
                 raise ContentError(path, f"framework {fw.slug!r} is defined twice")
             requirement_ids[fw.slug] = {}
@@ -163,8 +118,8 @@ def load_content(root: Path | str, *, tenant: str = DEFAULT_TENANT) -> Content:
     controls: list[Control] = []
     control_path = root / "controls.yaml"
     if control_path.exists():
-        with _reading(control_path):
-            for c in _parse(control_path, ControlsFile).controls:
+        with reading(control_path):
+            for c in parse(control_path, ControlsFile).controls:
                 node_id = ids.control_id(c.code)
                 if any(existing.id == node_id for existing in controls):
                     raise ContentError(control_path, f"control {c.code!r} is defined twice")
@@ -183,8 +138,8 @@ def load_content(root: Path | str, *, tenant: str = DEFAULT_TENANT) -> Content:
 
     mapped: set[tuple[str, str]] = set()
     for path in sorted((root / "mappings").glob("*.yaml")):
-        parsed_m = _parse(path, MappingsFile)
-        with _reading(path):
+        parsed_m = parse(path, MappingsFile)
+        with reading(path):
             if parsed_m.framework not in requirement_ids:
                 raise ContentError(path, f"unknown framework {parsed_m.framework!r}")
             for m in parsed_m.mappings:
@@ -213,18 +168,21 @@ def load_content(root: Path | str, *, tenant: str = DEFAULT_TENANT) -> Content:
     dates: list[ObligationDate] = []
     dates_path = root / "rules" / "obligation_dates.yaml"
     if dates_path.exists():
-        dates = _parse(dates_path, ObligationDatesFile).dates
+        dates = parse(dates_path, ObligationDatesFile).dates
         seen = [d.id for d in dates]
         duplicate = next((d for d in seen if seen.count(d) > 1), None)
         if duplicate is not None:
             raise ContentError(dates_path, f"date {duplicate!r} is defined twice")
+
+    estate, estate_edges = load_estate(root, tenant)
 
     return Content(
         tenant=tenant,
         frameworks=tuple(frameworks),
         requirements=tuple(requirements),
         controls=tuple(controls),
-        edges=tuple(edges),
+        edges=(*edges, *estate_edges),
+        estate=tuple(estate),
         dates=tuple(dates),
         copyrighted=frozenset(copyrighted),
         listing_sources=listing,

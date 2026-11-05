@@ -183,6 +183,102 @@ def _mapping(requirement, control, strm, strength, sufficiency) -> dict:
     }
 
 
+def good_org() -> dict:
+    """A tiny estate: one organisation, one simulated and one fictional supplier, three systems."""
+    return {
+        "source": "synthetic",
+        "organisation": {"slug": "kestrel", "name": "Kestrel Cloud Ltd"},
+        "departments": [{"slug": "legal", "name": "Legal"}],
+        "people": [
+            {
+                "slug": "l-ivanova",
+                "name": "Lena Ivanova",
+                "job_title": "Head of Legal",
+                "department": "legal",
+            }
+        ],
+        "providers": [
+            {
+                "slug": "mock-bedrock",
+                "name": "Bedrock (simulated)",
+                "simulated": True,
+                "source": "simulated",
+            },
+            {"slug": "corvid-labs", "name": "Corvid Labs Ltd"},
+        ],
+        "models": [
+            {
+                "slug": "bedrock-fm",
+                "name": "Bedrock FM",
+                "origin": "third_party",
+                "provider": "mock-bedrock",
+                "source": "simulated",
+            },
+            {
+                "slug": "corvid-chat",
+                "name": "Corvid Chat",
+                "origin": "third_party",
+                "provider": "corvid-labs",
+            },
+            {
+                "slug": "churn-gbm",
+                "name": "Churn trees",
+                "origin": "in_house",
+                "trained_on": ["billing"],
+            },
+        ],
+        "datasets": [
+            {
+                "slug": "billing",
+                "name": "Billing history",
+                "classification": "restricted",
+                "personal_data": True,
+            }
+        ],
+        "risks": [
+            {
+                "slug": "drift",
+                "title": "Model drifts",
+                "description": "Accuracy falls over time.",
+                "owner": "l-ivanova",
+            }
+        ],
+        "systems": [
+            {
+                "slug": "faq-bot",
+                "name": "FAQ bot",
+                "purpose": "Answer product questions",
+                "kind": "generative_ai",
+                "source": "declared",
+                "owner": "l-ivanova",
+                "developers": ["l-ivanova"],
+                "risk_approver": "l-ivanova",
+                "models": ["bedrock-fm"],
+                "datasets": [{"dataset": "billing", "purpose": "retrieval"}],
+                "risks": ["drift"],
+                "roles": ["provider", "deployer"],
+                "use_domains": ["customer_support"],
+                "interacts_with_people": True,
+                "first_placed_on_market": date(2026, 3, 2),
+            },
+            {
+                "slug": "translator",
+                "name": "Translator",
+                "purpose": "Translate chats",
+                "kind": "external_ai_api",
+                "models": ["corvid-chat"],
+            },
+            {
+                "slug": "churn",
+                "name": "Churn",
+                "purpose": "Flag churn",
+                "kind": "classical_ml",
+                "models": ["churn-gbm"],
+            },
+        ],
+    }
+
+
 def at_scale(files: dict[str, dict]) -> None:
     """Add controls until the library has the 25 the linter expects, each with a mapping."""
     controls = files["controls.yaml"]["controls"]
