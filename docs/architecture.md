@@ -197,7 +197,7 @@ Every node and edge carries `tenant`, `source` (discovered · declared · seeded
 - **Content rules:**
   - ISO entries contain the clause/control ID plus our own summary. No ISO text is reproduced.
   - EU AI Act and NIST entries may quote short excerpts with a citation.
-  - Every requirement records `source_url`, `version` (for example "2024/1689 as amended by 2026/1744") and `last_verified`.
+  - Every requirement records `source_url`, `source_version` (for example "2024/1689 as amended by 2026/1744") and `last_verified`. It is not called `version`, which is the record revision counter on every node.
   - Obligation dates are data.
 - **MVP content:** about 35 requirements, roughly 8–12 per instrument, chosen so they cover the three use cases.
 
