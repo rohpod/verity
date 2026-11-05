@@ -7,12 +7,13 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from verity_core.graph.errors import EdgeClosedError, ImmutableNodeError, TenantMismatchError
+from verity_core.graph.errors import EdgeNotFoundError, ImmutableNodeError, TenantMismatchError
 from verity_core.model.edges import Edge, EdgeKey
 from verity_core.model.enums import Direction, EdgeType, NodeType
 from verity_core.model.evidence import Evidence
 from verity_core.model.hashing import content_hash
 from verity_core.model.nodes import Node
+from verity_core.model.usage import UsageRecord
 from verity_core.model.validation import validate_edge, validate_node_change
 
 
@@ -34,6 +35,7 @@ class InMemoryRepository:
         self._edges: dict[EdgeKey, Edge] = {}
         self._out: dict[str, set[EdgeKey]] = {}
         self._in: dict[str, set[EdgeKey]] = {}
+        self._usage: dict[str, dict[tuple[datetime, str], UsageRecord]] = {}
 
     def _now(self) -> datetime:
         now = self._clock()
@@ -107,9 +109,9 @@ class InMemoryRepository:
             stored = _with(edge, created_at=now, updated_at=now, version=1)
             if stored.valid_from is None:
                 stored = _with(stored, valid_from=now)
+        elif existing.valid_to is not None:
+            stored = self._reopen(existing, edge, now)
         else:
-            if existing.valid_to is not None:
-                raise EdgeClosedError(f"{edge.key} is closed")
             candidate = _with(
                 edge,
                 valid_from=edge.valid_from or existing.valid_from,
@@ -127,6 +129,43 @@ class InMemoryRepository:
         self._edges[stored.key] = stored
         self._out.setdefault(stored.src, set()).add(stored.key)
         self._in.setdefault(stored.dst, set()).add(stored.key)
+        return stored
+
+    def _reopen(self, existing: Edge, edge: Edge, now: datetime) -> Edge:
+        """Keep the finished period in `closed_intervals` and start a new one."""
+        start = edge.valid_from or now
+        if start < existing.valid_to:
+            raise ValueError(f"{edge.key} cannot reopen at {start}, before it closed")
+        return _with(
+            edge,
+            created_at=existing.created_at,
+            updated_at=now,
+            version=existing.version + 1,
+            valid_from=start,
+            closed_intervals=(*existing.closed_intervals, (existing.valid_from, existing.valid_to)),
+        )
+
+    def close_edge(
+        self,
+        src: str,
+        edge_type: EdgeType,
+        dst: str,
+        *,
+        valid_to: datetime,
+        qualifier: str | None = None,
+    ) -> Edge:
+        if valid_to.tzinfo is None:
+            raise ValueError("valid_to must be timezone-aware")
+        key = EdgeKey(src, edge_type, dst, qualifier)
+        existing = self._edges.get(key)
+        if existing is None:
+            raise EdgeNotFoundError(f"no {edge_type} edge from {src!r} to {dst!r} ({qualifier})")
+        if existing.valid_to is not None:
+            return existing
+        stored = _with(
+            existing, valid_to=valid_to, updated_at=self._now(), version=existing.version + 1
+        )
+        self._edges[key] = stored
         return stored
 
     def neighbors(
@@ -149,3 +188,30 @@ class InMemoryRepository:
 
     def _open_edges_touching(self, node_id: str) -> list[Edge]:
         return self.neighbors(node_id, Direction.OUT) + self.neighbors(node_id, Direction.IN)
+
+    # --- usage ---------------------------------------------------------------------------
+
+    def append_usage(self, record: UsageRecord) -> None:
+        if record.tenant != self.tenant:
+            raise TenantMismatchError(f"usage record is in tenant {record.tenant!r}")
+        # Same identity as the DynamoDB key `U#{iso_ts}#{usage_id}`. The first write wins.
+        self._usage.setdefault(record.system_id, {}).setdefault(
+            (record.timestamp, str(record.usage_id)), record
+        )
+
+    def usage_records(
+        self,
+        system_id: str,
+        *,
+        since: datetime | None = None,
+        until: datetime | None = None,
+    ) -> list[UsageRecord]:
+        for bound in (since, until):
+            if bound is not None and bound.tzinfo is None:
+                raise ValueError("since and until must be timezone-aware")
+        records = (self._usage.get(system_id) or {}).items()
+        return [
+            record
+            for (stamp, _), record in sorted(records, key=lambda item: item[0])
+            if (since is None or stamp >= since) and (until is None or stamp < until)
+        ]

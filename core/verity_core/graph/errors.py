@@ -8,7 +8,7 @@ from verity_core.model.validation import (
 )
 
 __all__ = [
-    "EdgeClosedError",
+    "EdgeNotFoundError",
     "GraphValidationError",
     "ImmutableNodeError",
     "InvalidEdgeError",
@@ -30,5 +30,5 @@ class ImmutableNodeError(RepositoryError):
     """Evidence is immutable. Collecting again creates a new node."""
 
 
-class EdgeClosedError(RepositoryError):
-    """The edge was closed. Reopening it arrives with `close_edge`."""
+class EdgeNotFoundError(RepositoryError):
+    """No edge with that source, type, target and qualifier."""

@@ -1,18 +1,19 @@
 """Behaviour every GraphRepository must have. Uses only the protocol, via the `repo` fixture."""
 
 from datetime import UTC, datetime, timedelta
+from uuid import uuid4
 
 import pytest
 from conftest import START
 from factories import COMMON, evidence, make_edge, one_of_each
 from verity_core.graph.errors import (
-    EdgeClosedError,
+    EdgeNotFoundError,
     ImmutableNodeError,
     InvalidEdgeError,
     InvalidNodeError,
     TenantMismatchError,
 )
-from verity_core.graph.repository import GraphRepository
+from verity_core.graph.repository import GraphRepository, UsageSink
 from verity_core.model import ids
 from verity_core.model.enums import (
     Direction,
@@ -21,8 +22,10 @@ from verity_core.model.enums import (
     NodeType,
     RationaleType,
     Role,
+    Source,
 )
 from verity_core.model.nodes import Model, Organisation
+from verity_core.model.usage import UsageRecord
 
 NODES = one_of_each()
 PERSON = NODES[NodeType.PERSON]
@@ -261,21 +264,6 @@ def test_neighbors_respect_validity_at_as_of(repo):
     assert repo.neighbors(PERSON.id, Direction.OUT, as_of=end) == []
 
 
-def test_a_closed_edge_cannot_be_overwritten_yet(repo):
-    repo.upsert_node(PERSON)
-    repo.upsert_node(SYSTEM)
-    closed = make_edge(
-        EdgeType.OWNS,
-        PERSON.id,
-        SYSTEM.id,
-        valid_from=START - timedelta(days=3),
-        valid_to=START - timedelta(days=1),
-    )
-    repo.upsert_edge(closed)
-    with pytest.raises(EdgeClosedError):
-        repo.upsert_edge(make_edge(EdgeType.OWNS, PERSON.id, SYSTEM.id))
-
-
 def test_naive_as_of_is_rejected(repo):
     edge = repo.upsert_edge(owns(repo))
     with pytest.raises(ValueError, match="timezone-aware"):
@@ -289,3 +277,191 @@ def test_rejected_writes_leave_no_trace(repo):
     assert repo.neighbors(NODES[NodeType.MODEL].id, Direction.OUT) == []
     assert repo.neighbors("prov:nope", Direction.IN) == []
     assert UTC
+
+
+# --- close_edge and reopening (D7) ---------------------------------------------------------
+
+
+def test_close_edge_ends_the_edge_but_keeps_the_past(repo, clock):
+    edge = repo.upsert_edge(owns(repo))
+    clock.advance(days=2)
+    closed = repo.close_edge(PERSON.id, EdgeType.OWNS, SYSTEM.id, valid_to=clock.now)
+    assert closed.valid_to == clock.now and closed.version == 2
+    assert closed.created_at == edge.created_at and closed.updated_at == clock.now
+    assert repo.neighbors(PERSON.id, Direction.OUT) == []
+    assert repo.neighbors(PERSON.id, Direction.OUT, as_of=START + timedelta(days=1)) == [closed]
+    assert repo.neighbors(PERSON.id, Direction.OUT, as_of=clock.now) == []  # [from, to)
+    assert repo.neighbors(SYSTEM.id, Direction.IN) == []
+
+
+def test_closing_a_closed_edge_keeps_the_first_valid_to(repo, clock):
+    repo.upsert_edge(owns(repo))
+    clock.advance(days=1)
+    first = repo.close_edge(PERSON.id, EdgeType.OWNS, SYSTEM.id, valid_to=clock.now)
+    clock.advance(days=5)
+    again = repo.close_edge(PERSON.id, EdgeType.OWNS, SYSTEM.id, valid_to=clock.now)
+    assert again == first and again.version == 2
+
+
+def test_closing_an_unknown_edge_raises(repo):
+    owns(repo)
+    with pytest.raises(EdgeNotFoundError):
+        repo.close_edge(PERSON.id, EdgeType.OWNS, SYSTEM.id, valid_to=START)
+
+
+def test_valid_to_cannot_precede_valid_from(repo):
+    repo.upsert_edge(owns(repo))
+    with pytest.raises(ValueError):
+        repo.close_edge(PERSON.id, EdgeType.OWNS, SYSTEM.id, valid_to=START - timedelta(days=1))
+    assert len(repo.neighbors(PERSON.id, Direction.OUT)) == 1
+
+
+def test_close_edge_needs_an_aware_valid_to(repo):
+    repo.upsert_edge(owns(repo))
+    with pytest.raises(ValueError, match="timezone-aware"):
+        repo.close_edge(PERSON.id, EdgeType.OWNS, SYSTEM.id, valid_to=datetime(2026, 11, 6))
+
+
+def test_close_edge_with_a_qualifier_closes_one_role_only(repo, clock):
+    repo.upsert_node(NODES[NodeType.REQUIREMENT])
+    repo.upsert_node(SYSTEM)
+    req = "req:euaia:art50-1"
+    for role in (Role.PROVIDER, Role.DEPLOYER):
+        repo.upsert_edge(make_edge(EdgeType.APPLIES_TO, req, SYSTEM.id, role=role))
+    clock.advance(days=1)
+    repo.close_edge(req, EdgeType.APPLIES_TO, SYSTEM.id, valid_to=clock.now, qualifier="provider")
+    assert [e.qualifier for e in repo.neighbors(req, Direction.OUT)] == ["deployer"]
+    with pytest.raises(EdgeNotFoundError):  # a qualified edge is not found without its qualifier
+        repo.close_edge(req, EdgeType.APPLIES_TO, SYSTEM.id, valid_to=clock.now)
+
+
+def test_closing_frees_a_max_out_slot(repo, clock):
+    ca, org = NODES[NodeType.CONTROL_ASSESSMENT], NODES[NodeType.ORGANISATION]
+    for node in (ca, SYSTEM, org):
+        repo.upsert_node(node)
+    repo.upsert_edge(make_edge(EdgeType.SCOPED_TO, ca.id, SYSTEM.id))
+    clock.advance(days=1)
+    repo.close_edge(ca.id, EdgeType.SCOPED_TO, SYSTEM.id, valid_to=clock.now)
+    repo.upsert_edge(make_edge(EdgeType.SCOPED_TO, ca.id, org.id))  # no longer a second scope
+
+
+def test_a_closed_edge_that_reappears_keeps_its_earlier_period(repo, clock):
+    first = repo.upsert_edge(owns(repo))
+    clock.advance(days=2)
+    closed_at = clock.now
+    repo.close_edge(PERSON.id, EdgeType.OWNS, SYSTEM.id, valid_to=closed_at)
+    clock.advance(days=3)
+    reopened = repo.upsert_edge(make_edge(EdgeType.OWNS, PERSON.id, SYSTEM.id))
+
+    assert reopened.valid_from == clock.now and reopened.valid_to is None
+    assert reopened.closed_intervals == ((first.valid_from, closed_at),)
+    assert reopened.version == 3 and reopened.created_at == first.created_at
+    assert repo.neighbors(PERSON.id, Direction.OUT) == [reopened]
+
+    def active(days):
+        when = START + timedelta(days=days)
+        return bool(repo.neighbors(PERSON.id, Direction.OUT, as_of=when))
+
+    assert active(1)  # first period
+    assert not active(3)  # gap
+    assert active(5)  # second period
+
+
+def test_an_edge_that_flaps_twice_keeps_both_earlier_periods(repo, clock):
+    repo.upsert_edge(owns(repo))
+    for _ in range(2):
+        clock.advance(days=1)
+        repo.close_edge(PERSON.id, EdgeType.OWNS, SYSTEM.id, valid_to=clock.now)
+        clock.advance(days=1)
+        edge = repo.upsert_edge(make_edge(EdgeType.OWNS, PERSON.id, SYSTEM.id))
+    assert len(edge.closed_intervals) == 2 and edge.version == 5
+    assert len(repo.neighbors(PERSON.id, Direction.OUT)) == 1
+
+
+def test_an_edge_cannot_reopen_before_it_closed(repo, clock):
+    repo.upsert_edge(owns(repo))
+    repo.close_edge(PERSON.id, EdgeType.OWNS, SYSTEM.id, valid_to=START + timedelta(days=10))
+    with pytest.raises(ValueError, match="before it closed"):
+        repo.upsert_edge(make_edge(EdgeType.OWNS, PERSON.id, SYSTEM.id))  # clock is still day 0
+
+
+# --- usage (D7, D8) ------------------------------------------------------------------------
+
+
+def usage(minutes=0, **overrides):
+    fields = {
+        "tenant": COMMON["tenant"],
+        "usage_id": uuid4(),
+        "system_id": SYSTEM.id,
+        "provider_id": "prov:mock-bedrock",
+        "model_id": "model:fm-1",
+        "timestamp": START + timedelta(minutes=minutes),
+        "token_estimate": 120,
+        "source": Source.SIMULATED,
+    } | overrides
+    return UsageRecord(**fields)
+
+
+def test_usage_can_be_written_with_only_the_narrow_sink(repo):
+    assert isinstance(repo, UsageSink)
+
+    class OnlyAppends:
+        def append_usage(self, record): ...
+
+    assert isinstance(OnlyAppends(), UsageSink)
+    assert not isinstance(OnlyAppends(), GraphRepository)
+
+
+def test_usage_does_not_need_the_system_node(repo):
+    assert repo.get_node(SYSTEM.id) is None
+    record = usage()
+    repo.append_usage(record)  # D8: the app role has no read access, so no existence check
+    assert repo.usage_records(SYSTEM.id) == [record]
+
+
+def test_usage_comes_back_oldest_first_and_per_system(repo):
+    late, early, mid = usage(30), usage(0), usage(10)
+    other = usage(5, system_id="sys:other")
+    for record in (late, early, mid, other):
+        repo.append_usage(record)
+    assert repo.usage_records(SYSTEM.id) == [early, mid, late]
+    assert repo.usage_records("sys:other") == [other]
+    assert repo.usage_records("sys:none") == []
+
+
+def test_usage_filter_is_half_open(repo):
+    records = [usage(m) for m in (0, 10, 20)]
+    for record in records:
+        repo.append_usage(record)
+    since, until = START + timedelta(minutes=10), START + timedelta(minutes=20)
+    assert repo.usage_records(SYSTEM.id, since=since) == records[1:]
+    assert repo.usage_records(SYSTEM.id, until=until) == records[:2]
+    assert repo.usage_records(SYSTEM.id, since=since, until=until) == [records[1]]
+    with pytest.raises(ValueError, match="timezone-aware"):
+        repo.usage_records(SYSTEM.id, since=datetime(2026, 11, 5))
+
+
+def test_a_retried_usage_write_is_stored_once(repo):
+    record = usage()
+    repo.append_usage(record)
+    repo.append_usage(record)
+    repo.append_usage(record.model_copy(update={"token_estimate": 999}))  # first write wins
+    assert repo.usage_records(SYSTEM.id) == [record]
+
+
+def test_two_calls_at_the_same_instant_are_both_kept(repo):
+    first, second = usage(0), usage(0)
+    repo.append_usage(first)
+    repo.append_usage(second)
+    assert len(repo.usage_records(SYSTEM.id)) == 2
+
+
+def test_usage_from_another_tenant_is_refused(repo):
+    with pytest.raises(TenantMismatchError):
+        repo.append_usage(usage(tenant="other"))
+
+
+def test_usage_never_appears_as_a_node_or_edge(repo):
+    repo.append_usage(usage())
+    assert all(repo.nodes_by_type(t) == [] for t in NodeType)
+    assert repo.neighbors(SYSTEM.id, Direction.IN) == []
