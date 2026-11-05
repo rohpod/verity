@@ -1,6 +1,6 @@
 # Verity — Architecture
 
-_Stage 3 deliverable · 2026-11-05 · Status: accepted, amended in Stage 4 (see [milestone plan](stage-4-milestones.md), [ADR 0009](adr/0009-mock-openai-iam-auth.md), [ADR 0010](adr/0010-assessment-and-crosswalk-semantics.md))._
+_Stage 3 deliverable · 2026-11-05 · Status: accepted, amended in Stage 4 (see [milestone plan](stage-4-milestones.md), [ADR 0009](adr/0009-mock-openai-iam-auth.md), [ADR 0010](adr/0010-assessment-and-crosswalk-semantics.md), [ADR 0012](adr/0012-graph-schema-refinements.md))._
 Inputs: [Stage 1 discovery](stage-1-discovery.md) · [Stage 2 feasibility](stage-2-feasibility.md) · decisions in [`adr/`](adr/).
 
 **Locked constraints:** AWS Free plan · single region `eu-north-1` · Terraform/OpenTofu · Python 3.12 backend · React + TS frontend · DynamoDB + NetworkX graph · no S3 · Bedrock/OpenAI mock-only · public demo = static snapshot on GitHub Pages · target customer = mid-size EU SaaS company acting as both AI provider and deployer.
@@ -115,6 +115,7 @@ The pipeline is a sequence of pure functions over plain data, so it can be unit-
 - `DataClassification` is an enum property on `Dataset` (Public · Internal · Confidential · Restricted, plus a `personal_data` flag), not a node. We can promote it to a node later if controls start attaching to classifications.
 - `Model.origin ∈ {in_house, third_party}`. Only third-party models get `PROVIDED_BY`.
 - `Provider.simulated: bool` makes mocks explicit in the data itself.
+- **The tenant is the organisation:** each tenant has exactly one `Organisation`, enforced on write, so a system finds its organisation without an edge ([ADR 0012](adr/0012-graph-schema-refinements.md)).
 
 ### Identifiers
 
@@ -126,9 +127,25 @@ IDs are deterministic and typed, which makes re-crawls idempotent:
 - `req:iso42001:A.6.2.4`
 - `req:nistrmf:MAP-1.1`
 - `ctl:VC-014`
-- `ev:<sha256-prefix>`, where the hash covers subject + collector + `collected_at` + content ([ADR 0010](adr/0010-assessment-and-crosswalk-semantics.md))
+- `ev:<sha256-prefix>`, 32 hex characters, where the hash covers subject + collector + `collected_at` + the content's `sha256` ([ADR 0010](adr/0010-assessment-and-crosswalk-semantics.md), [ADR 0012](adr/0012-graph-schema-refinements.md))
+- `ca:VC-014:sys:talent-screening`, one node per control × scope
+- `res:iam-role:global:<name>` for resources without a region
 
-Every node and edge carries `tenant`, `source` (discovered · declared · seeded · synthetic · derived), `confidence`, `created_at`, `updated_at`, `version`, `valid_from` and `valid_to`.
+| Node type | Prefix | | Node type | Prefix |
+|---|---|---|---|---|
+| Organisation | `org:` | | Risk | `risk:` |
+| Department | `dept:` | | Control | `ctl:` |
+| Person | `person:` | | ControlAssessment | `ca:` |
+| AISystem | `sys:` | | Requirement | `req:` |
+| Candidate | `cand:` | | Framework | `fw:` |
+| AWSResource | `res:` | | Evidence | `ev:` |
+| Model | `model:` | | Policy | `pol:` |
+| Provider | `prov:` | | DiscoveryRun | `run:` |
+| Dataset | `ds:` | | ChangeEvent | `chg:` |
+
+IDs use only `[A-Za-z0-9._:-]`, so they can never corrupt a `#`-delimited key.
+
+Every node and edge carries `tenant`, `source` (discovered · declared · seeded · synthetic · derived · simulated), `confidence`, `created_at`, `updated_at`, `version`, `valid_from` and `valid_to`.
 
 ### Edge types
 
@@ -137,12 +154,12 @@ Every node and edge carries `tenant`, `source` (discovered · declared · seeded
 | Org | Person `MEMBER_OF` Department · Department `PART_OF` Organisation | |
 | Accountability | Person `OWNS` / `DEVELOPS` / `APPROVES_RISK_FOR` AISystem · Person `OWNS` Risk | Accountability only, never activity tracking |
 | Technical | AISystem `RUNS_ON` AWSResource · AWSResource `ASSUMES` / `CALLS` AWSResource | |
-| Model & data | AISystem `USES_MODEL` Model · Model `PROVIDED_BY` Provider · AISystem `PROCESSES` Dataset · Model `TRAINED_ON` Dataset | `PROCESSES {purpose: inference \| training \| retrieval}` |
+| Model & data | AISystem `USES_MODEL` Model · Model `PROVIDED_BY` Provider · AISystem `PROCESSES` Dataset · Model `TRAINED_ON` Dataset | `PROCESSES {purpose: inference \| training \| retrieval}`, with `purpose` as the edge qualifier. `TRAINED_ON` is model lineage; `training` means this system itself runs training |
 | Discovery | Candidate `DERIVED_FROM` AWSResource · Candidate `PROMOTED_TO` AISystem | *(added in §L review)* |
 | Risk | AISystem `HAS_RISK` Risk · Risk `MITIGATED_BY` Control | |
 | Obligations | Requirement `PART_OF` Framework \| Requirement | Parent may be a requirement, for hierarchy such as Art. 9 → 9(2)(a) *(§L)* |
-| | Requirement `MAPS_TO` Control | `{strm, strength 1–10, rationale_type, rationale, sufficiency: full \| partial}` |
-| | Requirement `APPLIES_TO` AISystem \| Organisation | `{role, rule_id, reason, in_force_from, status: in_force \| upcoming}` *(org target added §L)* |
+| | Requirement `MAPS_TO` Control | `{strm, strength 1–10, rationale_type, rationale, sufficiency: full \| partial}`. `strength` and `sufficiency` are empty for `no_relationship` |
+| | Requirement `APPLIES_TO` AISystem \| Organisation | `{role, rule_id, reason, in_force_from}`, with `role` as the edge qualifier. `in_force \| upcoming` is derived from `as_of`, not stored (D5) *(org target added §L)* |
 | Assurance | ControlAssessment `ASSESSES` Control · ControlAssessment `SCOPED_TO` AISystem \| Organisation \| Provider | *(Provider scope added §L)* |
 | | Person `ASSESSED` ControlAssessment | Named human verifier, required for L4 *(§L)* |
 | | Evidence `SUPPORTS` ControlAssessment · Evidence `ABOUT` any node · Evidence `COLLECTED_FROM` AWSResource | `ABOUT` lets a DPA document describe a Provider *(§L)* |
@@ -151,27 +168,27 @@ Every node and edge carries `tenant`, `source` (discovered · declared · seeded
 
 > **Key modelling choice: status lives on `ControlAssessment`, not on `Control`.** "Is human oversight implemented?" has a different answer for each system. A `Control` is a reusable definition. A `ControlAssessment` is *control × scope* and holds `status`, `assurance_level`, `method`, `assessed_at` and `assessor`. Keeping these apart is what lets the data distinguish **mapping**, **implementing** and **demonstrating**, not just the UI.
 
-**Control scope inheritance:** `Control.scope_level ∈ {organisation, system, provider}`. When a system-level question asks about an organisation-level control (for example the AI policy or AI literacy), the engine resolves it to the organisation's ControlAssessment and shows it as *inherited*.
+**Control scope inheritance:** `Control.scope_level ∈ {organisation, system, provider}`. When a system-level question asks about an organisation-level control (for example the AI policy or AI literacy), the engine resolves it to the organisation's ControlAssessment and shows it as *inherited*. Provider-level controls resolve through system → model → provider, and to *Not applicable* for a system with only in-house models (D13).
 
 ### Core traversals
 
 | Question | Traversal |
 |---|---|
-| What applies to system S, and what proves it? | `S ←APPLIES_TO– Req –MAPS_TO→ Ctl ←ASSESSES– CA(scope = S, or Org if inherited) ←SUPPORTS– Evidence` |
+| What applies to system S, and what proves it? | `{S, Org} ←APPLIES_TO– Req –MAPS_TO→ Ctl ←ASSESSES– CA(scope by Control.scope_level: S, Org or Provider) ←SUPPORTS– Evidence`. A control with no CA or evidence still returns a row, because gaps are findings |
 | Impact of an incident at provider P | `P ←PROVIDED_BY– Model ←USES_MODEL– AISystem → {owners, risks, applicable requirements, provider-scoped CAs}` (BFS, depth ≤ 3) |
 | Crosswalk: requirement R in framework A → framework B | `R –MAPS_TO→ Ctl ←MAPS_TO– R′ (PART_OF* fw B)`, composed STRM (§F) |
-| Evidence made stale by a change | `ChangeEvent –AFFECTS→ Resource ←COLLECTED_FROM– Evidence –SUPPORTS→ CA` |
+| Evidence made stale by a change | `ChangeEvent –AFFECTS→ Resource ←COLLECTED_FROM– Evidence –SUPPORTS→ CA`, only where `Evidence.collected_at < ChangeEvent.detected_at` |
 | Audit trail | `Req → Ctl → CA → Evidence` (with hashes, collector, `ASSESSED` person) |
 
 ## F. Framework crosswalk (hub and spoke)
 
-- **Hub:** the *Verity Control Library*, about 25–35 controls (`VC-001…`) written in our own words. Each has `kind ∈ {technical, organisational, legal_documentary}`, `automatable: bool` and `scope_level`.
+- **Hub:** the *Verity Control Library*, about 25–35 controls (`VC-001…`) written in our own words. Each has `kind ∈ {technical, organisational, legal_documentary}`, `automatable: bool` and `scope_level`. Only technical controls may be automatable.
 - **Spokes:** each framework requirement maps to hub controls with:
   - an STRM type: `equal` · `subset_of` · `superset_of` · `intersects_with` · `no_relationship`
-  - a strength from 1 to 10
+  - a strength from 1 to 10 (empty for `no_relationship`)
   - a rationale type: syntactic · semantic · functional
   - a written rationale
-  - a `sufficiency` flag
+  - a `sufficiency` flag (empty for `no_relationship`)
 - **Why a hub, not pairwise mappings:** pairwise mapping of 4 frameworks needs 6 mapping sets, and that number grows as N² while errors compound. A hub needs only N sets. Cross-framework links are **derived** by composing two spokes. Each one is labelled "related via VC-xxx", carries **no STRM type**, shows both spokes, takes the weaker of the two strengths, and `no_relationship` never composes. The Secure Controls Framework uses the same approach.
 - **When a requirement counts as satisfied:**
   - **Satisfied:** its `sufficiency: full` set is **non-empty**, and every control in it has an `Implemented` ControlAssessment with assurance ≥ L2 from non-stale evidence.
@@ -188,6 +205,7 @@ Every node and edge carries `tenant`, `source` (discovered · declared · seeded
 
 **Evidence nodes are immutable.** Each holds:
 - `kind`: config_snapshot · automated_test · usage_record · attestation · document_ref
+- `subject`: the node it is about, matched by an `ABOUT` edge
 - `collector`: `crawler@<ver>`, `cli@<ver>` or `person:<id>`
 - `collected_at` and `valid_until`
 - `content`: inline JSON up to 50 KB, *or* `content_ref` pointing to a git-versioned file under `evidence/`
@@ -201,7 +219,7 @@ Re-collecting evidence creates a new node and never overwrites the old one.
 |---|---|
 | fresh | Within `valid_until` and not invalidated |
 | expiring | 7 days or less until `valid_until` |
-| stale | Past `valid_until`, or invalidated by a `ChangeEvent` |
+| stale | Past `valid_until`, or collected before a `ChangeEvent` detected on its resource |
 
 **Assurance ladder** (a separate field from implementation status):
 
@@ -226,18 +244,19 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
 | Item | PK | SK |
 |---|---|---|
 | Node | `T#{tenant}#N#{id}` | `META` |
-| Outgoing edge | `T#{tenant}#N#{src}` | `E#{type}#{dst}` |
-| Reverse edge (mirror) | `T#{tenant}#N#{dst}` | `R#{type}#{src}` |
-| Node history | `T#{tenant}#N#{id}` | `H#{iso_ts}` |
-| Usage record | `T#{tenant}#N#{system}` | `U#{iso_ts}` |
+| Outgoing edge | `T#{tenant}#N#{src}` | `E#{type}#{dst}[#{qualifier}]` |
+| Reverse edge (mirror) | `T#{tenant}#N#{dst}` | `R#{type}#{src}[#{qualifier}]` |
+| Node history | `T#{tenant}#N#{id}` | `H#{iso_ts}#{version}` |
+| Usage record | `T#{tenant}#N#{system}` | `U#{iso_ts}#{usage_id}` |
 
+- The qualifier is `role` on `APPLIES_TO` and `purpose` on `PROCESSES`; other edge types have none ([ADR 0012](adr/0012-graph-schema-refinements.md)).
 - **GSI1** (`GSI1PK=T#{tenant}#TYPE#{type}`, `GSI1SK=id`) lists nodes by type.
 - Reverse lookups use the mirrored `R#` items instead of a second GSI, which keeps the design inside the 25-unit capacity budget.
-- **Repository pattern:** the `GraphRepository` protocol exposes `get_node`, `upsert_node`, `upsert_edge`, `neighbors(direction, type)`, `nodes_by_type`, `history`, `append_usage`, `usage_records`, `close_edge` and `load_graph() → networkx.MultiDiGraph`.
+- **Repository pattern:** the `GraphRepository` protocol exposes `get_node`, `upsert_node`, `upsert_edge`, `neighbors(direction, type)`, `nodes_by_type`, `history`, `append_usage`, `usage_records`, `close_edge` and `load_graph(as_of) → networkx.MultiDiGraph`. Each repository is bound to one tenant.
   - Implementations are `InMemoryRepository` (tests and local development) and `DynamoDBRepository`.
   - A future `Neo4jRepository` or `NeptuneRepository` would plug into the same interface. That is the migration path off DynamoDB.
 - **Traversal** happens in memory with NetworkX. The graph is hundreds to low thousands of items, so loading it whole is cheap.
-- **History:** edges are soft-deleted by setting `valid_to`, and nodes keep append-only `H#` versions. Together these support "what did system S look like on date D?" queries.
+- **History:** edges are soft-deleted by setting `valid_to`. A reopened edge keeps its earlier periods in `closed_intervals`. Nodes keep append-only `H#` versions. Together these support "what did system S look like on date D?" queries.
 
 ## I. Interfaces
 
@@ -292,6 +311,7 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
 | [0009](adr/0009-mock-openai-iam-auth.md) | mock-openai uses an `AWS_IAM` Function URL; reserved concurrency dropped |
 | [0010](adr/0010-assessment-and-crosswalk-semantics.md) | Assessment and crosswalk semantics |
 | [0011](adr/0011-region-eu-north-1.md) | Single region is eu-north-1 |
+| [0012](adr/0012-graph-schema-refinements.md) | Graph schema refinements: edge qualifier, closed intervals, tenant is the organisation, staleness cutoff |
 
 ## L. Schema validation walkthrough
 

@@ -31,6 +31,7 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/). Decisions by the owner:
 | D13 | Provider-scoped inheritance resolves system → model → provider; in-house models resolve to Not applicable |
 | D14 | GSI projects keys only; `H#` written only on real change; writes retry with backoff; inline evidence cap set from M2 measurements |
 | D15 | All 18 node types are kept, because the §L traversals need them |
+| D16 | Schema refinements found while planning M1. See [ADR 0012](adr/0012-graph-schema-refinements.md) |
 
 ## Milestones
 
@@ -38,7 +39,7 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/). Decisions by the owner:
 |---|---|---|---|---|
 | **Core engine (local)** | | | | |
 | M0 | Foundations: uv workspace, ruff, pytest, CI without AWS credentials, Dependabot, mutating-command hook | Sonnet | no | ✅ |
-| M1 | Graph core: models, IDs, `GraphRepository`, `InMemoryRepository`, NetworkX loader, traversals | Opus, then Sonnet | no | ⬜ |
+| M1 | Graph core: models, IDs, `GraphRepository`, `InMemoryRepository`, NetworkX loader, traversals | Opus, then Sonnet | no | 🔄 |
 | M2 | `DynamoDBRepository` (moto), shared contract suite | Sonnet | no | ⬜ |
 | **AWS baseline** | | | | |
 | M3 | Account baseline: non-root admin with MFA, region eu-north-1, `infra/` root, $0.01 budget, `verity-graph` | Opus (IAM), Sonnet | **yes, approval first** | ⬜ |
