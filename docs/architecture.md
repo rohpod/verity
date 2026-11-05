@@ -64,7 +64,7 @@ verity/
 | Purpose | Answer customer support questions | Rank job applicants for recruiters | Summarise customer contracts for sales and legal |
 | Model / provider | "Bedrock foundation model". **Simulated** by mock-bedrock (Converse-shaped) | Logistic regression trained locally on **synthetic** data; coefficients shipped as JSON. **Real** | "OpenAI GPT-class model". **Simulated** by mock-openai |
 | Data | Help-centre articles (Public); customer messages (Confidential, personal data) | Applicant profiles (Restricted, personal data) | Customer contracts (Confidential) |
-| EU AI Act screening | Limited risk: Art. 50(1) transparency. Role: provider + deployer | **Annex III §4(a) employment → high-risk candidate.** Obligations apply from **2 Dec 2027** | Minimal risk. Third-party / downstream-provider considerations |
+| EU AI Act screening | Limited risk: Art. 50(1) transparency. Role: provider + deployer | **Annex III §4(a) employment → high-risk candidate.** Chapter III applies from **2 Dec 2027**, but the system was placed on the market in 2026, so under Art. 111(2) its duties show as **Conditional** until a significant design change ([ADR 0019](adr/0019-m5-rules-and-assessment.md)) | Minimal risk. Third-party / downstream-provider considerations |
 | Governance story | Transparency, human handoff, logging | Bias, data governance, human oversight, technical documentation | Vendor risk, cross-border data transfer, confidentiality |
 | Seeded finding | Role grants `bedrock:Converse` but **no usage is observed**. This is a least-privilege finding; the permission is never exercised, in keeping with the mock-only rule | No bias-test evidence → gap | No DPA evidence for the provider → gap |
 
@@ -192,10 +192,13 @@ Every node and edge carries `tenant`, `source` (discovered · declared · seeded
   - a written rationale
   - a `sufficiency` flag (empty for `no_relationship`)
 - **Why a hub, not pairwise mappings:** pairwise mapping of 4 frameworks needs 6 mapping sets, and that number grows as N² while errors compound. A hub needs only N sets. Cross-framework links are **derived** by composing two spokes. Each one is labelled "related via VC-xxx", carries **no STRM type**, shows both spokes, takes the weaker of the two strengths, and `no_relationship` never composes. The Secure Controls Framework uses the same approach.
-- **When a requirement counts as satisfied:**
-  - **Satisfied:** its `sufficiency: full` set is **non-empty**, and every control in it has an `Implemented` ControlAssessment with assurance ≥ L2 from non-stale evidence.
-  - **Not addressed:** no mappings at all.
-  - **Partially addressed:** only partial mappings are met. This is never shown green.
+- **When a requirement counts as satisfied** ([ADR 0019](adr/0019-m5-rules-and-assessment.md)). A control is *met* if its assessment is Implemented at L2 or above from non-stale evidence.
+  - **Satisfied:** its `sufficiency: full` set is **non-empty**, every control in it is met, and at least one is non-automatable or at L4. A set of automated controls alone stops at *Partially addressed* (`automated_only`).
+  - **Partially addressed:** at least one mapped control is met but the above does not hold. This is never shown green.
+  - **Not met:** it has usable mappings and none is met.
+  - **Not addressed:** no usable mapping, either never mapped or reviewed as `no_relationship`.
+  - **Not applicable:** every target resolves to an in-house model.
+  - A parent requirement is never *Satisfied* from its children.
 - **Content rules:**
   - ISO entries contain the clause/control ID plus our own summary. No ISO text is reproduced.
   - EU AI Act and NIST entries may quote short excerpts with a citation.
@@ -267,6 +270,7 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
 - **CLI:**
   - `verity seed`: load content and organisation YAML
   - `verity crawl [--local]`
+  - `verity lint`: check the content
   - `verity assess`
   - `verity attest <control> <scope> --by <person>`: scaffolds a YAML file under `content/decisions/` for review; it never writes to the graph
   - `verity export`: write the redacted snapshot
@@ -322,6 +326,7 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
 | [0016](adr/0016-m3-live-results.md) | M3 live results: capacity, GSI delay, how throttling is reported |
 | [0017](adr/0017-m4-content-semantics.md) | M4 content semantics: mapping direction, strength convention, `full` sufficiency, obligation dates, ISO provenance |
 | [0018](adr/0018-unread-standards.md) | Mappings from a standard nobody read claim only an overlap, so ISO requirements never show as Satisfied |
+| [0019](adr/0019-m5-rules-and-assessment.md) | M5 rules and assessment: automated-only guardrail, Art. 111(2) conditional edges, high-risk candidates, decisions as Evidence, Not met |
 
 ## L. Schema validation walkthrough
 

@@ -12,6 +12,10 @@ The organisation, people and companies under `org/` are fictional. The mappings 
 | `rules/obligation_dates.yaml` | When EU AI Act obligations apply |
 | `org/` | Kestrel Cloud Ltd and its AI estate |
 
+## A curated subset
+
+The EU AI Act requirements are a curated subset, chosen to cover the three demo use cases. These are left out on purpose: Art. 17, 43, 49, 72 and 73, Art. 26(1), (5) and (6), and Art. 50(3) and (4). A requirement missing here is not a statement that it does not apply.
+
 ## Reading a mapping
 
 The requirement is concept A and the control is concept B ([ADR 0017](../docs/adr/0017-m4-content-semantics.md)).
