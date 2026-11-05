@@ -46,9 +46,10 @@ Work in stages, explain unfamiliar concepts briefly, challenge weak assumptions,
 
 ## Git workflow
 Follow [CONTRIBUTING.md](CONTRIBUTING.md).
-- Never commit or push to `main`. Start each feature or fix on a new branch from an up-to-date `main`.
+- Never commit or push to `main`. Before creating a branch, switch to `main` and run `git pull --ff-only`, so the new branch includes every merged PR.
 - Use Conventional Commits, with no attribution lines in commits or PRs.
 - Open a PR with the template when the work is ready. Never merge it: the owner reviews and merges on GitHub.
+- After opening a PR, switch back to `main` and ask the owner to merge. Don't start the next branch until the merge is done.
 
 ## Model guidance (Opus decides, Sonnet builds)
 The user switches models to save usage. Claude cannot switch models itself, so **tell the user when a switch is warranted**, in one line at the start of the reply, e.g. `💡 Model hint: this is design work, so consider switching to Opus (/model opus).`
