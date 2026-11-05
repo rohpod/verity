@@ -183,6 +183,32 @@ def _mapping(requirement, control, strm, strength, sufficiency) -> dict:
     }
 
 
+def at_scale(files: dict[str, dict]) -> None:
+    """Add controls until the library has the 25 the linter expects, each with a mapping."""
+    controls = files["controls.yaml"]["controls"]
+    for n in range(100, 100 + 25 - len(controls)):
+        controls.append(
+            {
+                "code": f"VC-{n}",
+                "title": f"Extra control {n}",
+                "summary": "An invented control that only pads the sample library.",
+                "kind": "organisational",
+                "scope_level": "system",
+            }
+        )
+        files["mappings/euaia.yaml"]["mappings"].append(
+            {
+                "requirement": "art4",
+                "control": f"VC-{n}",
+                "strm": "intersects_with",
+                "strength": 4,
+                "rationale_type": "functional",
+                "rationale": RATIONALE,
+                "sufficiency": "partial",
+            }
+        )
+
+
 def write_tree(root: Path, files: dict[str, dict]) -> Path:
     for name, data in files.items():
         path = root / name

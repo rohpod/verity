@@ -37,6 +37,12 @@ MUST_ASK = [
     "env VERITY_LIVE_AWS=1 uv run pytest tests/live",
     "export VERITY_LIVE_AWS=1 && uv run pytest tests/live",
     "bash -c 'VERITY_LIVE_AWS=1 uv run pytest'",
+    "uv run verity seed --target dynamodb",
+    "uv run verity seed --target=dynamodb --yes",
+    "verity seed --content content --target dynamodb",
+    "cd /repo && uv run verity seed --tenant kestrel --target dynamodb",
+    "bash -c 'uv run verity seed --target dynamodb'",
+    "uv run python -m verity_core.cli seed --target dynamodb",
 ]
 
 MUST_PASS = [
@@ -58,6 +64,12 @@ MUST_PASS = [
     "echo 'tofu apply is mutating'",
     "uv run pytest",
     "git status",
+    "uv run verity lint",
+    "uv run verity seed",
+    "uv run verity seed --target memory",
+    "uv run verity seed --content tests/content --target memory",
+    "echo 'verity seed --target dynamodb'",
+    "grep -rn 'seed --target dynamodb' docs",
 ]
 
 
