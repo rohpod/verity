@@ -290,7 +290,7 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
 
 | Area | Measure |
 |---|---|
-| Account | MFA on root, and root is never used day to day. An admin IAM user with MFA. IAM Identity Center is not available on the Free plan, so we use the `aws login` flow, which is verified to work ✅. The CLI now uses the IAM user `rohpod` with default region eu-north-1. That user has no permissions yet; M3 grants them before any apply. |
+| Account | MFA on root, and root is never used day to day. An admin IAM user with MFA. IAM Identity Center is not available on the Free plan, so we use the `aws login` flow, which is verified to work ✅. The CLI uses the IAM user `rohpod` with default region eu-north-1. It has `AdministratorAccess` plus the `verity-never-use` deny policy ([ADR 0015](adr/0015-account-baseline.md)). |
 | Workloads | One least-privilege role per Lambda. The crawler is read-only except for its own table. |
 | Abuse limits | mock-openai's Function URL uses `AWS_IAM` auth ([ADR 0009](adr/0009-mock-openai-iam-auth.md)). Reserved concurrency is not available: the account limit is 10 and AWS requires 100 unreserved. mock-bedrock can only be invoked via IAM. The Free plan cannot bill, which caps the worst case. |
 | Data | Synthetic data only. Env var values are discarded on receipt and never stored or logged. |
