@@ -1,0 +1,101 @@
+# Direction: the requirement is concept A and the control is concept B, so subset_of means the
+# control covers the whole requirement and more (ADR 0017). These are our interpretation, not
+# legal advice, and not an official mapping. See content/README.md for the strength rubric.
+framework: nistrmf
+mappings:
+- requirement: GOVERN-1.1
+  control: VC-005
+  strm: subset_of
+  strength: 8
+  rationale_type: semantic
+  rationale: A register with owners and review keeps legal requirements understood, managed and documented,
+    and also tracks standards.
+  sufficiency: full
+- requirement: GOVERN-1.6
+  control: VC-003
+  strm: intersects_with
+  strength: 7
+  rationale_type: semantic
+  rationale: Both need an inventory. NIST adds resourcing by risk priority, which the control omits, and
+    the control adds automated discovery.
+  sufficiency: partial
+- requirement: GOVERN-2.2
+  control: VC-001
+  strm: intersects_with
+  strength: 6
+  rationale_type: semantic
+  rationale: Both train staff by role. NIST is about AI risk management and includes partners, while the
+    control is about AI literacy.
+  sufficiency: partial
+- requirement: GOVERN-3.2
+  control: VC-004
+  strm: intersects_with
+  strength: 5
+  rationale_type: semantic
+  rationale: Both define roles, but the control has no specific treatment of human-AI configurations,
+    which is the point of this subcategory.
+  sufficiency: partial
+- requirement: GOVERN-3.2
+  control: VC-032
+  strm: intersects_with
+  strength: 5
+  rationale_type: semantic
+  rationale: Both concern who oversees AI. The control assigns people to systems, while NIST asks for
+    policies that define the roles.
+  sufficiency: partial
+- requirement: GOVERN-6.1
+  control: VC-051
+  strm: intersects_with
+  strength: 6
+  rationale_type: semantic
+  rationale: Both address third-party AI risk including intellectual property. NIST asks for policies,
+    while the control is a review of each supplier.
+  sufficiency: partial
+- requirement: MAP-3.5
+  control: VC-032
+  strm: intersects_with
+  strength: 6
+  rationale_type: semantic
+  rationale: Both define human oversight. NIST also asks that the process be assessed and documented against
+    policy, which the control does not say, and the control names the people.
+  sufficiency: partial
+- requirement: MAP-5.1
+  control: VC-010
+  strm: intersects_with
+  strength: 6
+  rationale_type: semantic
+  rationale: Both rate likelihood and size of impact. NIST also counts benefits and names its inputs,
+    which the control does not, and the control goes on to treat risks.
+  sufficiency: partial
+- requirement: MEASURE-2.11
+  control: VC-014
+  strm: subset_of
+  strength: 8
+  rationale_type: functional
+  rationale: Bias testing with recorded results delivers the evaluation and documentation NIST asks for,
+    and adds acting on what is found.
+  sufficiency: full
+- requirement: MANAGE-2.4
+  control: VC-033
+  strm: subset_of
+  strength: 7
+  rationale_type: functional
+  rationale: Assigned ability to override, stop or deactivate delivers the mechanisms NIST names, and
+    also covers single outputs.
+  sufficiency: full
+- requirement: MANAGE-3.1
+  control: VC-051
+  strm: subset_of
+  strength: 7
+  rationale_type: semantic
+  rationale: Regular supplier review with recorded risk controls covers the monitoring asked for, and
+    adds review before first use.
+  sufficiency: full
+- requirement: MANAGE-4.1
+  control: VC-031
+  strm: intersects_with
+  strength: 6
+  rationale_type: semantic
+  rationale: Monitoring is common to both. NIST also lists appeal, decommissioning, recovery and change
+    management, which the control does not cover.
+  sufficiency: partial

@@ -1,0 +1,60 @@
+# NIST AI RMF 1.0 core subcategories. Summaries are our own, written after reading NIST's Core
+# page on 2026-11-05. NIST says a revised version is in progress, so re-check this before M11.
+framework:
+  slug: nistrmf
+  name: NIST AI Risk Management Framework
+  source_url: https://airc.nist.gov/airmf-resources/airmf/5-sec-core/
+  source_version: AI RMF 1.0 (NIST AI 100-1)
+  last_verified: 2026-11-05
+requirements:
+- id: GOVERN-1.1
+  ref: GOVERN 1.1
+  summary: Legal and regulatory requirements on AI are understood, managed and documented.
+  verified_against: primary_text
+- id: GOVERN-1.6
+  ref: GOVERN 1.6
+  summary: AI systems are inventoried, with the inventory resourced according to risk priorities.
+  verified_against: primary_text
+- id: GOVERN-2.2
+  ref: GOVERN 2.2
+  summary: Staff and partners get AI risk management training that fits their duties.
+  verified_against: primary_text
+- id: GOVERN-3.2
+  ref: GOVERN 3.2
+  summary: Policies define and separate the roles for human-AI configurations and for oversight of AI
+    systems.
+  verified_against: primary_text
+- id: GOVERN-6.1
+  ref: GOVERN 6.1
+  summary: Policies address AI risks from third parties, including infringing their intellectual property
+    or other rights.
+  verified_against: primary_text
+- id: MAP-3.5
+  ref: MAP 3.5
+  summary: Human oversight processes are defined, assessed and documented in line with organisational
+    policy.
+  verified_against: primary_text
+- id: MAP-5.1
+  ref: MAP 5.1
+  summary: The likelihood and size of each identified impact, good and bad, are identified and documented
+    from use, incidents, feedback and other data.
+  verified_against: primary_text
+- id: MEASURE-2.11
+  ref: MEASURE 2.11
+  summary: Fairness and bias are evaluated and the results are documented.
+  verified_against: primary_text
+- id: MANAGE-2.4
+  ref: MANAGE 2.4
+  summary: Mechanisms and assigned responsibilities exist to supersede, disengage or deactivate AI systems
+    that behave outside their intended use.
+  verified_against: primary_text
+- id: MANAGE-3.1
+  ref: MANAGE 3.1
+  summary: Risks and benefits from third-party resources are regularly monitored, and risk controls are
+    applied and documented.
+  verified_against: primary_text
+- id: MANAGE-4.1
+  ref: MANAGE 4.1
+  summary: Post-deployment monitoring plans cover user input, appeal and override, decommissioning, incident
+    response, recovery and change management.
+  verified_against: primary_text

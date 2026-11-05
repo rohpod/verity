@@ -1,0 +1,89 @@
+# ISO/IEC 42001:2023 Annex A. IDs and our own one-line summaries ONLY: no ISO text, and nobody
+# here has read the standard. Each summary is drawn from the control's public title, so these
+# are `public_listing` (ADR 0017). The IDs match on two public listings; see content/README.md
+# for a third listing that disagrees. iso.org refuses automated reads, so it was not checked.
+framework:
+  slug: iso42001
+  name: ISO/IEC 42001
+  source_url: https://www.iso.org/standard/42001
+  source_version: ISO/IEC 42001:2023
+  last_verified: 2026-11-05
+  copyrighted: true
+requirements:
+- id: A.2.2
+  ref: A.2.2
+  summary: Keep a documented policy for AI.
+  verified_against: public_listing
+  listing_sources:
+  - https://docs.modulos.ai/frameworks/iso-42001/annexes-a-d.html
+  - https://riskprofs.com/iso-42001-annex-a-controls-list/
+- id: A.3.3
+  ref: A.3.3
+  summary: Give people a way to report concerns about AI.
+  verified_against: public_listing
+  listing_sources:
+  - https://docs.modulos.ai/frameworks/iso-42001/annexes-a-d.html
+  - https://riskprofs.com/iso-42001-annex-a-controls-list/
+- id: A.5.2
+  ref: A.5.2
+  summary: Have a process for assessing the impact of AI systems.
+  verified_against: public_listing
+  listing_sources:
+  - https://docs.modulos.ai/frameworks/iso-42001/annexes-a-d.html
+  - https://riskprofs.com/iso-42001-annex-a-controls-list/
+- id: A.5.4
+  ref: A.5.4
+  summary: Assess how an AI system affects individuals and groups.
+  verified_against: public_listing
+  listing_sources:
+  - https://docs.modulos.ai/frameworks/iso-42001/annexes-a-d.html
+  - https://riskprofs.com/iso-42001-annex-a-controls-list/
+- id: A.6.2.4
+  ref: A.6.2.4
+  summary: Verify and validate an AI system.
+  verified_against: public_listing
+  listing_sources:
+  - https://docs.modulos.ai/frameworks/iso-42001/annexes-a-d.html
+  - https://riskprofs.com/iso-42001-annex-a-controls-list/
+- id: A.6.2.6
+  ref: A.6.2.6
+  summary: Operate and monitor an AI system.
+  verified_against: public_listing
+  listing_sources:
+  - https://docs.modulos.ai/frameworks/iso-42001/annexes-a-d.html
+  - https://riskprofs.com/iso-42001-annex-a-controls-list/
+- id: A.6.2.7
+  ref: A.6.2.7
+  summary: Keep technical documentation for an AI system.
+  verified_against: public_listing
+  listing_sources:
+  - https://docs.modulos.ai/frameworks/iso-42001/annexes-a-d.html
+  - https://riskprofs.com/iso-42001-annex-a-controls-list/
+- id: A.6.2.8
+  ref: A.6.2.8
+  summary: Record event logs for an AI system.
+  verified_against: public_listing
+  listing_sources:
+  - https://docs.modulos.ai/frameworks/iso-42001/annexes-a-d.html
+  - https://riskprofs.com/iso-42001-annex-a-controls-list/
+- id: A.7.4
+  ref: A.7.4
+  summary: Look after the quality of data used for AI systems.
+  verified_against: public_listing
+  listing_sources:
+  - https://docs.modulos.ai/frameworks/iso-42001/annexes-a-d.html
+  - https://riskprofs.com/iso-42001-annex-a-controls-list/
+- id: A.8.2
+  ref: A.8.2
+  summary: Give users documentation and information about the system.
+  verified_against: public_listing
+  listing_sources:
+  - https://docs.modulos.ai/frameworks/iso-42001/annexes-a-d.html
+  - https://riskprofs.com/iso-42001-annex-a-controls-list/
+- id: A.10.3
+  ref: A.10.3
+  summary: Manage suppliers in relation to AI.
+  verified_against: public_listing
+  listing_sources:
+  - https://docs.modulos.ai/frameworks/iso-42001/annexes-a-d.html
+  - https://riskprofs.com/iso-42001-annex-a-controls-list/

@@ -37,6 +37,7 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/). Decisions by the owner:
 | D19 | How the account is set up and guarded. See [ADR 0015](adr/0015-account-baseline.md) |
 | D20 | What the real table showed. See [ADR 0016](adr/0016-m3-live-results.md) |
 | D21 | Mapping direction, strength, `sufficiency: full`, obligation dates and ISO provenance. See [ADR 0017](adr/0017-m4-content-semantics.md) |
+| D22 | Mappings from a text nobody read claim only an overlap, so ISO requirements never show as Satisfied. See [ADR 0018](adr/0018-unread-standards.md) |
 
 ## Milestones
 
@@ -49,7 +50,7 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/). Decisions by the owner:
 | **AWS baseline** | | | | |
 | M3 | Account baseline: non-root admin with MFA, region eu-north-1, `infra/` root, $0.01 budget, `verity-graph` | Opus (IAM), Sonnet | **yes, approval first** | 🔄 |
 | **Governance logic (local)** | | | | |
-| M4 | Content: hub controls, ~35 requirements, STRM mappings, Kestrel org, synthetic systems, `verity seed` | Sonnet builds the loader, linter, CLI and org data; Opus writes the regulatory content | no | 🔄 |
+| M4 | Content: hub controls, ~35 requirements, STRM mappings, Kestrel org, synthetic systems, `verity seed` | Sonnet builds the loader, linter, CLI and org data; Opus writes the regulatory content | no | ✅ |
 | M5 | Rules and assessment: applicability, status, assurance, satisfaction, `verity assess`, `verity attest` | Opus, then Sonnet | no | ⬜ |
 | M6 | Discovery pipeline (8 stages), `ai_signals.yaml`, `verity crawl --local` | Sonnet | no | ⬜ |
 | M7 | Demo estate code: mocks, `verity_ai` with SigV4 hook, 5 apps, local talent model | Sonnet | no | ⬜ |
@@ -84,10 +85,10 @@ The M4 criterion says STRM, EU AI Act dates and ISO 27001 Amendment 1 are re-ver
 | STRM types and rationales | The 5 types and 3 rationales match `enums.py`. Type and rationale "must be used together" | NIST IR 8477 final, February 2024, read in full | ✅ Closes the ADR 0004 ❓ |
 | STRM strength | Not defined by NIST. The 1 to 10 scale is Secure Controls Framework practice | NIST IR 8477, full text | ⚠️ Corrected in [ADR 0017](adr/0017-m4-content-semantics.md) |
 | STRM direction | "A subset of B" means B contains everything A does and more. Our documents never fixed which side is A | NIST IR 8477 | ⚠️ Fixed in ADR 0017 |
-| EU AI Act dates | 2 Dec 2027 (Annex III), 2 Aug 2028 (Annex I), 2 Dec 2026 (Art. 50(2), systems already on the market), in force 27 Jul 2026. These match Stage 2 | Secondary commentary only. EUR-Lex returned an empty page to automated fetches | ⛔ Needs a primary read before any date enters `obligation_dates.yaml` |
+| EU AI Act dates | Read in the Official Journal: published 24 Jul 2026, in force 27 Jul 2026; 2 Dec 2027 (Annex III), 2 Aug 2028 (Annex I), 2 Dec 2026 (Art. 50(2), systems already on the market; Art. 5 additions). Art. 113 of the base text keeps 2 Aug 2026 as the general date, which includes Art. 50. All match Stage 2 | Regulation (EU) 2026/1744 and 2024/1689, read through the EU Publications Office, because EUR-Lex returned an empty page to automated fetches | ✅ |
 | ISO/IEC 27001:2022 Amendment 1:2024 | "Climate action changes", February 2024. Adds to clauses 4.1 and 4.2. No sign of Annex A changes | Public preview of the amendment and a national adoption listing. iso.org returns 403 | ✅ Enough for our use, and recorded as `public_listing` |
 | NIST AI RMF | 1.0 is still current. A revision is in progress with no public draft found | nist.gov | ✅ |
-| ISO/IEC 42001 sub-control IDs | Public listings disagree | Secondary only | ⚠️ An ID needs two agreeing public sources, or it is dropped |
+| ISO/IEC 42001 sub-control IDs | Two public listings agree on all 38 IDs. A third disagrees on many ([details](../content/README.md)) | Secondary only | ⚠️ Kept as `public_listing`, and limited by [ADR 0018](adr/0018-unread-standards.md) |
 
 ## Notes for later milestones
 
@@ -96,11 +97,12 @@ Found while building and reviewing M1. Each is open until the named milestone cl
 | Milestone | Note |
 |---|---|
 | M3 | Last open criterion: the owner re-reads credits in the Billing console at least 24 hours after the last live write (2026-11-05). M3 stays 🔄 until they match. The checks moto could not do are done ([ADR 0016](adr/0016-m3-live-results.md)) |
-| M4 | A first seed of about 300 nodes and 1,000 edges needs about 5,200 write units, roughly 6 minutes at the table's 15 per second ([ADR 0014](adr/0014-m2-measurements-and-evidence-cap.md)). `verity seed` should expect throttling waits and report progress. Re-seeding writes almost nothing |
 | M6 | `load_graph` reads every `U#` usage record in the table and discards it. If usage grows large, load without a scan: list nodes through the type index and read each node's partition |
 | M6 | Estimated in M2: 150 daily crawls of 15 to 30 resources reach 19,000 to 35,000 items and a 2.5 to 4.5 minute scan, mostly from Evidence rather than `OBSERVED` ([ADR 0014](adr/0014-m2-measurements-and-evidence-cap.md)). It stays free, but decide how to limit it, for example writing evidence only on a change |
 | M6 | The 16 KB evidence cap comes from fixtures only. Measure real crawl evidence, including role policies, and decide what happens over the cap: `content_ref` is a git file, which a Lambda cannot write, so today the write fails |
 | M5 | Applicability rules read `content/rules/obligation_dates.yaml` ([ADR 0017](adr/0017-m4-content-semantics.md)). Loading `content/decisions/` stays in M5 |
+| M5 | Apply Art. 111(2): a high-risk system on the market before Chapter III applies comes into scope only on a significant design change. Talent Screening's seeded `first_placed_on_market` is 2026-06-15, so decide how to show it. A date alone would overstate its obligations from 2 Dec 2027. Recital 39 ties this to the type and model of system |
+| M5 | Art. 10(5) moved to the new Art. 4a, which allows special-category data for bias testing under strict conditions. The bias-test control does not cover it yet |
 | M6 | The crawler must not overwrite the `AISystem` facts seeded in M4 (`roles`, `use_domains` and the others in ADR 0017) |
 | M8 | Re-seeding removes nothing, so a mapping deleted from YAML stays open in the graph. Decide on pruning before the first live re-seed |
 | M5 | Art. 9 shows `unmapped` when only its sub-clause is mapped. Decide whether a parent inherits from its children |

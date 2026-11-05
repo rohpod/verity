@@ -1,0 +1,76 @@
+# ISO/IEC 27001:2022 with Amendment 1:2024. IDs and our own one-line summaries ONLY: no ISO text,
+# and nobody here has read the standard. Each summary is drawn from the public title, so these
+# are `public_listing` (ADR 0017). Amendment 1 (climate action changes) touches clauses 4.1 and
+# 4.2, per public sources. We found no sign that it changes the Annex A controls listed here.
+framework:
+  slug: iso27001
+  name: ISO/IEC 27001
+  source_url: https://www.iso.org/standard/27001
+  source_version: ISO/IEC 27001:2022 with Amd 1:2024
+  last_verified: 2026-11-05
+  copyrighted: true
+requirements:
+- id: '4.1'
+  ref: Clause 4.1
+  summary: Understand the organisation and its context. Amendment 1 adds deciding whether climate change
+    is a relevant issue.
+  verified_against: public_listing
+  listing_sources:
+  - https://www.qmsuk.com/news/27001-climate-change-amendment
+  - https://www.thecoresolution.com/iso-27001-climate-change-amendment
+- id: A.5.19
+  ref: A.5.19
+  summary: Manage information security in supplier relationships.
+  verified_against: public_listing
+  listing_sources:
+  - https://www.isms.online/iso-27001/annex-a-2022/
+  - https://hightable.io/iso27001-annex-a-controls-reference-guide/
+- id: A.5.20
+  ref: A.5.20
+  summary: Address information security in supplier agreements.
+  verified_against: public_listing
+  listing_sources:
+  - https://www.isms.online/iso-27001/annex-a-2022/
+  - https://hightable.io/iso27001-annex-a-controls-reference-guide/
+- id: A.5.21
+  ref: A.5.21
+  summary: Manage information security in the ICT supply chain.
+  verified_against: public_listing
+  listing_sources:
+  - https://www.isms.online/iso-27001/annex-a-2022/
+  - https://hightable.io/iso27001-annex-a-controls-reference-guide/
+- id: A.5.23
+  ref: A.5.23
+  summary: Manage information security for cloud services.
+  verified_against: public_listing
+  listing_sources:
+  - https://www.isms.online/iso-27001/annex-a-2022/
+  - https://hightable.io/iso27001-annex-a-controls-reference-guide/
+- id: A.5.34
+  ref: A.5.34
+  summary: Protect privacy and personal data.
+  verified_against: public_listing
+  listing_sources:
+  - https://www.isms.online/iso-27001/annex-a-2022/
+  - https://hightable.io/iso27001-annex-a-controls-reference-guide/
+- id: A.8.2
+  ref: A.8.2
+  summary: Control privileged access rights.
+  verified_against: public_listing
+  listing_sources:
+  - https://www.isms.online/iso-27001/annex-a-2022/
+  - https://hightable.io/iso27001-annex-a-controls-reference-guide/
+- id: A.8.15
+  ref: A.8.15
+  summary: Keep logs.
+  verified_against: public_listing
+  listing_sources:
+  - https://www.isms.online/iso-27001/annex-a-2022/
+  - https://hightable.io/iso27001-annex-a-controls-reference-guide/
+- id: A.8.16
+  ref: A.8.16
+  summary: Monitor activities.
+  verified_against: public_listing
+  listing_sources:
+  - https://www.isms.online/iso-27001/annex-a-2022/
+  - https://hightable.io/iso27001-annex-a-controls-reference-guide/

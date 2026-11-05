@@ -1,0 +1,94 @@
+# EU AI Act. Summaries are our own, written after reading Regulation (EU) 2024/1689 and the
+# amending Regulation (EU) 2026/1744 in the Official Journal. Both were read through the EU
+# Publications Office on 2026-11-05. Application dates are in rules/obligation_dates.yaml.
+framework:
+  slug: euaia
+  name: EU AI Act
+  source_url: https://eur-lex.europa.eu/eli/reg/2024/1689/oj
+  source_version: 2024/1689 as amended by 2026/1744
+  last_verified: 2026-11-05
+requirements:
+- id: art4
+  ref: Art. 4
+  summary: Providers and deployers take measures to support the AI literacy of staff and others operating
+    AI systems for them. No specific level of literacy has to be guaranteed.
+  verified_against: primary_text
+- id: art9
+  ref: Art. 9
+  summary: High-risk AI systems have a documented risk management system that runs as a continuous process
+    across the whole lifecycle.
+  verified_against: primary_text
+- id: art9-2a
+  ref: Art. 9(2)(a)
+  summary: Identify and analyse the known and reasonably foreseeable risks the system can pose to health,
+    safety or fundamental rights when used as intended.
+  parent: art9
+  verified_against: primary_text
+- id: art10
+  ref: Art. 10
+  summary: Training, validation and testing data for high-risk AI systems meet quality criteria and are
+    under data governance.
+  verified_against: primary_text
+- id: art10-2ah
+  ref: Art. 10(2), points (a) to (e) and (h)
+  summary: Data practices cover design choices, data origin and collection, preparation, assumptions,
+    suitability of the data, and gaps in it.
+  parent: art10
+  verified_against: primary_text
+- id: art10-2fg
+  ref: Art. 10(2)(f) and (g)
+  summary: Examine data sets for biases likely to harm people or lead to prohibited discrimination, and
+    take measures to detect, prevent and reduce them.
+  parent: art10
+  verified_against: primary_text
+- id: art11
+  ref: Art. 11
+  summary: Technical documentation is drawn up before a high-risk system is released, kept up to date,
+    and shows that the system meets the requirements.
+  verified_against: primary_text
+- id: art12
+  ref: Art. 12
+  summary: High-risk systems technically allow events to be recorded automatically over their lifetime,
+    to support traceability and monitoring.
+  verified_against: primary_text
+- id: art13
+  ref: Art. 13
+  summary: High-risk systems are transparent enough for deployers to interpret and properly use their
+    output, and come with instructions for use.
+  verified_against: primary_text
+- id: art14
+  ref: Art. 14
+  summary: High-risk systems can be effectively overseen by people, who can understand the system, avoid
+    over-reliance on it, disregard or override its output, and stop it.
+  verified_against: primary_text
+- id: art25-4
+  ref: Art. 25(4)
+  summary: A high-risk provider and a third party supplying components or models agree in writing the
+    information, access and help the provider needs to comply.
+  verified_against: primary_text
+- id: art26
+  ref: Art. 26
+  summary: Duties of deployers of high-risk AI systems.
+  verified_against: primary_text
+- id: art26-2
+  ref: Art. 26(2)
+  summary: Deployers assign human oversight to people with the competence, training and authority it needs,
+    and give them support.
+  parent: art26
+  verified_against: primary_text
+- id: art26-7
+  ref: Art. 26(7)
+  summary: Employers tell workers and their representatives before using a high-risk AI system at the
+    workplace that they will be subject to it.
+  parent: art26
+  verified_against: primary_text
+- id: art50-1
+  ref: Art. 50(1)
+  summary: Providers design systems that interact directly with people so those people are told they are
+    dealing with an AI, unless that is obvious.
+  verified_against: primary_text
+- id: art50-2
+  ref: Art. 50(2)
+  summary: Providers of systems generating synthetic audio, image, video or text mark the output in a
+    machine-readable way as artificially generated.
+  verified_against: primary_text

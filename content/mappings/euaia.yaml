@@ -1,0 +1,131 @@
+# Direction: the requirement is concept A and the control is concept B, so subset_of means the
+# control covers the whole requirement and more (ADR 0017). These are our interpretation, not
+# legal advice, and not an official mapping. See content/README.md for the strength rubric.
+framework: euaia
+mappings:
+- requirement: art4
+  control: VC-001
+  strm: subset_of
+  strength: 8
+  rationale_type: semantic
+  rationale: Art. 4 asks for measures that support literacy and sets no level. The control does that for
+    the same audience and adds a training record.
+  sufficiency: full
+- requirement: art9-2a
+  control: VC-010
+  strm: subset_of
+  strength: 8
+  rationale_type: semantic
+  rationale: Identifying and analysing foreseeable risks is the first part of the control, which goes
+    on to rate and treat them, and also covers risks to the organisation.
+  sufficiency: full
+- requirement: art10-2ah
+  control: VC-012
+  strm: subset_of
+  strength: 8
+  rationale_type: semantic
+  rationale: The control records each listed practice for the data behind a model. It applies to every
+    model, not only to high-risk systems.
+  sufficiency: full
+- requirement: art10-2ah
+  control: VC-013
+  strm: superset_of
+  strength: 5
+  rationale_type: semantic
+  rationale: Data origin and the original purpose of collection are one point in the list, so a provenance
+    record covers only part of the requirement.
+  sufficiency: partial
+- requirement: art10-2fg
+  control: VC-014
+  strm: subset_of
+  strength: 7
+  rationale_type: functional
+  rationale: The control examines data for bias and acts on what it finds, as points (f) and (g) ask.
+    It also tests outputs, which they do not require.
+  sufficiency: full
+- requirement: art11
+  control: VC-020
+  strm: subset_of
+  strength: 7
+  rationale_type: semantic
+  rationale: The control requires what the applicable rules require, written before release and kept current,
+    and applies beyond high-risk systems.
+  sufficiency: full
+- requirement: art12
+  control: VC-030
+  strm: subset_of
+  strength: 8
+  rationale_type: functional
+  rationale: A system meeting the control can record events automatically over its lifetime, for traceability
+    and for spotting risks, as Art. 12 asks.
+  sufficiency: full
+- requirement: art13
+  control: VC-021
+  strm: superset_of
+  strength: 6
+  rationale_type: semantic
+  rationale: Instructions for use are half of Art. 13. The design duty to make operation interpretable
+    has no control of its own, so this stays partial.
+  sufficiency: partial
+- requirement: art13
+  control: VC-040
+  strm: no_relationship
+  rationale_type: semantic
+  rationale: Both are called transparency but they differ. Art. 13 informs deployers about a high-risk
+    system, while the control tells the people dealing with an AI that it is one.
+- requirement: art14
+  control: VC-032
+  strm: superset_of
+  strength: 7
+  rationale_type: semantic
+  rationale: Oversight by people who understand the limits, interpret output and resist over-reliance
+    is one half of Art. 14. Together with VC-033 it covers the article.
+  sufficiency: full
+- requirement: art14
+  control: VC-033
+  strm: superset_of
+  strength: 7
+  rationale_type: functional
+  rationale: The ability to disregard, override and stop is the other half of Art. 14. Together with VC-032
+    it covers the article.
+  sufficiency: full
+- requirement: art25-4
+  control: VC-052
+  strm: subset_of
+  strength: 8
+  rationale_type: semantic
+  rationale: The control is the written agreement Art. 25(4) describes. It applies to any supplier, not
+    only to suppliers to a high-risk system.
+  sufficiency: full
+- requirement: art26-2
+  control: VC-032
+  strm: subset_of
+  strength: 8
+  rationale_type: semantic
+  rationale: The control names people with the competence, training, authority and support Art. 26(2)
+    lists, and adds understanding limits and over-reliance.
+  sufficiency: full
+- requirement: art26-7
+  control: VC-034
+  strm: subset_of
+  strength: 8
+  rationale_type: semantic
+  rationale: The control gives the same notice to the same audience before use at work, and adds a record
+    of it, and it is not limited to high-risk systems.
+  sufficiency: full
+- requirement: art50-1
+  control: VC-040
+  strm: subset_of
+  strength: 8
+  rationale_type: functional
+  rationale: Telling people they are dealing with an AI achieves the outcome of Art. 50(1). The control
+    adds a check that the notice is shown.
+  sufficiency: full
+- requirement: art50-2
+  control: VC-041
+  strm: subset_of
+  strength: 8
+  rationale_type: functional
+  rationale: Machine-readable marking of generated content achieves the outcome of Art. 50(2). The control
+    asks for the same qualities of the method and adds a check.
+  sufficiency: full

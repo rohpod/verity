@@ -1,0 +1,46 @@
+# When EU AI Act obligations start to apply. Dates are data, read from the Official Journal
+# text on 2026-11-05 (ADR 0017, ADR 0018). A date here is not the whole answer: M5 also has to
+# apply Art. 111(2), which keeps high-risk systems already on the market out of scope until a
+# significant design change.
+dates:
+- id: euaia-chapters-1-2
+  date: 2025-02-02
+  covers: Chapters I and II, including Art. 4 and Art. 5, under Art. 113, third paragraph, point (a).
+    The rewritten Art. 4 took effect on 27 July 2026.
+  source_url: https://eur-lex.europa.eu/eli/reg/2026/1744/oj
+  last_verified: 2026-11-05
+- id: euaia-omnibus-in-force
+  date: 2026-07-27
+  covers: Regulation (EU) 2026/1744 entered into force, on the third day after publication on 24 July
+    2026 (its Art. 4).
+  source_url: https://eur-lex.europa.eu/eli/reg/2026/1744/oj
+  last_verified: 2026-11-05
+- id: euaia-general
+  date: 2026-08-02
+  covers: The general date of application under Art. 113, which includes Art. 50.
+  source_url: https://eur-lex.europa.eu/eli/reg/2024/1689/oj
+  last_verified: 2026-11-05
+- id: euaia-art5-new
+  date: 2026-12-02
+  covers: Art. 5(1), first subparagraph, points (ba) and (bb), and Art. 5(1a) and (1b), under Art. 113,
+    third paragraph, point (a).
+  source_url: https://eur-lex.europa.eu/eli/reg/2026/1744/oj
+  last_verified: 2026-11-05
+- id: euaia-art50-2-legacy
+  date: 2026-12-02
+  covers: Art. 50(2) for systems generating synthetic content that were placed on the market before 2
+    August 2026, under Art. 111(4).
+  source_url: https://eur-lex.europa.eu/eli/reg/2026/1744/oj
+  last_verified: 2026-11-05
+- id: euaia-high-risk-annex-iii
+  date: 2027-12-02
+  covers: Chapter III, Sections 1 to 3, for systems high-risk under Art. 6(2) and Annex III, under Art.
+    113, third paragraph, point (c)(i).
+  source_url: https://eur-lex.europa.eu/eli/reg/2026/1744/oj
+  last_verified: 2026-11-05
+- id: euaia-high-risk-annex-i
+  date: 2028-08-02
+  covers: Chapter III, Sections 1 to 3, for systems high-risk under Art. 6(1) and Annex I, under Art.
+    113, third paragraph, point (c)(ii).
+  source_url: https://eur-lex.europa.eu/eli/reg/2026/1744/oj
+  last_verified: 2026-11-05

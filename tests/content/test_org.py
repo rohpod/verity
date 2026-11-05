@@ -146,6 +146,33 @@ def test_a_provider_on_an_in_house_model_loads_but_the_graph_refuses_it(tmp_path
         repo.upsert_edge(provided_by)
 
 
+@pytest.mark.parametrize(
+    ("mutate", "message"),
+    [
+        (lambda o: o["risks"][0].update(mitigated_by=["VC-099"]), "risk 'drift' refers to unknown"),
+        (
+            lambda o: o.update(
+                policies=[{"slug": "p", "title": "P", "summary": "S", "implements": ["VC-099"]}]
+            ),
+            "policy 'p' refers to unknown",
+        ),
+    ],
+)
+def test_links_to_a_control_that_does_not_exist_are_refused(tmp_path, mutate, message):
+    with pytest.raises(ContentError, match=message):
+        load(tmp_path, change(mutate))
+
+
+def test_risks_and_policies_link_to_controls(tmp_path):
+    def mutate(org):
+        org["risks"][0]["mitigated_by"] = ["VC-014"]
+        org["policies"] = [{"slug": "p", "title": "P", "summary": "S", "implements": ["VC-001"]}]
+
+    edges = {(e.type, e.src, e.dst) for e in load(tmp_path, change(mutate)).edges}
+    assert (EdgeType.MITIGATED_BY, "risk:drift", "ctl:VC-014") in edges
+    assert (EdgeType.IMPLEMENTS, "pol:p", "ctl:VC-001") in edges
+
+
 def test_two_organisations_are_refused(tmp_path):
     files = with_org()
     files["org/other.yaml"] = {"organisation": {"slug": "other", "name": "Other Ltd"}}
@@ -223,11 +250,6 @@ def kestrel():
 
 def systems(content):
     return {n.id: n for n in content.estate if isinstance(n, AISystem)}
-
-
-def test_the_real_content_passes_every_rule_that_can_pass_before_the_controls_exist():
-    # PR 5 adds the controls and the regulatory content; until then only the control count fails.
-    assert {i.code for i in lint(load_content(REAL))} <= {"control_count"}
 
 
 def test_there_are_three_declared_systems_and_25_synthetic_ones(kestrel):

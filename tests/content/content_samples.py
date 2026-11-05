@@ -153,7 +153,7 @@ def good_files() -> dict[str, dict]:
         "mappings/iso42001.yaml": {
             "framework": "iso42001",
             "mappings": [
-                _mapping("A.6.2.4", "VC-014", "subset_of", 7, "full"),
+                _mapping("A.6.2.4", "VC-014", "intersects_with", 5, "partial"),
                 _mapping("A.8.2", "VC-012", "intersects_with", 5, "partial"),
             ],
         },

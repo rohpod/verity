@@ -1,0 +1,97 @@
+# Direction: the requirement is concept A and the control is concept B, so subset_of means the
+# control covers the whole requirement and more (ADR 0017). These are our interpretation, not
+# legal advice, and not an official mapping. See content/README.md for the strength rubric.
+# The ISO text was not read, so every mapping here is intersects_with, partial, strength 5 or
+# less. An ISO requirement can therefore never show as Satisfied (ADR 0018).
+framework: iso42001
+mappings:
+- requirement: A.2.2
+  control: VC-002
+  strm: intersects_with
+  strength: 5
+  rationale_type: semantic
+  rationale: 'From the public title only, the ISO text was not read: both concern having an AI policy.'
+  sufficiency: partial
+- requirement: A.3.3
+  control: VC-006
+  strm: intersects_with
+  strength: 5
+  rationale_type: semantic
+  rationale: 'From the public title only, the ISO text was not read: both concern a way to report concerns.'
+  sufficiency: partial
+- requirement: A.5.2
+  control: VC-011
+  strm: intersects_with
+  strength: 5
+  rationale_type: semantic
+  rationale: 'From the public title only, the ISO text was not read: both concern assessing the impact
+    of AI systems.'
+  sufficiency: partial
+- requirement: A.5.4
+  control: VC-011
+  strm: intersects_with
+  strength: 5
+  rationale_type: semantic
+  rationale: 'From the public title only, the ISO text was not read: both concern the effect on individuals
+    and groups.'
+  sufficiency: partial
+- requirement: A.6.2.4
+  control: VC-022
+  strm: intersects_with
+  strength: 5
+  rationale_type: semantic
+  rationale: 'From the public title only, the ISO text was not read: both concern verifying and validating
+    a system.'
+  sufficiency: partial
+- requirement: A.6.2.6
+  control: VC-031
+  strm: intersects_with
+  strength: 5
+  rationale_type: semantic
+  rationale: 'From the public title only, the ISO text was not read: both concern monitoring a system
+    in operation.'
+  sufficiency: partial
+- requirement: A.6.2.7
+  control: VC-020
+  strm: intersects_with
+  strength: 5
+  rationale_type: semantic
+  rationale: 'From the public title only, the ISO text was not read: both concern technical documentation.'
+  sufficiency: partial
+- requirement: A.6.2.8
+  control: VC-030
+  strm: intersects_with
+  strength: 5
+  rationale_type: semantic
+  rationale: 'From the public title only, the ISO text was not read: both concern event logs.'
+  sufficiency: partial
+- requirement: A.7.4
+  control: VC-012
+  strm: intersects_with
+  strength: 4
+  rationale_type: semantic
+  rationale: 'From the public title only, the ISO text was not read: both touch on the data behind a system,
+    and the control is broader than quality.'
+  sufficiency: partial
+- requirement: A.8.2
+  control: VC-021
+  strm: intersects_with
+  strength: 5
+  rationale_type: semantic
+  rationale: 'From the public title only, the ISO text was not read: both concern information for users.'
+  sufficiency: partial
+- requirement: A.10.3
+  control: VC-050
+  strm: intersects_with
+  strength: 3
+  rationale_type: semantic
+  rationale: 'From the public title only, the ISO text was not read: a data processing agreement is one
+    likely part of managing suppliers.'
+  sufficiency: partial
+- requirement: A.10.3
+  control: VC-051
+  strm: intersects_with
+  strength: 5
+  rationale_type: semantic
+  rationale: 'From the public title only, the ISO text was not read: both concern managing AI suppliers.'
+  sufficiency: partial

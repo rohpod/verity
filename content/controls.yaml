@@ -1,0 +1,179 @@
+# The Verity Control Library: the hub of the crosswalk (ADR 0004), in our own words. Numbering
+# leaves gaps by theme. Only technical controls may be automatable, and automatable means an
+# automated check can raise it (ADR 0005). Bias testing and overrides are technical but stay
+# non-automatable, because the result needs a person to judge it.
+controls:
+- code: VC-001
+  title: AI literacy programme
+  summary: Staff and others who operate AI for the organisation get training suited to their role and
+    to the people affected, and the training is recorded.
+  kind: organisational
+  scope_level: organisation
+- code: VC-002
+  title: AI policy
+  summary: A documented, approved AI policy says who may build, buy and approve AI, and is reviewed regularly.
+  kind: organisational
+  scope_level: organisation
+- code: VC-003
+  title: AI system inventory
+  summary: Every AI system is recorded with an owner, and automated discovery looks for systems that are
+    not recorded.
+  kind: technical
+  automatable: true
+  scope_level: organisation
+- code: VC-004
+  title: AI roles and accountability
+  summary: Roles for AI development, use, risk approval and oversight are named and kept separate where
+    they should be.
+  kind: organisational
+  scope_level: organisation
+- code: VC-005
+  title: Register of AI obligations
+  summary: Laws and standards that apply to AI use are recorded with an owner and reviewed when they change.
+  kind: organisational
+  scope_level: organisation
+- code: VC-006
+  title: AI concern reporting route
+  summary: Anyone can raise a concern about an AI system through a known route, and concerns are tracked
+    to a close.
+  kind: organisational
+  scope_level: organisation
+- code: VC-010
+  title: AI risk assessment
+  summary: Each system has a risk assessment that identifies, analyses, rates and treats risks to people
+    and the organisation, including likelihood and size of impact, and is kept current.
+  kind: organisational
+  scope_level: system
+- code: VC-011
+  title: Impact assessment on people
+  summary: Before release, the effect of the system on individuals and groups is assessed and recorded.
+  kind: organisational
+  scope_level: system
+- code: VC-012
+  title: Training and test data governance
+  summary: Design choices, data origin, preparation, assumptions, suitability and known gaps are recorded
+    for the data behind each model.
+  kind: organisational
+  scope_level: system
+- code: VC-013
+  title: Data provenance record
+  summary: Where each data set came from, and the original purpose of collecting any personal data in
+    it, is recorded.
+  kind: organisational
+  scope_level: system
+- code: VC-014
+  title: Bias testing
+  summary: Data and outputs are examined for bias against people or groups, results are recorded, and
+    bias found is detected, prevented or reduced.
+  kind: technical
+  scope_level: system
+- code: VC-020
+  title: Technical documentation
+  summary: Each system has technical documentation, written before release and kept up to date, covering
+    what the applicable rules require.
+  kind: legal_documentary
+  scope_level: system
+- code: VC-021
+  title: Instructions for use
+  summary: Users and deployers receive instructions covering purpose, limits, accuracy and how to use
+    the output properly.
+  kind: legal_documentary
+  scope_level: system
+- code: VC-022
+  title: Pre-release verification and validation
+  summary: A system is tested against its requirements before release and after significant change, and
+    the results are kept.
+  kind: technical
+  scope_level: system
+- code: VC-030
+  title: Automatic event logging
+  summary: The system records events automatically across its lifetime, with enough detail to trace its
+    behaviour and to spot risks.
+  kind: technical
+  automatable: true
+  scope_level: system
+- code: VC-031
+  title: Operational monitoring
+  summary: A running system is monitored for errors, drift and misuse, and alerts reach a named person.
+  kind: technical
+  automatable: true
+  scope_level: system
+- code: VC-032
+  title: Assigned human oversight
+  summary: Named people with the competence, training, authority and support for the job oversee each
+    system, understand its limits, can interpret its output and watch for over-reliance.
+  kind: organisational
+  scope_level: system
+- code: VC-033
+  title: Override and stop
+  summary: A person can disregard or override an output and can stop or deactivate the system, and who
+    may do so is assigned.
+  kind: technical
+  scope_level: system
+- code: VC-034
+  title: Informing workers
+  summary: Workers and their representatives are told before an AI system is used on them at work, and
+    that notice is recorded.
+  kind: organisational
+  scope_level: system
+- code: VC-040
+  title: AI interaction disclosure
+  summary: People dealing directly with a system are told it is an AI, and a check confirms the notice
+    is shown.
+  kind: technical
+  automatable: true
+  scope_level: system
+- code: VC-041
+  title: Synthetic content marking
+  summary: Generated audio, image, video or text is marked as artificial in a machine-readable way, using
+    a method that is effective, interoperable and robust as far as feasible, and a check confirms the
+    marking.
+  kind: technical
+  automatable: true
+  scope_level: system
+- code: VC-050
+  title: Supplier data processing agreement
+  summary: A data processing agreement is in place before an AI supplier receives personal data.
+  kind: legal_documentary
+  scope_level: provider
+- code: VC-051
+  title: AI supplier risk review
+  summary: AI suppliers are reviewed before use and regularly afterwards, including rights issues such
+    as intellectual property, and the risk controls applied are recorded.
+  kind: organisational
+  scope_level: provider
+- code: VC-052
+  title: Supplier information agreement
+  summary: A written agreement sets out the information, capabilities, technical access and help a supplier
+    gives so that the organisation can meet its obligations.
+  kind: legal_documentary
+  scope_level: provider
+- code: VC-053
+  title: Cross-border transfer check
+  summary: Before personal data goes to a supplier outside the EU, the transfer is checked and its legal
+    basis recorded.
+  kind: legal_documentary
+  scope_level: provider
+- code: VC-060
+  title: Least-privilege AI permissions
+  summary: Workloads hold only the AI permissions they use, and unused grants are found automatically.
+  kind: technical
+  automatable: true
+  scope_level: system
+- code: VC-061
+  title: Approved egress endpoints
+  summary: A system may send data only to approved AI endpoints, and a check confirms it.
+  kind: technical
+  automatable: true
+  scope_level: system
+- code: VC-062
+  title: Cloud security baseline
+  summary: Cloud accounts running AI workloads meet a security baseline, and a check confirms it.
+  kind: technical
+  automatable: true
+  scope_level: organisation
+- code: VC-063
+  title: Personal data safeguards
+  summary: Personal data used by AI systems has a lawful basis, is kept to what is needed, and is protected.
+  kind: organisational
+  scope_level: system

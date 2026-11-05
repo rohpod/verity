@@ -167,6 +167,7 @@ class PolicyIn(_Item):
     slug: Slug
     title: NonEmpty
     summary: NonEmpty
+    implements: list[ControlCode] = Field(default_factory=list)
 
 
 class RiskIn(_Item):
@@ -174,6 +175,7 @@ class RiskIn(_Item):
     title: NonEmpty
     description: NonEmpty
     owner: Slug | None = None
+    mitigated_by: list[ControlCode] = Field(default_factory=list)
 
 
 class DatasetUseIn(_Strict):
