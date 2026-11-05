@@ -39,6 +39,7 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/). Decisions by the owner:
 | D21 | Mapping direction, strength, `sufficiency: full`, obligation dates and ISO provenance. See [ADR 0017](adr/0017-m4-content-semantics.md) |
 | D22 | Mappings from a text nobody read claim only an overlap, so ISO requirements never show as Satisfied. See [ADR 0018](adr/0018-unread-standards.md) |
 | D23 | M5 rules: automated-only guardrail, Art. 111(2), high-risk candidates, decisions as Evidence, *Not met*. See [ADR 0019](adr/0019-m5-rules-and-assessment.md) |
+| D24 | M5 review fixes: decision lifecycle, risk-tier expiry, unknown facts, severity from binding law, ended assessments. See [ADR 0020](adr/0020-m5-review-fixes.md) |
 
 ## Milestones
 
@@ -52,7 +53,7 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/). Decisions by the owner:
 | M3 | Account baseline: non-root admin with MFA, region eu-north-1, `infra/` root, $0.01 budget, `verity-graph` | Opus (IAM), Sonnet | **yes, approval first** | 🔄 |
 | **Governance logic (local)** | | | | |
 | M4 | Content: hub controls, ~35 requirements, STRM mappings, Kestrel org, synthetic systems, `verity seed` | Sonnet builds the loader, linter, CLI and org data; Opus writes the regulatory content | no | ✅ |
-| M5 | Rules and assessment: applicability, status, assurance, satisfaction, `verity assess`, `verity attest` | Opus, then Sonnet | no | ✅ |
+| M5 | Rules and assessment: applicability, status, assurance, satisfaction, `verity assess`, `verity attest` | Opus, then Sonnet | no | 🔄 |
 | M6 | Discovery pipeline (8 stages), `ai_signals.yaml`, `verity crawl --local` | Sonnet | no | ⬜ |
 | M7 | Demo estate code: mocks, `verity_ai` with SigV4 hook, 5 apps, local talent model | Sonnet | no | ⬜ |
 | **Live** | | | | |
@@ -102,6 +103,8 @@ Found while building and reviewing M1. Each is open until the named milestone cl
 | M6 | Estimated in M2: 150 daily crawls of 15 to 30 resources reach 19,000 to 35,000 items and a 2.5 to 4.5 minute scan, mostly from Evidence rather than `OBSERVED` ([ADR 0014](adr/0014-m2-measurements-and-evidence-cap.md)). It stays free, but decide how to limit it, for example writing evidence only on a change |
 | M6 | The 16 KB evidence cap comes from fixtures only. Measure real crawl evidence, including role policies, and decide what happens over the cap: `content_ref` is a git file, which a Lambda cannot write, so today the write fails |
 | M5 | Applicability rules read `content/rules/obligation_dates.yaml` ([ADR 0017](adr/0017-m4-content-semantics.md)). The M5 decisions are in [ADR 0019](adr/0019-m5-rules-and-assessment.md) |
+| M5 | The end-of-milestone review reopened M5 until the fixes in [ADR 0020](adr/0020-m5-review-fixes.md) land and the review's experiments pass again |
+| M8 | `verity seed` now reads every Evidence node to check decisions ([ADR 0020](adr/0020-m5-review-fixes.md)). Measure how long that takes once M6 evidence is in the table |
 | M6 | The crawler must not overwrite the `AISystem` facts seeded in M4 (`roles`, `use_domains` and the others in ADR 0017) |
 | M8 | Re-seeding removes nothing, so a mapping deleted from YAML stays open in the graph. Decide on pruning before the first live re-seed |
 | M6 | Stamp `ChangeEvent.detected_at` at run start, so evidence collected in the same run survives. Leave `valid_from` unset on re-crawls, or every run writes history |
