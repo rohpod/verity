@@ -271,7 +271,7 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
   - `verity seed`: load content and organisation YAML
   - `verity crawl [--local]`
   - `verity lint`: check the content
-  - `verity assess`
+  - `verity assess [--as-of DATE] [--system ID] [--target memory|dynamodb]`: derive applicability and assess the controls. Memory (the default) seeds and assesses a fresh graph and writes nothing to AWS
   - `verity attest <control> <scope> --by <person>`: scaffolds a YAML file under `content/decisions/` for review; it never writes to the graph
   - `verity export`: write the redacted snapshot
 - **Crawler Lambda:** event `{ "mode": "full" | "incremental" }`, triggered by the schedule or a manual invoke.

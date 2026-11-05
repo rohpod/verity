@@ -1,18 +1,34 @@
-"""The `verity` command (architecture section I). M4 adds `lint` and `seed`."""
+"""The `verity` command (architecture section I). M4 adds `lint` and `seed`, M5 `assess` and
+`attest`."""
 
 import argparse
 import sys
+from collections import Counter
 from collections.abc import Callable, Sequence
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 
+import yaml
+from pydantic import ValidationError
+
+from verity_core.assess.apply import ApplyResult, apply_assessment, estimate_apply
+from verity_core.assess.requirements import RequirementState
 from verity_core.content.lint import lint
 from verity_core.content.loader import Content, ContentError, load_content
-from verity_core.content.seed import SeedEstimate, estimate, seed
+from verity_core.content.schema import AttestationDecision
+from verity_core.content.seed import (
+    INDEX_UNITS_PER_NODE,
+    TABLE_UNITS_PER_RECORD,
+    SeedEstimate,
+    estimate,
+    seed,
+)
 from verity_core.graph.memory import InMemoryRepository
+from verity_core.model.enums import ImplementationStatus
 
 OK, LINT_FAILED, UNREADABLE, REFUSED = 0, 1, 2, 3
 PROGRESS_EVERY = 25
+_SEVERITY = {"high": 0, "medium": 1, "low": 2}
 
 
 def _utc_now() -> datetime:
@@ -86,11 +102,129 @@ def cmd_seed(args: argparse.Namespace) -> int:
     return OK
 
 
-def _confirmed() -> bool:
+def _confirmed(word: str = "seed") -> bool:
     if not sys.stdin.isatty():
         return False
-    answer = input("This writes to the real verity-graph table in eu-north-1. Type 'seed': ")
-    return answer.strip() == "seed"
+    answer = input(f"This writes to the real verity-graph table in eu-north-1. Type '{word}': ")
+    return answer.strip() == word
+
+
+def _start_of(day: date) -> datetime:
+    return datetime.combine(day, time.min, UTC)
+
+
+def _print_assessment(
+    result: ApplyResult, as_of: datetime, *, verb: str, verbose: bool = False
+) -> None:
+    states = Counter(s.state for s in result.statuses)
+    print(f"as of {as_of.date()}: {len(result.results)} control assessments")
+    print(
+        "requirements: "
+        + ", ".join(f"{states[state]} {state.value}" for state in RequirementState if states[state])
+    )
+    if verbose:
+        for finding in result.findings:
+            line = f"{finding.severity.value:<6} {finding.code}  {finding.subject}"
+            print(f"  {line}  {finding.message}")
+    by_code = Counter((f.severity.value, f.code) for f in result.findings)
+    print(f"{len(result.findings)} finding(s)" + (":" if by_code else ""))
+    for (severity, code), n in sorted(
+        by_code.items(), key=lambda kv: (_SEVERITY[kv[0][0]], kv[0][1])
+    ):
+        print(f"  {severity:<6} {code}: {n}")
+    written = ", ".join(f"{n} {kind}" for kind, n in sorted(result.written.items())) or "nothing"
+    print(f"{verb}: {written}")
+
+
+def cmd_assess(args: argparse.Namespace) -> int:
+    loaded = _load_and_lint(args.content, args.tenant)
+    if isinstance(loaded, int):
+        return loaded
+    if loaded.rules is None:
+        print("cannot assess: content/rules/applicability.yaml is missing", file=sys.stderr)
+        return UNREADABLE
+    today = _utc_now().date()
+    as_of = _start_of(args.as_of or today)
+
+    if args.target == "memory":
+        # Seeds a fresh in-memory graph, then assesses it. Nothing reaches AWS.
+        repo = InMemoryRepository(args.tenant, _utc_now)
+        seed(repo, loaded, _utc_now)
+        result = apply_assessment(
+            repo, loaded.rules, loaded.dates, as_of, _utc_now, system_id=args.system
+        )
+        _print_assessment(result, as_of, verb="stored in memory", verbose=args.verbose)
+        print(
+            "dry run only: nothing was written to AWS. Use --target dynamodb to assess the table."
+        )
+        return OK
+
+    if as_of.date() != today:
+        print(
+            "refused: the real table is only assessed as of today, so a past or future date "
+            "cannot overwrite the stored assessments",
+            file=sys.stderr,
+        )
+        return REFUSED
+    # Imported here so a dry run needs no AWS libraries.
+    from verity_core.graph.dynamodb.repository import DynamoDBRepository
+
+    repo = DynamoDBRepository(args.tenant, _utc_now)
+    graph = repo.load_graph()
+    if not graph.nodes:
+        print("the table is empty: run `verity seed --target dynamodb` first", file=sys.stderr)
+        return REFUSED
+    plan = estimate_apply(
+        graph, loaded.rules, loaded.dates, as_of, _utc_now, args.tenant, system_id=args.system
+    )
+    new_nodes = plan.written["assessments"]
+    records = plan.total_written
+    units = TABLE_UNITS_PER_RECORD * records + INDEX_UNITS_PER_NODE * new_nodes
+    print(
+        f"estimated writes: {records} records ({new_nodes} assessments), about {units} write units "
+        "on the table. A second run writes nothing."
+    )
+    if not (args.yes or _confirmed("assess")):
+        print("not confirmed: nothing was written", file=sys.stderr)
+        return REFUSED
+    result = apply_assessment(
+        repo, loaded.rules, loaded.dates, as_of, _utc_now, system_id=args.system
+    )
+    _print_assessment(result, as_of, verb="written", verbose=args.verbose)
+    return OK
+
+
+def cmd_attest(args: argparse.Namespace) -> int:
+    """Scaffolds a decision file for review (D9). It never touches the graph."""
+    today = _utc_now().date()
+    slug = args.scope.partition(":")[2] or args.scope
+    decision_id = f"attestation-{args.control.lower()}-{slug}"
+    data = {
+        "id": decision_id,
+        "kind": "attestation",
+        "decided_on": today,
+        "by": args.by,
+        "valid_until": today + timedelta(days=365),
+        "simulated": False,
+        "statement": f"TODO: say what {args.by} attests about {args.control} for {args.scope}.",
+        "control": args.control,
+        "scope": args.scope,
+        "status": args.status,
+    }
+    try:
+        AttestationDecision.model_validate(data)
+    except ValidationError as exc:
+        print(f"cannot scaffold: {exc}", file=sys.stderr)
+        return UNREADABLE
+    path = args.content / "decisions" / f"{decision_id}.yaml"
+    if path.exists():
+        print(f"refused: {path} already exists", file=sys.stderr)
+        return REFUSED
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+    print(f"wrote {path}")
+    print("Edit the statement, run `verity lint`, and open a pull request: the PR is the approval.")
+    return OK
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -113,6 +247,34 @@ def build_parser() -> argparse.ArgumentParser:
         help="memory is a dry run (default); dynamodb writes to the real table",
     )
     seed_parser.add_argument("--yes", action="store_true", help="skip the confirmation prompt")
+
+    assess_parser = add("assess", cmd_assess, "derive applicability and assess the controls")
+    assess_parser.add_argument(
+        "--as-of",
+        type=date.fromisoformat,
+        metavar="YYYY-MM-DD",
+        help="assess as of this date (default: today)",
+    )
+    assess_parser.add_argument("--system", metavar="ID", help="only this system, such as sys:x")
+    assess_parser.add_argument(
+        "--target",
+        choices=("memory", "dynamodb"),
+        default="memory",
+        help="memory seeds, then assesses a fresh graph (default); dynamodb writes to the table",
+    )
+    assess_parser.add_argument("--yes", action="store_true", help="skip the confirmation prompt")
+    assess_parser.add_argument("--verbose", action="store_true", help="list every finding")
+
+    attest_parser = add("attest", cmd_attest, "scaffold an attestation decision file")
+    attest_parser.add_argument("control", help="control code, such as VC-001")
+    attest_parser.add_argument("scope", help="the organisation, system or provider ID")
+    attest_parser.add_argument("--by", required=True, help="person ID, such as person:l-ivanova")
+    attest_parser.add_argument(
+        "--status",
+        choices=[s.value for s in ImplementationStatus][:3],
+        default=ImplementationStatus.PARTIALLY_IMPLEMENTED.value,
+        help="what is attested (default: partially_implemented)",
+    )
     return parser
 
 
@@ -123,3 +285,7 @@ def run(argv: Sequence[str] | None = None) -> int:
 
 def main() -> None:
     sys.exit(run())
+
+
+if __name__ == "__main__":
+    main()
