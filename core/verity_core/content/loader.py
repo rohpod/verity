@@ -7,13 +7,14 @@ written anywhere: `seed.py` does that, through `GraphRepository`.
 Layout under the root; every file is optional:
 
     frameworks/*.yaml  controls.yaml  mappings/*.yaml  rules/obligation_dates.yaml
-    org/*.yaml
+    org/*.yaml  decisions/*.yaml
 """
 
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from verity_core.content.decisions import load_decisions
 from verity_core.content.org import load_estate
 from verity_core.content.schema import (
     ControlsFile,
@@ -26,6 +27,7 @@ from verity_core.content.yamlio import ContentError, parse, reading
 from verity_core.model import ids
 from verity_core.model.edges import Edge, MapsToEdge, PlainEdge
 from verity_core.model.enums import EdgeType, Source
+from verity_core.model.evidence import Evidence
 from verity_core.model.nodes import Control, Framework, Node, Requirement
 
 DEFAULT_TENANT = "kestrel"
@@ -41,13 +43,15 @@ class Content:
     dates: tuple[ObligationDate, ...] = ()
     # The fictional organisation and its AI estate, from `org/*.yaml`.
     estate: tuple[Node, ...] = ()
+    # Human decisions from `decisions/*.yaml`, as Evidence (ADR 0019).
+    decisions: tuple[Evidence, ...] = ()
     # Framework slugs whose text is copyrighted (ISO): IDs and original summaries only.
     copyrighted: frozenset[str] = frozenset()
     # Public pages that agree on each requirement's ID, by requirement ID.
     listing_sources: dict[str, tuple[str, ...]] = field(default_factory=dict)
 
     def nodes(self) -> list[Node]:
-        return [*self.frameworks, *self.requirements, *self.controls, *self.estate]
+        return [*self.frameworks, *self.requirements, *self.controls, *self.estate, *self.decisions]
 
 
 def load_content(root: Path | str, *, tenant: str = DEFAULT_TENANT) -> Content:
@@ -175,14 +179,16 @@ def load_content(root: Path | str, *, tenant: str = DEFAULT_TENANT) -> Content:
             raise ContentError(dates_path, f"date {duplicate!r} is defined twice")
 
     estate, estate_edges = load_estate(root, tenant, control_ids)
+    decisions, decision_edges = load_decisions(root, tenant)
 
     return Content(
         tenant=tenant,
         frameworks=tuple(frameworks),
         requirements=tuple(requirements),
         controls=tuple(controls),
-        edges=(*edges, *estate_edges),
+        edges=(*edges, *estate_edges, *decision_edges),
         estate=tuple(estate),
+        decisions=tuple(decisions),
         dates=tuple(dates),
         copyrighted=frozenset(copyrighted),
         listing_sources=listing,

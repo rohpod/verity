@@ -1,0 +1,12 @@
+id: document-vc-050-mock-bedrock
+kind: document
+decided_on: 2026-11-05
+by: person:l-ivanova
+valid_until: 2027-11-05
+simulated: true
+statement: >-
+  Simulated sign-off by a fictional person. A fictional data processing agreement with the
+  simulated Bedrock provider is on file.
+control: VC-050
+scope: prov:mock-bedrock
+path: evidence/dpa-mock-bedrock.md

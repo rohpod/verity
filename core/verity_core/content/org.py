@@ -218,6 +218,7 @@ def _system(s: SystemIn, tenant: str, source: Source) -> AISystem:
         interacts_with_people=s.interacts_with_people,
         generates_synthetic_content=s.generates_synthetic_content,
         first_placed_on_market=s.first_placed_on_market,
+        significant_change_on=s.significant_change_on,
         tenant=tenant,
         source=source,
     )

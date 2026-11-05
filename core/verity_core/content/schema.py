@@ -9,11 +9,12 @@ can be read.
 from datetime import date
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, RootModel, model_validator
 
 from verity_core.model.enums import (
     ControlKind,
     DataClassification,
+    ImplementationStatus,
     ModelOrigin,
     Purpose,
     RationaleType,
@@ -200,6 +201,7 @@ class SystemIn(_Item):
     interacts_with_people: bool | None = None
     generates_synthetic_content: bool | None = None
     first_placed_on_market: date | None = None
+    significant_change_on: date | None = None
 
 
 class OrgFile(_Strict):
@@ -215,3 +217,80 @@ class OrgFile(_Strict):
     policies: list[PolicyIn] = Field(default_factory=list)
     risks: list[RiskIn] = Field(default_factory=list)
     systems: list[SystemIn] = Field(default_factory=list)
+
+
+# --- human decisions (`decisions/*.yaml`, ADR 0008 and 0019) -------------------------------
+# One decision per file, so the approving pull request names exactly what it approves.
+
+PersonRef = Annotated[str, Field(pattern=r"^person:[A-Za-z0-9._-]+$")]
+# Only what a person can decide. `not_assessed` and `not_applicable` are the engine's words.
+DecidedStatus = Literal[
+    ImplementationStatus.IMPLEMENTED,
+    ImplementationStatus.PARTIALLY_IMPLEMENTED,
+    ImplementationStatus.NOT_IMPLEMENTED,
+]
+
+
+class _Decision(_Strict):
+    id: Slug
+    decided_on: date
+    by: PersonRef
+    valid_until: date
+    statement: NonEmpty
+    # A demo sign-off by a fictional person. The statement must say "simulated sign-off" (D11).
+    simulated: bool = False
+
+    @model_validator(mode="after")
+    def _expires_after_it_is_made(self):
+        if self.valid_until <= self.decided_on:
+            raise ValueError("valid_until must be after decided_on")
+        return self
+
+
+class RiskTierDecision(_Decision):
+    """Confirms or rejects a high-risk candidate (ADR 0019)."""
+
+    kind: Literal["risk_tier"]
+    system: NonEmpty  # an AISystem ID
+    tier: Literal["high_risk", "not_high_risk"]
+    basis: Literal["annex_iii", "not_listed", "art6_3"]
+    condition: Literal["a", "b", "c", "d"] | None = None  # the Art. 6(3) condition relied on
+    profiling: bool | None = None
+
+    @model_validator(mode="after")
+    def _art6_3_never_covers_profiling(self):
+        if self.basis != "art6_3":
+            if self.condition is not None or self.profiling is not None:
+                raise ValueError("condition and profiling belong to basis art6_3 only")
+        elif self.profiling:
+            raise ValueError("Art. 6(3) never applies to profiling: that is always high-risk")
+        elif self.condition is None or self.profiling is None:
+            raise ValueError("basis art6_3 needs a condition (a to d) and profiling: false")
+        return self
+
+
+class _ControlDecision(_Decision):
+    control: ControlCode
+    scope: NonEmpty  # the ID of the organisation, system or provider the control is assessed for
+
+
+class AttestationDecision(_ControlDecision):
+    kind: Literal["attestation"]
+    status: DecidedStatus
+
+
+class VerificationDecision(_ControlDecision):
+    kind: Literal["verification"]
+    status: DecidedStatus
+
+
+class DocumentDecision(_ControlDecision):
+    kind: Literal["document"]
+    path: NonEmpty  # a file under evidence/
+
+
+DecisionIn = RiskTierDecision | AttestationDecision | VerificationDecision | DocumentDecision
+
+
+class DecisionFile(RootModel[DecisionIn]):
+    root: DecisionIn = Field(discriminator="kind")

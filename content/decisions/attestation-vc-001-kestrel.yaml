@@ -1,0 +1,12 @@
+id: attestation-vc-001-kestrel
+kind: attestation
+decided_on: 2026-11-05
+by: person:l-ivanova
+valid_until: 2027-11-05
+simulated: true
+statement: >-
+  Simulated sign-off by a fictional person. Kestrel declares that AI literacy training is
+  partly in place.
+control: VC-001
+scope: org:kestrel
+status: partially_implemented

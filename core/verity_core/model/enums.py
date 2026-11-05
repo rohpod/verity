@@ -159,6 +159,14 @@ class Role(StrEnum):
     ANY = "any"
 
 
+class AppliesCondition(StrEnum):
+    """Why an `APPLIES_TO` edge is conditional rather than in force or upcoming (ADR 0019)."""
+
+    # Art. 111(2): a high-risk system placed on the market before Chapter III applies is in
+    # scope only after a significant change in its design.
+    LEGACY_SIGNIFICANT_CHANGE = "legacy_significant_change"
+
+
 class Purpose(StrEnum):
     """Why a system processes a dataset. `training` means this system itself runs training;
     `TRAINED_ON` is model lineage (ADR 0012)."""
