@@ -31,3 +31,29 @@ AI governance/risk/compliance platform: a learning and portfolio project built t
 
 ## Working style
 Work in stages, explain unfamiliar concepts briefly, challenge weak assumptions, and don't dump large implementations at once.
+
+## Implementation Guidelines
+
+- Implement one milestone at a time.
+- Follow the approved architecture and ADRs.
+- Do not introduce architectural changes without discussing them.
+- Write tests alongside implementation.
+- Explain significant technical decisions.
+- Never create AWS resources without explicit approval.
+- Maintain the zero-cost requirement.
+- Distinguish simulated components from real implementations.
+- Do not mark a task complete until its validation criteria pass.
+
+## Git workflow
+Follow [CONTRIBUTING.md](CONTRIBUTING.md).
+- Never commit or push to `main`. Before creating a branch, switch to `main` and run `git pull --ff-only`, so the new branch includes every merged PR.
+- Use Conventional Commits, with no attribution lines in commits or PRs.
+- Open a PR with the template when the work is ready. Never merge it: the owner reviews and merges on GitHub.
+- After opening a PR, switch back to `main` and ask the owner to merge. Don't start the next branch until the merge is done.
+
+## Model guidance (Opus decides, Sonnet builds)
+The user switches models to save usage. Claude cannot switch models itself, so **tell the user when a switch is warranted**, in one line at the start of the reply, e.g. `💡 Model hint: this is design work, so consider switching to Opus (/model opus).`
+- **Opus** is for: planning a stage or milestone (plan mode), graph schema and crosswalk/STRM mappings, EU AI Act and other regulatory interpretation, IAM policies and anything that could cost money, security reviews, end-of-milestone review against the ADRs, any change that would need a new ADR, and a bug Sonnet has failed to fix twice.
+- **Sonnet** is for: implementing an approved milestone step, writing tests from validation criteria, Terraform from an agreed spec, React components, CLI commands, refactors, and docs updates.
+- When running on Sonnet and the task turns into an architectural decision, a regulatory judgement, or an unresolved repeated failure: stop, say so, and suggest switching to Opus. Don't improvise the design.
+- When running on Opus and the work is routine implementation of an approved plan: suggest switching to Sonnet.

@@ -27,8 +27,8 @@ _Researched 2026-11-05. Status key: ✅ verified on an official source · 🟡 v
 ## 2. Service-by-service verdict
 | Service | Use in project | Free allowance | Verdict |
 |---|---|---|---|
-| **Lambda** | crawler, API, 3 apps, mocks | 1M requests + 400k GB-s per month, Always Free ✅ ([Free Tier guide](https://docs.aws.amazon.com/whitepapers/latest/how-aws-pricing-works/get-started-with-the-aws-free-tier.html)) | ✅ GO. Cap with reserved concurrency (1–2) as an abuse brake. |
-| Lambda Function URLs | HTTPS endpoints without API Gateway | ❓ Not listed separately; it's a Lambda feature with no separate price as far as we know | ✅ GO, use `AWS_IAM` auth (not `NONE`) |
+| **Lambda** | crawler, API, 3 apps, mocks | 1M requests + 400k GB-s per month, Always Free ✅ ([Free Tier guide](https://docs.aws.amazon.com/whitepapers/latest/how-aws-pricing-works/get-started-with-the-aws-free-tier.html)) | ✅ GO. ~~Cap with reserved concurrency (1–2) as an abuse brake.~~ **[Updated in Stage 4: the account limit is 10, so reserved concurrency can't be set.]** |
+| Lambda Function URLs | HTTPS endpoints without API Gateway | ❓ Not listed separately; it's a Lambda feature with no separate price as far as we know | ✅ GO, use `AWS_IAM` auth (not `NONE`). **[Stage 4: pricing to be confirmed on the Function URL docs before M8.]** |
 | **DynamoDB** | knowledge graph and evidence store | 25 GB + 25 WCU + 25 RCU, **provisioned mode + Standard table class only**. On-demand reads/writes are *not* free ✅ ([pricing](https://aws.amazon.com/dynamodb/pricing/)) | ✅ GO, provisioned, auto-scaling OFF, Standard class, 1 table (+≤2 GSIs, sharing the 25-unit budget) |
 | **CloudWatch Logs** | Lambda logs | 5 GB/month shared across ingestion, storage and Insights queries 🟡 | ⚠️ GO with guardrails: 3-day log retention, log level INFO/WARN, no payload logging |
 | EventBridge Scheduler | daily crawl | 14M invocations/month ✅ ([pricing](https://aws.amazon.com/eventbridge/pricing/)) | ✅ GO |
@@ -75,7 +75,7 @@ Other changes worth modelling:
 2. **Keep Lambda packages tiny.** scikit-learn plus numpy exceeds what's practical in a Lambda zip. Train the ML model locally, export its parameters to JSON, and run inference in pure Python. It's still a real trained model, with no heavy runtime.
 3. **One frontend data path.** The dashboard reads a **graph snapshot JSON**, both locally and on GitHub Pages. The private backend (Function URLs with IAM auth) handles crawling and writes, then exports the snapshot. No public AWS endpoint, so no Cognito needed for the MVP.
 4. **Region:** a single EU region (recommend `eu-west-1`, Ireland). It fits the EU-exposure story and gives us a clean data-residency attribute. Verify Lambda and DynamoDB are offered there (they are in all commercial regions).
-5. **Guardrails on day 1:** a $0.01 cost budget with email alert, Free Tier usage alerts, reserved concurrency caps, 3-day log retention, and a Claude Code hook that pauses before any mutating `aws`/`terraform apply` command.
+5. **Guardrails on day 1:** a $0.01 cost budget with email alert, Free Tier usage alerts, 3-day log retention (reserved concurrency dropped in Stage 4), and a Claude Code hook that pauses before any mutating `aws`/`terraform apply` command.
 
 ## 5. Decisions needed
 - **D1 — Real Bedrock calls from credits?** On the Free plan, a handful of calls to a small model would cost cents of credit and $0 out of pocket. It's *more* authentic (and gives CloudTrail evidence of actual use), but it bends your "no paid inference" rule. My recommendation: mock by default, with an optional `REAL_BEDROCK=false` adapter switch you flip deliberately for one recorded demo.

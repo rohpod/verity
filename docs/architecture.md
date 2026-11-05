@@ -1,6 +1,6 @@
 # Verity — Architecture
 
-_Stage 3 deliverable · 2026-11-05 · Status: proposed (pending review)._
+_Stage 3 deliverable · 2026-11-05 · Status: accepted, amended in Stage 4 (see [milestone plan](stage-4-milestones.md), [ADR 0009](adr/0009-mock-openai-iam-auth.md), [ADR 0010](adr/0010-assessment-and-crosswalk-semantics.md))._
 Inputs: [Stage 1 discovery](stage-1-discovery.md) · [Stage 2 feasibility](stage-2-feasibility.md) · decisions in [`adr/`](adr/).
 
 **Locked constraints:** AWS Free plan · single region `eu-west-1` · Terraform/OpenTofu · Python 3.12 backend · React + TS frontend · DynamoDB + NetworkX graph · no S3 · Bedrock/OpenAI mock-only · public demo = static snapshot on GitHub Pages · target customer = mid-size EU SaaS company acting as both AI provider and deployer.
@@ -13,7 +13,7 @@ Inputs: [Stage 1 discovery](stage-1-discovery.md) · [Stage 2 feasibility](stage
                     ┌──────────────── AWS account (eu-west-1, Free plan) ──────────────────┐
   Demo AI estate    │  [support-assistant λ] ──invoke──▶ [mock-bedrock λ]  (Converse shape) │
   (the fictional    │  [talent-screening λ]  (real model, pure-Python inference)           │
-   customer's       │  [contract-insights λ] ──HTTPS──▶ [mock-openai λ URL] (/v1/chat/…)    │
+   customer's       │  [contract-insights λ] ──HTTPS──▶ [mock-openai λ URL, AWS_IAM] (/v1/chat/…)    │
    workloads)       │  [shadow-summariser λ] (untagged, no manifest → must be detected)    │
                     │  [invoice-renderer λ]  (not AI → must NOT be flagged)                │
                     │  SSM /verity/manifests/*  (ai-manifest.yaml, published by Terraform) │
@@ -22,7 +22,7 @@ Inputs: [Stage 1 discovery](stage-1-discovery.md) · [Stage 2 feasibility](stage
                     │      read-only discovery role + write to its own table only │        │
                     │                                                             ▼        │
                     │                           DynamoDB `verity-graph` (provisioned 25/25)│
-                    │  Guardrails: Budgets alert · reserved concurrency · 3-day log retention│
+                    │  Guardrails: Budgets alert · 3-day log retention                      │
                     └───────────────────────────────────────────┬──────────────────────────┘
                                                                 │ boto3 (admin IAM user, MFA)
   Laptop:  `verity` CLI ── seed (YAML) · assess · export ──▶ web/public/data/snapshot.json
@@ -53,7 +53,7 @@ verity/
   tests/  docs/  .github/workflows/
 ```
 
-**Tooling:** `uv` (Python 3.12; the macOS system Python 3.9 is EOL), pydantic v2, NetworkX, pytest + `moto`, ruff. Lambdas run on arm64; Linux wheels are vendored with `uv pip install --python-platform aarch64-manylinux2014`. _❓ Confirm the newest supported Lambda Python runtime at implementation time._
+**Tooling:** `uv` (Python 3.12; the macOS system Python 3.9 is EOL), pydantic v2, NetworkX, pytest + `moto`, ruff. Lambdas run on arm64; Linux wheels are vendored with `uv pip install --python-platform aarch64-manylinux2014`. `python3.12` is supported on arm64, with deprecation forecast for 31 Oct 2028 ✅ (verified 2026-11-05). IaC uses OpenTofu (`tofu`).
 
 ## C. Demo AI estate
 
@@ -80,7 +80,7 @@ The pipeline is a sequence of pure functions over plain data, so it can be unit-
 | # | Stage | What it does |
 |---|---|---|
 | 1 | Enumerate | `tag:GetResources`, `lambda:ListFunctions`, `iam:ListRoles`, `dynamodb:ListTables`, `ssm:GetParametersByPath(/verity/manifests)`. Resource Explorer `Search` is optional and uses the local index only, never Config-backed views. |
-| 2 | Enrich | Function configuration (runtime, role, architecture). **Env var *names* only; values are never read.** Tags. Inline and attached role policies. |
+| 2 | Enrich | Function configuration (runtime, role, architecture). **Env var *names* only.** `ListFunctions` returns values too, so the collector discards them on receipt: never stored, never logged, and covered by a canary test. Tags. Inline and attached role policies. |
 | 3 | Signal & score | Rules in `content/rules/ai_signals.yaml` combine signals into `ai_likelihood ∈ {declared, confirmed_usage, probable, possible, none}`. Every result stores the signals that fired, so the UI can explain *why*. |
 | 4 | Correlate | The `ai:system-id` tag or a manifest links a resource to an `AISystem`. Unlinked resources scored *probable* or *possible* become `Candidate`s (the shadow-AI inbox). |
 | 5 | Relate | `ASSUMES` (function → role) and `CALLS` (function → table/function, derived from IAM resource ARNs and env var names). Also system → provider. |
@@ -126,7 +126,7 @@ IDs are deterministic and typed, which makes re-crawls idempotent:
 - `req:iso42001:A.6.2.4`
 - `req:nistrmf:MAP-1.1`
 - `ctl:VC-014`
-- `ev:<sha256-prefix>`
+- `ev:<sha256-prefix>`, where the hash covers subject + collector + `collected_at` + content ([ADR 0010](adr/0010-assessment-and-crosswalk-semantics.md))
 
 Every node and edge carries `tenant`, `source` (discovered · declared · seeded · synthetic · derived), `confidence`, `created_at`, `updated_at`, `version`, `valid_from` and `valid_to`.
 
@@ -172,9 +172,10 @@ Every node and edge carries `tenant`, `source` (discovered · declared · seeded
   - a rationale type: syntactic · semantic · functional
   - a written rationale
   - a `sufficiency` flag
-- **Why a hub, not pairwise mappings:** pairwise mapping of 4 frameworks needs 6 mapping sets, and that number grows as N² while errors compound. A hub needs only N sets. Cross-framework links are **derived** by composing two spokes. Each one is labelled "derived via VC-xxx", takes the weaker of the two strengths, and is never presented as `equal`. The Secure Controls Framework uses the same approach.
+- **Why a hub, not pairwise mappings:** pairwise mapping of 4 frameworks needs 6 mapping sets, and that number grows as N² while errors compound. A hub needs only N sets. Cross-framework links are **derived** by composing two spokes. Each one is labelled "related via VC-xxx", carries **no STRM type**, shows both spokes, takes the weaker of the two strengths, and `no_relationship` never composes. The Secure Controls Framework uses the same approach.
 - **When a requirement counts as satisfied:**
-  - **Satisfied:** every control in its `sufficiency: full` set has an `Implemented` ControlAssessment with assurance ≥ L2.
+  - **Satisfied:** its `sufficiency: full` set is **non-empty**, and every control in it has an `Implemented` ControlAssessment with assurance ≥ L2 from non-stale evidence.
+  - **Not addressed:** no mappings at all.
   - **Partially addressed:** only partial mappings are met. This is never shown green.
 - **Content rules:**
   - ISO entries contain the clause/control ID plus our own summary. No ISO text is reproduced.
@@ -232,7 +233,7 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
 
 - **GSI1** (`GSI1PK=T#{tenant}#TYPE#{type}`, `GSI1SK=id`) lists nodes by type.
 - Reverse lookups use the mirrored `R#` items instead of a second GSI, which keeps the design inside the 25-unit capacity budget.
-- **Repository pattern:** the `GraphRepository` protocol exposes `get_node`, `upsert_node`, `upsert_edge`, `neighbors(direction, type)`, `nodes_by_type`, `history` and `load_graph() → networkx.MultiDiGraph`.
+- **Repository pattern:** the `GraphRepository` protocol exposes `get_node`, `upsert_node`, `upsert_edge`, `neighbors(direction, type)`, `nodes_by_type`, `history`, `append_usage`, `usage_records`, `close_edge` and `load_graph() → networkx.MultiDiGraph`.
   - Implementations are `InMemoryRepository` (tests and local development) and `DynamoDBRepository`.
   - A future `Neo4jRepository` or `NeptuneRepository` would plug into the same interface. That is the migration path off DynamoDB.
 - **Traversal** happens in memory with NetworkX. The graph is hundreds to low thousands of items, so loading it whole is cheap.
@@ -244,7 +245,7 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
   - `verity seed`: load content and organisation YAML
   - `verity crawl [--local]`
   - `verity assess`
-  - `verity attest <control> <scope> --by <person>`
+  - `verity attest <control> <scope> --by <person>`: scaffolds a YAML file under `content/decisions/` for review; it never writes to the graph
   - `verity export`: write the redacted snapshot
 - **Crawler Lambda:** event `{ "mode": "full" | "incremental" }`, triggered by the schedule or a manual invoke.
 - **Snapshot contract:** `snapshot.schema.json` is generated from the pydantic models, and the TS types are generated from that schema, so the frontend and backend cannot drift.
@@ -268,10 +269,10 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
 
 | Area | Measure |
 |---|---|
-| Account | MFA on root, and root is never used day to day. An admin IAM user with MFA. IAM Identity Center is not available on the Free plan, so we use the `aws login` flow if available _(❓)_, otherwise short-lived MFA sessions. |
+| Account | MFA on root, and root is never used day to day. An admin IAM user with MFA. IAM Identity Center is not available on the Free plan, so we use the `aws login` flow, which is verified to work ✅. The CLI currently runs as root with default region ap-south-1; both are fixed in M3 before any apply. |
 | Workloads | One least-privilege role per Lambda. The crawler is read-only except for its own table. |
-| Abuse limits | mock-openai's Function URL uses `NONE` auth (needed for OpenAI compatibility) plus a bearer key from SSM, with reserved concurrency 1. mock-bedrock can only be invoked via IAM. The Free plan cannot bill, which caps the worst case. |
-| Data | Synthetic data only. Env var values are never collected. |
+| Abuse limits | mock-openai's Function URL uses `AWS_IAM` auth ([ADR 0009](adr/0009-mock-openai-iam-auth.md)). Reserved concurrency is not available: the account limit is 10 and AWS requires 100 unreserved. mock-bedrock can only be invoked via IAM. The Free plan cannot bill, which caps the worst case. |
+| Data | Synthetic data only. Env var values are discarded on receipt and never stored or logged. |
 | Public snapshot | The export redacts the account ID (`000000000000`) and strips function URLs. |
 | Repository | Secret scanning, Dependabot, branch protection on `main`. CI holds no AWS credentials. |
 | Developer guardrail | A Claude Code project hook asks for confirmation before `terraform/tofu apply` and mutating `aws` commands. |
@@ -288,6 +289,8 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
 | [0006](adr/0006-static-snapshot-demo.md) | Public demo as a redacted static snapshot |
 | [0007](adr/0007-mock-only-ai-providers.md) | Bedrock/OpenAI mock-only behind adapter SDK |
 | [0008](adr/0008-governance-as-code.md) | Human governance decisions as code |
+| [0009](adr/0009-mock-openai-iam-auth.md) | mock-openai uses an `AWS_IAM` Function URL; reserved concurrency dropped |
+| [0010](adr/0010-assessment-and-crosswalk-semantics.md) | Assessment and crosswalk semantics |
 
 ## L. Schema validation walkthrough
 
