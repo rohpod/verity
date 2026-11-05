@@ -1,5 +1,5 @@
 # 0001 — AWS Free plan, single region eu-west-1
-- **Status:** Accepted (2026-11-05)
+- **Status:** Accepted (2026-11-05). Region choice superseded by [0011](0011-region-eu-north-1.md).
 
 ## Context
 The project must cost $0. The AWS account was created after 15 Jul 2025 on the **Free plan**. That plan never bills; usage beyond the Always Free allowances draws down credits. It ends after 6 months or when the credits run out, whichever comes first. The Free plan does not support multi-region features or AWS Organizations. ([AWS Billing: Free Tier](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/free-tier.html), [Free plan supported services](https://docs.aws.amazon.com/accounts/latest/reference/supported-services-sign-up-new.html))

@@ -82,7 +82,7 @@ Other changes worth modelling:
 - **D2 — IaC tool:** Terraform/OpenTofu (no S3 needed, highly transferable skill) vs AWS SAM (AWS-native, simpler Lambda dev loop, but needs an S3 artefact bucket on credits). My recommendation: Terraform.
 - **D3 — Region:** `eu-west-1` (recommended) vs `us-east-1`.
 
-**Decided 2026-11-05:** D1 = **Mock only** (Bedrock is never invoked) · D2 = **Terraform/OpenTofu** · D3 = **eu-west-1**.
+**Decided 2026-11-05:** D1 = **Mock only** (Bedrock is never invoked) · D2 = **Terraform/OpenTofu** · D3 = **eu-west-1**. **[Updated: region changed to eu-north-1, see [ADR 0011](adr/0011-region-eu-north-1.md).]**
 
 ## 6. Feasibility verdict
 **GO.** Every MVP component has a zero-cost path on your Free plan. Three things can't be done at zero cost and will be simulated, clearly labelled:
