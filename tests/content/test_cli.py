@@ -1,9 +1,11 @@
 import sys
+from pathlib import Path
 
 import pytest
 from content_samples import at_scale, broken, good_files, write_tree
 from verity_core import cli
 from verity_core.graph.memory import InMemoryRepository
+from verity_core.model.enums import NodeType
 
 
 def tree(tmp_path, files=None):
@@ -101,3 +103,103 @@ def test_main_exits_with_the_status(tmp_path, monkeypatch):
 def test_a_command_is_required():
     with pytest.raises(SystemExit):
         cli.run([])
+
+
+# --- assess and attest (M5) ---------------------------------------------------------------
+
+REAL_CONTENT = str(Path(__file__).parents[2] / "content")
+
+
+def test_assess_defaults_to_a_dry_run_that_never_builds_the_real_repository(capsys, fake_table):
+    assert cli.run(["assess", "--content", REAL_CONTENT, "--as-of", "2026-11-05"]) == cli.OK
+    out = capsys.readouterr().out
+    assert "dry run only" in out
+    assert "high   no_evidence" in out
+    assert fake_table == []
+
+
+def test_assess_lists_every_finding_with_verbose(capsys):
+    args = ["assess", "--content", REAL_CONTENT, "--as-of", "2026-11-05", "--verbose"]
+    assert cli.run(args) == cli.OK
+    assert "no_owner  sys:legacy-faq-bot" in capsys.readouterr().out
+
+
+def test_assess_can_be_limited_to_one_system(capsys):
+    args = ["assess", "--content", REAL_CONTENT, "--as-of", "2026-11-05", "--system"]
+    assert cli.run([*args, "sys:talent-screening"]) == cli.OK
+    assert "no_owner" not in capsys.readouterr().out
+
+
+def test_assess_without_rules_cannot_run(tmp_path, capsys):
+    assert cli.run(["assess", "--content", tree(tmp_path)]) == cli.UNREADABLE
+    assert "applicability.yaml is missing" in capsys.readouterr().err
+
+
+def test_the_real_table_is_assessed_only_as_of_today(capsys, fake_table):
+    args = ["assess", "--content", REAL_CONTENT, "--as-of", "2020-01-01", "--target", "dynamodb"]
+    assert cli.run(args) == cli.REFUSED
+    assert "only assessed as of today" in capsys.readouterr().err
+    assert fake_table == []
+
+
+def test_the_real_table_must_be_seeded_first(capsys, fake_table):
+    assert cli.run(["assess", "--content", REAL_CONTENT, "--target", "dynamodb"]) == cli.REFUSED
+    assert "run `verity seed" in capsys.readouterr().err
+
+
+def test_the_real_target_is_refused_without_confirmation_and_prints_the_estimate(
+    capsys, fake_table, monkeypatch
+):
+    from verity_core.content.loader import load_content
+    from verity_core.content.seed import seed
+
+    content = load_content(REAL_CONTENT)
+    stored = {}
+
+    def factory(tenant, clock):
+        stored.setdefault("repo", InMemoryRepository(tenant, clock))
+        return stored["repo"]
+
+    monkeypatch.setattr("verity_core.graph.dynamodb.repository.DynamoDBRepository", factory)
+    seed(factory("kestrel", cli._utc_now), content, cli._utc_now)
+    assert cli.run(["assess", "--content", REAL_CONTENT, "--target", "dynamodb"]) == cli.REFUSED
+    captured = capsys.readouterr()
+    assert "estimated writes" in captured.out
+    assert "not confirmed" in captured.err
+    assert not stored["repo"].nodes_by_type(NodeType.CONTROL_ASSESSMENT)
+
+
+def test_attest_scaffolds_a_decision_file_and_refuses_to_overwrite(tmp_path, capsys):
+    args = ["attest", "VC-001", "org:kestrel", "--by", "person:l-ivanova"]
+    args += ["--content", str(tmp_path)]
+    assert cli.run(args) == cli.OK
+    (path,) = (tmp_path / "decisions").glob("*.yaml")
+    text = path.read_text()
+    assert "kind: attestation" in text and "status: partially_implemented" in text
+    assert cli.run(args) == cli.REFUSED
+    assert "already exists" in capsys.readouterr().err
+
+
+def test_attest_refuses_an_invalid_control(tmp_path, capsys):
+    args = ["attest", "NOPE", "org:kestrel", "--by", "person:l-ivanova", "--content", str(tmp_path)]
+    assert cli.run(args) == cli.UNREADABLE
+    assert not (tmp_path / "decisions").exists()
+
+
+def test_attest_never_touches_the_graph(tmp_path, fake_table):
+    args = ["attest", "VC-001", "org:kestrel", "--by", "person:l-ivanova"]
+    cli.run([*args, "--content", str(tmp_path)])
+    assert fake_table == []
+
+
+def test_the_module_runs_as_a_script():
+    import subprocess
+    import sys
+
+    out = subprocess.run(
+        [sys.executable, "-m", "verity_core.cli", "lint", "--content", REAL_CONTENT],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    assert "content passes lint" in out

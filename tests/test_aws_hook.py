@@ -43,6 +43,12 @@ MUST_ASK = [
     "cd /repo && uv run verity seed --tenant kestrel --target dynamodb",
     "bash -c 'uv run verity seed --target dynamodb'",
     "uv run python -m verity_core.cli seed --target dynamodb",
+    "uv run verity assess --target dynamodb",
+    "uv run verity assess --target=dynamodb --yes",
+    "uv run verity assess --as-of 2026-11-05 --system sys:x --target dynamodb",
+    "cd /repo && uv run verity assess --tenant kestrel --target dynamodb",
+    "bash -c 'uv run verity assess --target dynamodb'",
+    "uv run python -m verity_core.cli assess --target dynamodb",
 ]
 
 MUST_PASS = [
@@ -67,6 +73,11 @@ MUST_PASS = [
     "uv run verity lint",
     "uv run verity seed",
     "uv run verity seed --target memory",
+    "uv run verity assess",
+    "uv run verity assess --target memory --as-of 2026-12-02",
+    "uv run verity attest VC-001 org:kestrel --by person:l-ivanova",
+    "echo 'verity assess --target dynamodb'",
+    "grep -rn 'assess --target dynamodb' docs",
     "uv run verity seed --content tests/content --target memory",
     "echo 'verity seed --target dynamodb'",
     "grep -rn 'seed --target dynamodb' docs",

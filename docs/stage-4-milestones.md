@@ -52,7 +52,7 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/). Decisions by the owner:
 | M3 | Account baseline: non-root admin with MFA, region eu-north-1, `infra/` root, $0.01 budget, `verity-graph` | Opus (IAM), Sonnet | **yes, approval first** | 🔄 |
 | **Governance logic (local)** | | | | |
 | M4 | Content: hub controls, ~35 requirements, STRM mappings, Kestrel org, synthetic systems, `verity seed` | Sonnet builds the loader, linter, CLI and org data; Opus writes the regulatory content | no | ✅ |
-| M5 | Rules and assessment: applicability, status, assurance, satisfaction, `verity assess`, `verity attest` | Opus, then Sonnet | no | 🔄 |
+| M5 | Rules and assessment: applicability, status, assurance, satisfaction, `verity assess`, `verity attest` | Opus, then Sonnet | no | ✅ |
 | M6 | Discovery pipeline (8 stages), `ai_signals.yaml`, `verity crawl --local` | Sonnet | no | ⬜ |
 | M7 | Demo estate code: mocks, `verity_ai` with SigV4 hook, 5 apps, local talent model | Sonnet | no | ⬜ |
 | **Live** | | | | |
@@ -102,11 +102,11 @@ Found while building and reviewing M1. Each is open until the named milestone cl
 | M6 | Estimated in M2: 150 daily crawls of 15 to 30 resources reach 19,000 to 35,000 items and a 2.5 to 4.5 minute scan, mostly from Evidence rather than `OBSERVED` ([ADR 0014](adr/0014-m2-measurements-and-evidence-cap.md)). It stays free, but decide how to limit it, for example writing evidence only on a change |
 | M6 | The 16 KB evidence cap comes from fixtures only. Measure real crawl evidence, including role policies, and decide what happens over the cap: `content_ref` is a git file, which a Lambda cannot write, so today the write fails |
 | M5 | Applicability rules read `content/rules/obligation_dates.yaml` ([ADR 0017](adr/0017-m4-content-semantics.md)). The M5 decisions are in [ADR 0019](adr/0019-m5-rules-and-assessment.md) |
-| M5 | Art. 10(5) moved to the new Art. 4a, which allows special-category data for bias testing under strict conditions. The bias-test control does not cover it yet |
 | M6 | The crawler must not overwrite the `AISystem` facts seeded in M4 (`roles`, `use_domains` and the others in ADR 0017) |
 | M8 | Re-seeding removes nothing, so a mapping deleted from YAML stays open in the graph. Decide on pruning before the first live re-seed |
 | M6 | Stamp `ChangeEvent.detected_at` at run start, so evidence collected in the same run survives. Leave `valid_from` unset on re-crawls, or every run writes history |
 | M6 | §D says "system → provider", but §E only has the path through Model. Decide how to record a provider with no known model |
+| M8 | The first `verity assess --target dynamodb` on the real content writes 1,368 records (65 `APPLIES_TO` edges, 433 ControlAssessments, 870 assessment edges): about 5,900 write units, roughly 6.6 minutes at 15 table units a second, and a second run writes 0. Measured on the in-memory copy that `estimate_apply` uses. It is not yet run on the real table. Decisions that change only add or close a few records |
 | M8 | Edge writes do not re-check the nodes they connect, which is safe with one writer at a time ([ADR 0014](adr/0014-m2-measurements-and-evidence-cap.md)). Do not run a seed and a crawl together |
 | M11 | Art. 10(5) moved to the new Art. 4a, which allows special-category data for bias testing under strict conditions. The bias-test control does not cover it, because Kestrel records no special-category processing ([ADR 0019](adr/0019-m5-rules-and-assessment.md)). Revisit if that changes |
 | M11 | D15 overstates its reason: Policy, Dataset, Candidate and DiscoveryRun appear in none of the 5 traversals. They stay, because other views need them |

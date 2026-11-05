@@ -111,6 +111,9 @@ def apply_assessment(
         _store(repo, graph, result, as_of, clock, note)
     unchanged = len(results) - written["assessments"]
     findings = derive_findings(graph, as_of, results, statuses, applicability_findings)
+    if system_id is not None:
+        shown = {system_id, *(r.scope_id for r in results)}
+        findings = [f for f in findings if f.subject in shown]
     return ApplyResult(written, unchanged, tuple(statuses), tuple(results), tuple(findings))
 
 
