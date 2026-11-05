@@ -3,9 +3,10 @@
 from datetime import UTC
 from typing import Annotated
 
-from pydantic import AfterValidator, AwareDatetime, BaseModel, ConfigDict, Field
+from pydantic import AfterValidator, AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
-from verity_core.model.enums import Source
+from verity_core.model.enums import NodeType, Source
+from verity_core.model.ids import check_id
 
 
 def _to_utc(value: AwareDatetime) -> AwareDatetime:
@@ -41,3 +42,15 @@ class Envelope(VerityRecord):
     version: int = Field(default=0, ge=0)
     valid_from: UtcDatetime | None = None
     valid_to: UtcDatetime | None = None
+
+
+class NodeBase(Envelope):
+    """A graph node. Subclasses set `type`, and the ID prefix must match it."""
+
+    id: str
+    type: NodeType
+
+    @model_validator(mode="after")
+    def _id_matches_type(self) -> "NodeBase":
+        check_id(self.id, self.type)
+        return self
