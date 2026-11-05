@@ -31,10 +31,17 @@ MUST_ASK = [
     "aws login",
     "echo hi | aws s3 cp - s3://b/k",
     "tofu apply 'unterminated",
+    "aws ce get-cost-and-usage --time-period x",
+    "aws --region us-east-1 ce get-cost-forecast",
+    "VERITY_LIVE_AWS=1 uv run pytest tests/live",
+    "env VERITY_LIVE_AWS=1 uv run pytest tests/live",
+    "export VERITY_LIVE_AWS=1 && uv run pytest tests/live",
+    "bash -c 'VERITY_LIVE_AWS=1 uv run pytest'",
 ]
 
 MUST_PASS = [
     "tofu plan",
+    "uv run pytest tests/graph",
     "tofu validate",
     "tofu fmt -check",
     "tofu init",

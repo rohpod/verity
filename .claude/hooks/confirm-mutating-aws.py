@@ -24,6 +24,8 @@ AWS_READ_ONLY_COMMANDS = {
     ("configure", "list-profiles"),
 }
 AWS_ALWAYS_ASK_SERVICES = {"login", "sso", "configure"}  # configure set/import changes local config
+AWS_CHARGED_PER_CALL_SERVICES = {"ce"}  # Cost Explorer: $0.01 a request, even for reads
+LIVE_TEST_SWITCH = "VERITY_LIVE_AWS="  # live tests write through boto3, not the aws command
 SEPARATORS = {"&&", "||", ";", "|", "&", "\n"}
 
 
@@ -96,6 +98,8 @@ def aws_reason(args: list[str]) -> str | None:
         return None
     service = pos[0]
     verb = pos[1] if len(pos) > 1 else ""
+    if service in AWS_CHARGED_PER_CALL_SERVICES:
+        return f"aws {service} is charged per request"
     if (service, verb) in AWS_READ_ONLY_COMMANDS:
         return None
     if service in AWS_ALWAYS_ASK_SERVICES:
@@ -113,6 +117,8 @@ def reason_for(command: str) -> str | None:
     except ValueError:
         return "command could not be parsed"
     for tokens in parts:
+        if any(tok.startswith(LIVE_TEST_SWITCH) for tok in tokens):
+            return "VERITY_LIVE_AWS runs tests against the real AWS account"
         tokens = strip_prefix(tokens)
         if not tokens:
             continue

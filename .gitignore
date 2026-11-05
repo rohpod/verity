@@ -19,6 +19,8 @@ web/dist/
 *.tfstate
 *.tfstate.*
 *.tfplan
+*.tfvars
+*.tfvars.json
 crash.log
 .terraform.lock.hcl.bak
 override.tf

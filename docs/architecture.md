@@ -316,6 +316,7 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
 | [0012](adr/0012-graph-schema-refinements.md) | Graph schema refinements: edge qualifier, closed intervals, tenant is the organisation, staleness cutoff |
 | [0013](adr/0013-dynamodb-write-model.md) | DynamoDB write model: transactions, JSON records, version checks |
 | [0014](adr/0014-m2-measurements-and-evidence-cap.md) | M2 results: throttling retries, measured costs, 16 KB inline evidence cap |
+| [0015](adr/0015-account-baseline.md) | Account baseline: identity outside OpenTofu, deny policy, `credential_process`, budget excludes credits |
 
 ## L. Schema validation walkthrough
 

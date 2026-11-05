@@ -1,0 +1,29 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "VerityNeverUse",
+      "Effect": "Deny",
+      "Action": [
+        "apigateway:*",
+        "bedrock:Converse*",
+        "bedrock:Invoke*",
+        "cloudtrail:CreateEventDataStore",
+        "cloudtrail:CreateTrail",
+        "config:*",
+        "ec2:CreateFlowLogs",
+        "ec2:CreateNatGateway",
+        "freetier:UpgradeAccountPlan",
+        "neptune-graph:*",
+        "organizations:CreateAccount",
+        "organizations:CreateOrganization",
+        "rds:CreateDBCluster",
+        "rds:CreateDBInstance",
+        "s3:CreateBucket",
+        "sagemaker:InvokeEndpoint*",
+        "secretsmanager:*"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

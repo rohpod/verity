@@ -1,0 +1,3 @@
+# Copy to terraform.tfvars, which is git-ignored. Never commit real values.
+account_id   = "000000000000"
+budget_email = "you@example.invalid"

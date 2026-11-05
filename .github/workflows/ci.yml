@@ -21,3 +21,13 @@ jobs:
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run pytest
+      - uses: opentofu/setup-opentofu@v2.0.2
+        with:
+          tofu_version: 1.13.5
+          tofu_wrapper: false
+      - run: tofu fmt -check -recursive
+        working-directory: infra
+      - run: tofu init -backend=false -input=false
+        working-directory: infra
+      - run: tofu validate
+        working-directory: infra
