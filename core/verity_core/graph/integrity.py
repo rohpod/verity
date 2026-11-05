@@ -7,19 +7,13 @@ import networkx as nx
 
 from verity_core.graph.loader import in_edges, node_record, out_edges
 from verity_core.model.enums import (
+    SCOPE_NODE_TYPE,
     AssuranceLevel,
     EdgeType,
     ModelOrigin,
     NodeType,
-    ScopeLevel,
 )
 from verity_core.model.nodes import Control, ControlAssessment, Evidence, Model
-
-_SCOPE_NODE_TYPE = {
-    ScopeLevel.ORGANISATION: NodeType.ORGANISATION,
-    ScopeLevel.SYSTEM: NodeType.AI_SYSTEM,
-    ScopeLevel.PROVIDER: NodeType.PROVIDER,
-}
 
 
 @dataclass(frozen=True)
@@ -64,7 +58,7 @@ def _check_assessment(graph: nx.MultiDiGraph, ca: ControlAssessment) -> list[Int
         control = node_record(graph, controls[0].dst)
         scope = node_record(graph, scopes[0].dst)
         if isinstance(control, Control) and scope is not None:
-            expected = _SCOPE_NODE_TYPE[control.scope_level]
+            expected = SCOPE_NODE_TYPE[control.scope_level]
             if scope.type is not expected:
                 issues.append(
                     IntegrityIssue(

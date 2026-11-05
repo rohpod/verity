@@ -179,3 +179,11 @@ class RationaleType(StrEnum):
 class Sufficiency(StrEnum):
     FULL = "full"
     PARTIAL = "partial"
+
+
+# The node type a ControlAssessment must be scoped to, for a control of each scope level.
+SCOPE_NODE_TYPE: dict[ScopeLevel, NodeType] = {
+    ScopeLevel.ORGANISATION: NodeType.ORGANISATION,
+    ScopeLevel.SYSTEM: NodeType.AI_SYSTEM,
+    ScopeLevel.PROVIDER: NodeType.PROVIDER,
+}
