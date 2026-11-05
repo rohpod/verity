@@ -4,6 +4,7 @@ version = "0.0.0"
 description = "Verity domain model, graph repository, discovery, rules and assessment engine"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "networkx>=3.3",
     "pydantic>=2.9",
 ]
 

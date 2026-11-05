@@ -13,6 +13,8 @@ A repository is bound to one tenant. Contract, shared by every implementation:
 from datetime import datetime
 from typing import Protocol, runtime_checkable
 
+import networkx as nx
+
 from verity_core.model.edges import Edge
 from verity_core.model.enums import Direction, EdgeType, NodeType
 from verity_core.model.nodes import Node
@@ -78,6 +80,12 @@ class GraphRepository(UsageSink, Protocol):
 
     def history(self, node_id: str) -> list[Node]:
         """Every real version, oldest first, including the current one."""
+        ...
+
+    def load_graph(self, *, as_of: datetime | None = None) -> nx.MultiDiGraph:
+        """The whole tenant graph, ready to traverse. Nodes and edges are open now, or valid
+        at `as_of`. Usage records are not included. Node attributes are those of the current
+        version; only validity is time-travelled."""
         ...
 
     def usage_records(

@@ -1,6 +1,6 @@
 """Base class and the envelope carried by every node and edge."""
 
-from datetime import UTC
+from datetime import UTC, datetime
 from typing import Annotated
 
 from pydantic import AfterValidator, AwareDatetime, BaseModel, ConfigDict, Field, model_validator
@@ -48,6 +48,16 @@ class Envelope(VerityRecord):
         if self.valid_from and self.valid_to and self.valid_to < self.valid_from:
             raise ValueError("valid_to is before valid_from")
         return self
+
+    def is_active(self, as_of: datetime | None = None) -> bool:
+        """Open now (`as_of=None`), or valid at `as_of`. The period is half-open: `[from, to)`."""
+        if as_of is None:
+            return self.valid_to is None
+        if as_of.tzinfo is None:
+            raise ValueError("as_of must be timezone-aware")
+        return (self.valid_from is None or self.valid_from <= as_of) and (
+            self.valid_to is None or as_of < self.valid_to
+        )
 
 
 class NodeBase(Envelope):
