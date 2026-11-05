@@ -21,6 +21,15 @@ Planning M1 meant walking the §E schema and §H key design against the use case
 - **`no_relationship` has no strength or sufficiency.** Both must be empty for that STRM type and are required for the others, so such a mapping can never count towards *Satisfied*.
 - **Only technical controls can be automatable.** A control with `kind` organisational or legal_documentary cannot set `automatable: true`. Otherwise the [0005](0005-control-assessment-assurance-ladder.md) guardrail could be bypassed through content.
 
+**Added by the end-of-M1 review**
+- **`source_version`, not `version`.** `Requirement` and `Framework` hold the legal text's version in `source_version`, because `version` is the record revision counter on every node.
+- **An unknown provider is a gap.** A provider-level control is *Not applicable* only when every model of the system is known to be in-house (D13). No recorded model, or a third-party model with no `PROVIDED_BY`, gives `provider_unknown`.
+- **Past queries use past versions.** `load_graph(as_of)` builds each node from the version the graph held then, so a past status is the status of that date.
+- **`valid_to` cannot be in the future.** `as_of=None` means "open" and reads no clock, so a future end would make a record vanish early.
+- **Ending a node closes its edges.** An open edge to an ended node is refused, so `neighbors` and `load_graph` agree.
+- **Re-seeding is safe.** Sending the same closed edge again changes nothing. An open edge sent for a closed one reopens it, and a `valid_from` earlier than the close is treated as stale, so periods never overlap.
+- **Reads return copies.** Frozen models still hold mutable dicts, so a repository never hands out what it stores.
+
 ## Alternatives
 | Option | Why not chosen |
 |---|---|

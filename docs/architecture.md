@@ -168,7 +168,7 @@ Every node and edge carries `tenant`, `source` (discovered · declared · seeded
 
 > **Key modelling choice: status lives on `ControlAssessment`, not on `Control`.** "Is human oversight implemented?" has a different answer for each system. A `Control` is a reusable definition. A `ControlAssessment` is *control × scope* and holds `status`, `assurance_level`, `method`, `assessed_at` and `assessor`. Keeping these apart is what lets the data distinguish **mapping**, **implementing** and **demonstrating**, not just the UI.
 
-**Control scope inheritance:** `Control.scope_level ∈ {organisation, system, provider}`. When a system-level question asks about an organisation-level control (for example the AI policy or AI literacy), the engine resolves it to the organisation's ControlAssessment and shows it as *inherited*. Provider-level controls resolve through system → model → provider, and to *Not applicable* for a system with only in-house models (D13).
+**Control scope inheritance:** `Control.scope_level ∈ {organisation, system, provider}`. When a system-level question asks about an organisation-level control (for example the AI policy or AI literacy), the engine resolves it to the organisation's ControlAssessment and shows it as *inherited*. Provider-level controls resolve through system → model → provider, and to *Not applicable* only when every model of the system is known to be in-house (D13). A system with no recorded model, or a third-party model with no `PROVIDED_BY`, is a gap: *provider unknown*.
 
 ### Core traversals
 
@@ -252,7 +252,7 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
 - The qualifier is `role` on `APPLIES_TO` and `purpose` on `PROCESSES`; other edge types have none ([ADR 0012](adr/0012-graph-schema-refinements.md)).
 - **GSI1** (`GSI1PK=T#{tenant}#TYPE#{type}`, `GSI1SK=id`) lists nodes by type.
 - Reverse lookups use the mirrored `R#` items instead of a second GSI, which keeps the design inside the 25-unit capacity budget.
-- **Repository pattern:** the `GraphRepository` protocol exposes `get_node`, `upsert_node`, `upsert_edge`, `neighbors(direction, type)`, `nodes_by_type`, `history`, `append_usage`, `usage_records`, `close_edge` and `load_graph(as_of) → networkx.MultiDiGraph`. Each repository is bound to one tenant.
+- **Repository pattern:** the `GraphRepository` protocol exposes `get_node`, `upsert_node`, `upsert_edge`, `neighbors(direction, type)`, `nodes_by_type`, `history`, `append_usage`, `usage_records`, `close_edge` and `load_graph(as_of) → networkx.MultiDiGraph`. Each repository is bound to one tenant. `as_of` uses the node versions held at that time.
   - Implementations are `InMemoryRepository` (tests and local development) and `DynamoDBRepository`.
   - A future `Neo4jRepository` or `NeptuneRepository` would plug into the same interface. That is the migration path off DynamoDB.
 - **Traversal** happens in memory with NetworkX. The graph is hundreds to low thousands of items, so loading it whole is cheap.
@@ -324,4 +324,4 @@ I traced each core traversal (§E) against the three use cases. Six gaps came ou
 5. **Accountability for verification.** L4 "Verified" needs a navigable *who*. Before this fix it was only a string on the Evidence node. → Added the `Person ASSESSED ControlAssessment` edge.
 6. **Candidate lifecycle.** There was no way to trace a promoted registry entry back to the resource that triggered it. → Added `Candidate DERIVED_FROM AWSResource` and `PROMOTED_TO AISystem`.
 
-**Result:** all five traversals resolve for all three use cases using only the node and edge types above. The walkthrough is on paper; it will be re-checked with executable tests in the Stage 4 graph milestone.
+**Result:** all five traversals resolve for all three use cases using only the node and edge types above. M1 re-checked this with executable tests in `tests/graph/test_traversals.py`. Traversal 2 is correctly empty for Talent Screening (in-house model) and traversal 3 for the supplier clause (`no_relationship`).
