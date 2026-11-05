@@ -34,6 +34,7 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/). Decisions by the owner:
 | D16 | Schema refinements found while planning M1. See [ADR 0012](adr/0012-graph-schema-refinements.md) |
 | D17 | How `DynamoDBRepository` writes and reads. See [ADR 0013](adr/0013-dynamodb-write-model.md) |
 | D18 | M2's results: throttling retries, measured costs and the evidence cap. See [ADR 0014](adr/0014-m2-measurements-and-evidence-cap.md) |
+| D19 | How the account is set up and guarded. See [ADR 0015](adr/0015-account-baseline.md) |
 
 ## Milestones
 
@@ -44,7 +45,7 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/). Decisions by the owner:
 | M1 | Graph core: models, IDs, `GraphRepository`, `InMemoryRepository`, NetworkX loader, traversals | Opus, then Sonnet | no | ✅ |
 | M2 | `DynamoDBRepository` (moto), shared contract suite | Sonnet | no | ✅ |
 | **AWS baseline** | | | | |
-| M3 | Account baseline: non-root admin with MFA, region eu-north-1, `infra/` root, $0.01 budget, `verity-graph` | Opus (IAM), Sonnet | **yes, approval first** | ⬜ |
+| M3 | Account baseline: non-root admin with MFA, region eu-north-1, `infra/` root, $0.01 budget, `verity-graph` | Opus (IAM), Sonnet | **yes, approval first** | 🔄 |
 | **Governance logic (local)** | | | | |
 | M4 | Content: hub controls, ~35 requirements, STRM mappings, Kestrel org, synthetic systems, `verity seed` | Opus | no | ⬜ |
 | M5 | Rules and assessment: applicability, status, assurance, satisfaction, `verity assess`, `verity attest` | Opus, then Sonnet | no | ⬜ |

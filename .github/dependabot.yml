@@ -11,4 +11,8 @@ updates:
     ignore:
       # Local workspace member, not a PyPI package. Updating it fails to resolve.
       - dependency-name: verity-core
-# npm (web/) and OpenTofu providers (infra/) are added by the milestones that create those directories.
+  - package-ecosystem: terraform
+    directory: /infra
+    schedule:
+      interval: weekly
+# npm (web/) is added by the milestone that creates that directory.
