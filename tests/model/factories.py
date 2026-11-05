@@ -156,3 +156,66 @@ def one_of_each() -> dict[NodeType, object]:
         ),
     ]
     return {node.type: node for node in nodes}
+
+
+def make_edge(edge_type, src, dst, **overrides):
+    """A valid edge of any type between two node IDs, supplying the type's own fields."""
+    from verity_core.model.edges import AppliesToEdge, MapsToEdge, PlainEdge, ProcessesEdge
+    from verity_core.model.enums import (
+        EdgeType,
+        Purpose,
+        RationaleType,
+        Role,
+        StrmType,
+        Sufficiency,
+    )
+
+    fields = {"src": src, "dst": dst, "type": edge_type, **COMMON}
+    match edge_type:
+        case EdgeType.MAPS_TO:
+            cls, extra = (
+                MapsToEdge,
+                {
+                    "strm": StrmType.SUBSET_OF,
+                    "strength": 7,
+                    "rationale_type": RationaleType.FUNCTIONAL,
+                    "rationale": "Test fixture, not a verified mapping.",
+                    "sufficiency": Sufficiency.FULL,
+                },
+            )
+        case EdgeType.APPLIES_TO:
+            cls, extra = (
+                AppliesToEdge,
+                {
+                    "role": Role.DEPLOYER,
+                    "rule_id": "test-rule",
+                    "reason": "Test fixture.",
+                },
+            )
+        case EdgeType.PROCESSES:
+            cls, extra = ProcessesEdge, {"purpose": Purpose.INFERENCE}
+        case _:
+            cls, extra = PlainEdge, {}
+    return cls(**fields | extra | overrides)
+
+
+def rule_nodes() -> dict[NodeType, object]:
+    """One node per type for sweeping edge rules. The Model is third-party and the AWSResource
+    an IAM role, so only the endpoint-type rule can fail."""
+    nodes = one_of_each()
+    nodes[NodeType.MODEL] = nodes[NodeType.MODEL].model_copy(
+        update={"origin": ModelOrigin.THIRD_PARTY}
+    )
+    nodes[NodeType.AWS_RESOURCE] = AWSResource(
+        id=ids.resource_id("iam-role", "global", "crawler"),
+        resource_type="iam-role",
+        region="global",
+        name="crawler",
+        **COMMON,
+    )
+    return nodes
+
+
+def twin(node):
+    """A second node of the same type, for edges between two nodes of one type."""
+    return node.model_copy(update={"id": ids.make_id(node.type, "twin")})

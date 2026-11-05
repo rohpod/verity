@@ -43,6 +43,12 @@ class Envelope(VerityRecord):
     valid_from: UtcDatetime | None = None
     valid_to: UtcDatetime | None = None
 
+    @model_validator(mode="after")
+    def _validity_is_ordered(self) -> "Envelope":
+        if self.valid_from and self.valid_to and self.valid_to < self.valid_from:
+            raise ValueError("valid_to is before valid_from")
+        return self
+
 
 class NodeBase(Envelope):
     """A graph node. Subclasses set `type`, and the ID prefix must match it."""
