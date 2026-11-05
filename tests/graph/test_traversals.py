@@ -9,8 +9,8 @@ from datetime import timedelta
 
 import estate as E
 import pytest
+from factories import COMMON, make_edge
 from factories import evidence as make_evidence
-from factories import make_edge
 from verity_core.graph.integrity import check_integrity
 from verity_core.graph.loader import build_graph
 from verity_core.graph.traversals import (
@@ -28,12 +28,15 @@ from verity_core.model.enums import (
     EdgeType,
     EvidenceKind,
     ImplementationStatus,
+    ModelOrigin,
     Role,
     Source,
     StrmType,
 )
+from verity_core.model.nodes import Model, Person
 
 R = Resolution
+GPT = ids.model_id("gpt-class")
 
 
 def project(rows):
@@ -133,6 +136,7 @@ OBLIGATIONS = {
             E.ca(E.VC_SUPPLIER_DPA, E.OPENAI),
             0,
         ),
+        (E.ISO_A7_4, Role.ANY, E.VC_EGRESS, R.DIRECT, None, E.ca(E.VC_EGRESS, E.CONTRACT), 2),
     ],
 }
 
@@ -199,6 +203,40 @@ def test_the_unmapped_requirement_is_a_row_not_a_silent_drop(estate_graph):
     assert unmapped[0].mapping is None and unmapped[0].evidence_ids == ()
 
 
+def supplier_row(graph):
+    return [
+        (r.resolution, r.provider_id, r.assessment_id)
+        for r in obligations_for(graph, E.CONTRACT)
+        if r.requirement_id == E.ISO_A10_3
+    ]
+
+
+def test_a_third_party_model_with_no_provider_is_a_gap_not_not_applicable(estate_graph):
+    graph = estate_graph.copy()
+    graph.remove_edge(GPT, E.OPENAI, (EdgeType.PROVIDED_BY, None))
+    assert supplier_row(graph) == [(R.PROVIDER_UNKNOWN, None, None)]
+
+
+def test_a_system_with_no_recorded_model_is_a_gap_not_not_applicable(estate_graph):
+    graph = estate_graph.copy()
+    graph.remove_edge(E.CONTRACT, GPT, (EdgeType.USES_MODEL, None))
+    assert supplier_row(graph) == [(R.PROVIDER_UNKNOWN, None, None)]
+
+
+def test_a_known_provider_does_not_hide_a_second_model_with_no_provider(estate_graph):
+    graph = estate_graph.copy()
+    orphan = Model(id=ids.model_id("orphan"), name="X", origin=ModelOrigin.THIRD_PARTY, **COMMON)
+    graph.add_node(orphan.id, record=orphan)
+    used = make_edge(EdgeType.USES_MODEL, E.CONTRACT, orphan.id)
+    graph.add_edge(E.CONTRACT, orphan.id, key=(EdgeType.USES_MODEL, None), record=used)
+    assert {r for r, _, _ in supplier_row(graph)} == {R.INHERITED_PROVIDER, R.PROVIDER_UNKNOWN}
+
+
+def test_only_in_house_models_are_not_applicable(estate_graph):
+    (row,) = [r for r in obligations_for(estate_graph, E.TALENT) if r.requirement_id == E.ISO_A10_3]
+    assert row.resolution is R.NOT_APPLICABLE
+
+
 # --- 5. Audit trail ------------------------------------------------------------------------
 
 
@@ -228,6 +266,15 @@ def test_audit_trail_talent_screening_is_verified_by_a_named_person_and_labelled
     assert snapshot.kind is EvidenceKind.CONFIG_SNAPSHOT and snapshot.collector == "crawler@0.1.0"
     assert attestation.kind is EvidenceKind.ATTESTATION and attestation.collector == E.VERIFIER
     assert attestation.source is Source.SIMULATED
+
+
+def test_audit_trail_names_the_assessor_when_there_are_two_assessed_edges(estate):
+    other = Person(id=ids.person_id("a-aaa"), name="Sorts first", **COMMON)
+    estate.upsert_node(other)
+    estate.upsert_edge(make_edge(EdgeType.ASSESSED, other.id, E.ca(E.VC_OVERSIGHT, E.TALENT)))
+    (link,) = audit_trail(estate.load_graph(), E.ART14, E.TALENT).links
+    assert link.assessed_by == E.VERIFIER
+    assert link.signoff_source is Source.SIMULATED
 
 
 def test_audit_trail_talent_screening_bias_test_is_an_assessment_with_no_proof(estate_graph):
@@ -344,7 +391,7 @@ def test_provider_impact_contract_insights_reaches_the_provider_scoped_assessmen
     (system,) = impact.systems
     assert system.system_id == E.CONTRACT
     assert (system.owner_ids, system.risk_ids) == ((E.VERIFIER,), (E.RISK_CONTRACT,))
-    assert system.requirement_ids == (E.ISO_A10_3,)
+    assert system.requirement_ids == (E.ISO_A10_3, E.ISO_A7_4)
 
 
 def test_provider_impact_never_reaches_a_system_with_an_in_house_model(estate_graph):
@@ -503,8 +550,22 @@ def test_stale_talent_screening_returns_the_assessment_but_spares_the_attestatio
     assert impact.assessment_ids == (E.ca(E.VC_OVERSIGHT, E.TALENT),)  # the CA is returned
 
 
-def test_stale_contract_insights_with_nothing_collected_stales_nothing(estate_graph):
+def test_stale_contract_insights_hits_config_evidence_but_not_the_document(estate_graph):
+    (snapshot,) = evidence_ids(estate_graph, E.CONTRACT, EvidenceKind.CONFIG_SNAPSHOT)
+    (record,) = evidence_ids(estate_graph, E.CONTRACT, EvidenceKind.DOCUMENT_REF)
     impact = stale_by_change(estate_graph, E.CHG_CONTRACT)
+    assert [s.evidence_id for s in impact.evidence] == [snapshot]
+    assert record not in [s.evidence_id for s in impact.evidence]  # ABOUT, not COLLECTED_FROM
+    assert impact.assessment_ids == (E.ca(E.VC_EGRESS, E.CONTRACT),)
+    # The missing DPA is a different assessment, so the change neither touches nor hides it.
+    assert E.ca(E.VC_SUPPLIER_DPA, E.OPENAI) not in impact.assessment_ids
+
+
+def test_a_change_with_nothing_collected_stales_nothing(estate_graph):
+    graph = estate_graph.copy()
+    (snapshot,) = evidence_ids(graph, E.CONTRACT, EvidenceKind.CONFIG_SNAPSHOT)
+    graph.remove_edge(snapshot, E.RES_CONTRACT, (EdgeType.COLLECTED_FROM, None))
+    impact = stale_by_change(graph, E.CHG_CONTRACT)
     assert impact.evidence == () and impact.assessment_ids == ()
 
 
@@ -546,7 +607,7 @@ USE_CASES = {
     "contract-insights": (E.CONTRACT, E.OPENAI, E.ISO_A10_3, E.EUAIA, E.CHG_CONTRACT, E.ISO_A10_3),
 }
 CROSSWALK_LINKS = {"support-assistant": 1, "talent-screening": 1, "contract-insights": 0}
-STALE_EVIDENCE = {"support-assistant": 1, "talent-screening": 1, "contract-insights": 0}
+STALE_EVIDENCE = {"support-assistant": 1, "talent-screening": 1, "contract-insights": 1}
 
 
 @pytest.mark.parametrize("name", USE_CASES)
