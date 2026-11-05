@@ -8,4 +8,7 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # Local workspace member, not a PyPI package. Updating it fails to resolve.
+      - dependency-name: verity-core
 # npm (web/) and OpenTofu providers (infra/) are added by the milestones that create those directories.
