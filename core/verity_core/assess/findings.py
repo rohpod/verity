@@ -1,0 +1,110 @@
+"""Findings, derived on read and never stored (ADR 0019). Sorted: severity, then code, subject,
+message, so the same graph and `as_of` always give the same list.
+
+`risk_tier_unconfirmed` and `unknown_fact` come from the applicability engine, so the caller
+passes them in. Everything else is derived here from the graph, the control results and the
+requirement statuses.
+"""
+
+from collections.abc import Iterable, Sequence
+from datetime import datetime
+
+import networkx as nx
+
+from verity_core.assess.controls import ControlResult
+from verity_core.assess.freshness import Freshness
+from verity_core.assess.requirements import RequirementStatus
+from verity_core.graph.loader import in_edges, node_record
+from verity_core.graph.traversals import Resolution
+from verity_core.model.edges import AppliesToEdge
+from verity_core.model.enums import EdgeType, ImplementationStatus
+from verity_core.model.nodes import AISystem
+from verity_core.rules.finding import Finding, Severity
+from verity_core.rules.status import ApplicabilityStatus, applicability_status
+
+_ORDER = {Severity.HIGH: 0, Severity.MEDIUM: 1, Severity.LOW: 2}
+_IN_SCOPE = (ApplicabilityStatus.IN_FORCE, ApplicabilityStatus.CONDITIONAL)
+
+
+def derive_findings(
+    graph: nx.MultiDiGraph,
+    as_of: datetime,
+    results: Sequence[ControlResult],
+    statuses: Sequence[RequirementStatus],
+    applicability_findings: Iterable[Finding] = (),
+) -> list[Finding]:
+    found = list(applicability_findings)
+    behind: dict[tuple[str, str], list[RequirementStatus]] = {}
+    for status in statuses:
+        for target in status.targets:
+            if target.scope_id is not None:
+                behind.setdefault((target.control_id, target.scope_id), []).append(status)
+
+    for r in results:
+        where = f"{r.control_id} for {r.scope_id}"
+        if r.status is ImplementationStatus.NOT_IMPLEMENTED:
+            found.append(
+                Finding(
+                    "control_not_met", Severity.HIGH, r.scope_id, f"{where} is not implemented."
+                )
+            )
+        if r.status is ImplementationStatus.NOT_ASSESSED:
+            in_scope = any(
+                s.applicability in _IN_SCOPE for s in behind.get((r.control_id, r.scope_id), ())
+            )
+            found.append(
+                Finding(
+                    "no_evidence",
+                    Severity.HIGH if in_scope else Severity.MEDIUM,
+                    r.scope_id,
+                    f"{where} has no usable evidence.",
+                )
+            )
+        if r.freshness is Freshness.EXPIRING:
+            found.append(
+                Finding(
+                    "evidence_expiring",
+                    Severity.LOW,
+                    r.scope_id,
+                    f"The evidence for {where} expires within 7 days.",
+                )
+            )
+
+    for status in statuses:
+        for target in status.targets:
+            if target.resolution is Resolution.PROVIDER_UNKNOWN:
+                found.append(
+                    Finding(
+                        "provider_unknown",
+                        Severity.HIGH,
+                        status.system_id,
+                        f"{target.control_id} needs a model provider and none is recorded "
+                        f"for {status.system_id}.",
+                    )
+                )
+
+    for node_id in sorted(graph.nodes):
+        system = node_record(graph, node_id)
+        if not isinstance(system, AISystem):
+            continue
+        if not in_edges(graph, system.id, EdgeType.OWNS):
+            found.append(
+                Finding("no_owner", Severity.MEDIUM, system.id, f"{system.name} has no owner.")
+            )
+        conditional = any(
+            isinstance(e, AppliesToEdge)
+            and applicability_status(e, as_of) is ApplicabilityStatus.CONDITIONAL
+            for e in in_edges(graph, system.id, EdgeType.APPLIES_TO)
+        )
+        if conditional:
+            found.append(
+                Finding(
+                    "conditional_obligation",
+                    Severity.LOW,
+                    system.id,
+                    f"{system.name} has obligations that apply only after a significant change.",
+                )
+            )
+
+    unique = {(f.code, f.subject, f.message): f for f in found}
+    return sorted(unique.values(), key=lambda f: (_ORDER[f.severity], f.code, f.subject, f.message))
