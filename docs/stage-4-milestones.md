@@ -10,7 +10,7 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/). Decisions by the owner:
 | Plan expires **4 May 2027**; $100 credits left; no Lambda functions or DynamoDB tables in eu-west-1 | Take the last live snapshot by **1 Apr 2027** |
 | Lambda account concurrency is **10**; AWS requires 100 to stay unreserved | Reserved concurrency can't be set; dropped ([ADR 0009](adr/0009-mock-openai-iam-auth.md)) |
 | `ListFunctions` returns env var values | IAM can't enforce "names only"; the crawler discards values on receipt (D1) |
-| CLI session is **root**; default region is **ap-south-1** | Fix both before any apply (M3) |
+| CLI session is **root**; default region is **ap-south-1** | **Updated:** the CLI now uses IAM user `rohpod` in **eu-north-1** ([ADR 0011](adr/0011-region-eu-north-1.md)). The user has **no permissions yet**, so M3 must grant them |
 | `python3.12` supports arm64; deprecation forecast 31 Oct 2028 | Closes the architecture §B ❓ |
 | `aws login` flow works | Closes the architecture §J ❓ |
 | `tofu` 1.13.5 installed, `terraform` not; repo is public; `gh` logged out | Use `tofu`; owner runs `! gh auth login` |
@@ -41,7 +41,7 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/). Decisions by the owner:
 | M1 | Graph core: models, IDs, `GraphRepository`, `InMemoryRepository`, NetworkX loader, traversals | Opus, then Sonnet | no | ⬜ |
 | M2 | `DynamoDBRepository` (moto), shared contract suite | Sonnet | no | ⬜ |
 | **AWS baseline** | | | | |
-| M3 | Account baseline: non-root admin with MFA, region eu-west-1, `infra/` root, $0.01 budget, `verity-graph` | Opus (IAM), Sonnet | **yes, approval first** | ⬜ |
+| M3 | Account baseline: non-root admin with MFA, region eu-north-1, `infra/` root, $0.01 budget, `verity-graph` | Opus (IAM), Sonnet | **yes, approval first** | ⬜ |
 | **Governance logic (local)** | | | | |
 | M4 | Content: hub controls, ~35 requirements, STRM mappings, Kestrel org, synthetic systems, `verity seed` | Opus | no | ⬜ |
 | M5 | Rules and assessment: applicability, status, assurance, satisfaction, `verity assess`, `verity attest` | Opus, then Sonnet | no | ⬜ |
@@ -59,7 +59,7 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/). Decisions by the owner:
 - **M0:** pytest and ruff pass locally and in CI; the hook blocks a sample `tofu apply`.
 - **M1:** all 5 §E traversals pass for all 3 use cases as executable tests; invalid edges are rejected (for example `PROVIDED_BY` on an in-house model); D4 and D7 covered.
 - **M2:** one contract suite passes on both repositories; re-upserting an unchanged node writes no `H#`; a test fails if boto3 DynamoDB is used outside the repository; D14 cap set from measured item sizes.
-- **M3:** session is no longer root; table is PROVISIONED, STANDARD, 15/15 + 10/10, no auto-scaling; a real repository round trip works; credits unchanged.
+- **M3:** eu-north-1 re-checked first (no existing functions or tables; Lambda concurrency limit); session is no longer root; table is PROVISIONED, STANDARD, 15/15 + 10/10, no auto-scaling; a real repository round trip works; credits unchanged.
 - **M4:** content linter passes (every requirement has `source_url`, `version`, `last_verified`; every mapping has a rationale); ISO entries hold IDs and original summaries only; no derived link has a STRM type; seeding twice changes nothing. STRM, EU AI Act dates and ISO 27001 Amendment 1 re-verified first.
 - **M5:** date-boundary tests either side of every obligation date; role tests; property test that no automated input makes a non-automatable control Implemented; D2, D3, D13 cases; bias-test and DPA gaps appear as findings.
 - **M6:** `shadow-summariser` scores *probable*, `invoice-renderer` *none*; D1 canary appears nowhere; `lambda:GetFunction` never called; re-crawl duplicates nothing except run and evidence records; a config change yields a ChangeEvent and stale evidence.

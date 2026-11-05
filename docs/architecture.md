@@ -3,14 +3,14 @@
 _Stage 3 deliverable · 2026-11-05 · Status: accepted, amended in Stage 4 (see [milestone plan](stage-4-milestones.md), [ADR 0009](adr/0009-mock-openai-iam-auth.md), [ADR 0010](adr/0010-assessment-and-crosswalk-semantics.md))._
 Inputs: [Stage 1 discovery](stage-1-discovery.md) · [Stage 2 feasibility](stage-2-feasibility.md) · decisions in [`adr/`](adr/).
 
-**Locked constraints:** AWS Free plan · single region `eu-west-1` · Terraform/OpenTofu · Python 3.12 backend · React + TS frontend · DynamoDB + NetworkX graph · no S3 · Bedrock/OpenAI mock-only · public demo = static snapshot on GitHub Pages · target customer = mid-size EU SaaS company acting as both AI provider and deployer.
+**Locked constraints:** AWS Free plan · single region `eu-north-1` · Terraform/OpenTofu · Python 3.12 backend · React + TS frontend · DynamoDB + NetworkX graph · no S3 · Bedrock/OpenAI mock-only · public demo = static snapshot on GitHub Pages · target customer = mid-size EU SaaS company acting as both AI provider and deployer.
 
 ---
 
 ## A. High-level architecture
 
 ```
-                    ┌──────────────── AWS account (eu-west-1, Free plan) ──────────────────┐
+                    ┌──────────────── AWS account (eu-north-1, Free plan) ─────────────────┐
   Demo AI estate    │  [support-assistant λ] ──invoke──▶ [mock-bedrock λ]  (Converse shape) │
   (the fictional    │  [talent-screening λ]  (real model, pure-Python inference)           │
    customer's       │  [contract-insights λ] ──HTTPS──▶ [mock-openai λ URL, AWS_IAM] (/v1/chat/…)    │
@@ -120,7 +120,7 @@ The pipeline is a sequence of pure functions over plain data, so it can be unit-
 
 IDs are deterministic and typed, which makes re-crawls idempotent:
 - `sys:talent-screening`
-- `res:lambda:eu-west-1:talent-screening`
+- `res:lambda:eu-north-1:talent-screening`
 - `fw:euaia`
 - `req:euaia:art50-1`
 - `req:iso42001:A.6.2.4`
@@ -269,7 +269,7 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
 
 | Area | Measure |
 |---|---|
-| Account | MFA on root, and root is never used day to day. An admin IAM user with MFA. IAM Identity Center is not available on the Free plan, so we use the `aws login` flow, which is verified to work ✅. The CLI currently runs as root with default region ap-south-1; both are fixed in M3 before any apply. |
+| Account | MFA on root, and root is never used day to day. An admin IAM user with MFA. IAM Identity Center is not available on the Free plan, so we use the `aws login` flow, which is verified to work ✅. The CLI now uses the IAM user `rohpod` with default region eu-north-1. That user has no permissions yet; M3 grants them before any apply. |
 | Workloads | One least-privilege role per Lambda. The crawler is read-only except for its own table. |
 | Abuse limits | mock-openai's Function URL uses `AWS_IAM` auth ([ADR 0009](adr/0009-mock-openai-iam-auth.md)). Reserved concurrency is not available: the account limit is 10 and AWS requires 100 unreserved. mock-bedrock can only be invoked via IAM. The Free plan cannot bill, which caps the worst case. |
 | Data | Synthetic data only. Env var values are discarded on receipt and never stored or logged. |
@@ -281,7 +281,7 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
 
 | ADR | Decision |
 |---|---|
-| [0001](adr/0001-free-plan-single-region.md) | AWS Free plan, single region eu-west-1 |
+| [0001](adr/0001-free-plan-single-region.md) | AWS Free plan, single region (region superseded by 0011) |
 | [0002](adr/0002-terraform-no-s3.md) | Terraform/OpenTofu with direct Lambda uploads, no S3 |
 | [0003](adr/0003-dynamodb-graph-repository.md) | DynamoDB single-table graph + NetworkX behind a repository interface |
 | [0004](adr/0004-hub-and-spoke-strm-crosswalk.md) | Hub-and-spoke crosswalk with NIST IR 8477 STRM |
@@ -291,6 +291,7 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
 | [0008](adr/0008-governance-as-code.md) | Human governance decisions as code |
 | [0009](adr/0009-mock-openai-iam-auth.md) | mock-openai uses an `AWS_IAM` Function URL; reserved concurrency dropped |
 | [0010](adr/0010-assessment-and-crosswalk-semantics.md) | Assessment and crosswalk semantics |
+| [0011](adr/0011-region-eu-north-1.md) | Single region is eu-north-1 |
 
 ## L. Schema validation walkthrough
 

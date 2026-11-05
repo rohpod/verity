@@ -7,7 +7,7 @@ AI governance/risk/compliance platform: a learning and portfolio project built t
    - **Never use:** S3, Secrets Manager, API Gateway, Neptune, AWS Config, NAT Gateway, VPC Flow Logs, CloudTrail trails/Lake, Bedrock/SageMaker *invocation*, on-demand DynamoDB, multi-region features, or AWS Organizations.
    - Never suggest upgrading the account to the Paid plan.
    - Before adding any AWS service not listed above, verify its current pricing and Free plan availability on official AWS pages and ask the user.
-2. **AWS only**, single region **eu-west-1**. The only exception is GitHub Pages hosting of the static demo snapshot.
+2. **AWS only**, single region **eu-north-1**. The only exception is GitHub Pages hosting of the static demo snapshot.
 3. **Ask before any mutating AWS action** (`terraform/tofu apply|destroy`, `aws ... create|put|delete|update`). Explain what it creates, the verified price, and how to delete it.
 
 ## Honesty rules
