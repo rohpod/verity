@@ -29,3 +29,16 @@ def clock():
 @pytest.fixture(params=["memory"])
 def repo(request, clock):
     return InMemoryRepository(TENANT, clock)
+
+
+@pytest.fixture
+def estate(repo):
+    from estate import load_estate
+
+    load_estate(repo)
+    return repo
+
+
+@pytest.fixture
+def estate_graph(estate):
+    return estate.load_graph()
