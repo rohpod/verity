@@ -1,19 +1,29 @@
 """`InMemoryRepository`: tests and local development. `DynamoDBRepository` (M2) must behave
-identically, which the shared contract suite checks."""
+identically, which the shared contract suite checks. Every write decision comes from
+`planning.py`; this class only stores the result."""
 
 from collections.abc import Callable
-from datetime import UTC, datetime
-from typing import Any
+from datetime import datetime
 
 import networkx as nx
 from pydantic import BaseModel
 
-from verity_core.graph.errors import EdgeNotFoundError, ImmutableNodeError, TenantMismatchError
+from verity_core.graph.errors import EdgeNotFoundError
 from verity_core.graph.loader import build_graph, version_at
+from verity_core.graph.planning import (
+    WriteAction,
+    check_usage_bounds,
+    edges_to_close,
+    ensure_tenant,
+    plan_close_edge,
+    plan_edge_write,
+    plan_node_write,
+    read_clock,
+    require_aware,
+    usage_identity,
+)
 from verity_core.model.edges import Edge, EdgeKey
 from verity_core.model.enums import Direction, EdgeType, NodeType
-from verity_core.model.evidence import Evidence
-from verity_core.model.hashing import content_hash
 from verity_core.model.nodes import Node
 from verity_core.model.usage import UsageRecord
 from verity_core.model.validation import validate_edge, validate_node_change
@@ -23,22 +33,9 @@ def _sort_key(key: EdgeKey) -> tuple[str, str, str, str]:
     return (key.src, key.type.value, key.dst, key.qualifier or "")
 
 
-def _with[R: BaseModel](record: R, **updates: Any) -> R:
-    """Copy with changes, validated again (for example `valid_to` must not precede `valid_from`)."""
-    return type(record).model_validate({**record.model_dump(), **updates})
-
-
 def _copy[R: BaseModel](record: R) -> R:
     """Frozen models still hold mutable dicts and lists, so reads hand out deep copies."""
     return record.model_copy(deep=True)
-
-
-def _period_start(edge: Edge, after: datetime | None, fallback: datetime) -> datetime:
-    """The edge's `valid_from`, unless it is absent or stale (earlier than `after`)."""
-    start = edge.valid_from
-    if start is None or (after is not None and start < after):
-        return fallback
-    return start
 
 
 class InMemoryRepository:
@@ -52,16 +49,6 @@ class InMemoryRepository:
         self._in: dict[str, set[EdgeKey]] = {}
         self._usage: dict[str, dict[tuple[datetime, str], UsageRecord]] = {}
 
-    def _now(self) -> datetime:
-        now = self._clock()
-        if now.tzinfo is None:
-            raise ValueError("the clock must return timezone-aware datetimes")
-        return now.astimezone(UTC)
-
-    def _reject_future_end(self, valid_to: datetime | None) -> None:
-        if valid_to is not None and valid_to > self._now():
-            raise ValueError(f"valid_to {valid_to} is in the future")
-
     # --- nodes ---------------------------------------------------------------------------
 
     def get_node(self, node_id: str) -> Node | None:
@@ -69,52 +56,26 @@ class InMemoryRepository:
         return _copy(node) if node else None
 
     def upsert_node(self, node: Node) -> Node:
-        if node.tenant != self.tenant:
-            raise TenantMismatchError(
-                f"{node.id!r} is in tenant {node.tenant!r}, not {self.tenant!r}"
-            )
-        existing = self._nodes.get(node.id)
+        ensure_tenant(self.tenant, node.tenant, repr(node.id))
         validate_node_change(
             node,
             open_edges=self._open_edges_touching(node.id),
             organisation_ids=[n.id for n in self.nodes_by_type(NodeType.ORGANISATION)],
         )
-        self._reject_future_end(node.valid_to)
-        now = self._now()
-
-        if existing is None:
-            stored = _with(node, created_at=now, updated_at=now, version=1)
-            if stored.valid_from is None:
-                stored = _with(stored, valid_from=now)
-        else:
-            # A caller that does not know `valid_from` leaves it unset; keep the stored one.
-            candidate = node if node.valid_from else _with(node, valid_from=existing.valid_from)
-            if content_hash(candidate) == content_hash(existing):
-                return _copy(existing)
-            if isinstance(existing, Evidence):
-                raise ImmutableNodeError(f"{node.id!r} is Evidence; collect new evidence instead")
-            stored = _with(
-                candidate,
-                created_at=existing.created_at,
-                updated_at=now,
-                version=existing.version + 1,
-            )
-
-        self._nodes[stored.id] = stored
-        self._history.setdefault(stored.id, []).append(stored)
-        if stored.valid_to is not None:
-            self._close_edges_of(stored)
+        plan = plan_node_write(self._nodes.get(node.id), node, read_clock(self._clock))
+        stored = plan.node
+        if plan.action is not WriteAction.NOOP:
+            self._nodes[stored.id] = stored
+            self._history.setdefault(stored.id, []).append(stored)
+            if stored.valid_to is not None:
+                self._close_edges_of(stored)
         return _copy(stored)
 
     def _close_edges_of(self, node: Node) -> None:
         """An ended node takes its edges with it, so `neighbors` and `load_graph` agree."""
-        for edge in self._open_edges_touching(node.id):
+        for edge, valid_to in edges_to_close(node, self._open_edges_touching(node.id)):
             self.close_edge(
-                edge.src,
-                edge.type,
-                edge.dst,
-                valid_to=max(node.valid_to, edge.valid_from),
-                qualifier=edge.qualifier,
+                edge.src, edge.type, edge.dst, valid_to=valid_to, qualifier=edge.qualifier
             )
 
     def nodes_by_type(self, node_type: NodeType) -> list[Node]:
@@ -127,60 +88,22 @@ class InMemoryRepository:
     # --- edges ---------------------------------------------------------------------------
 
     def upsert_edge(self, edge: Edge) -> Edge:
-        if edge.tenant != self.tenant:
-            raise TenantMismatchError(
-                f"{edge.type} edge is in tenant {edge.tenant!r}, not {self.tenant!r}"
-            )
+        ensure_tenant(self.tenant, edge.tenant, f"{edge.type} edge")
         validate_edge(
             edge,
             self._nodes.get(edge.src),
             self._nodes.get(edge.dst),
             open_out_edges=self.neighbors(edge.src, Direction.OUT),
         )
-        self._reject_future_end(edge.valid_to)
-        now = self._now()
-        existing = self._edges.get(edge.key)
+        plan = plan_edge_write(self._edges.get(edge.key), edge, read_clock(self._clock))
+        return self._store_edge(plan.edge, plan.action)
 
-        if existing is None:
-            stored = _with(edge, created_at=now, updated_at=now, version=1)
-            if stored.valid_from is None:
-                stored = _with(stored, valid_from=now)
-        elif existing.valid_to is not None and edge.valid_to is None:
-            stored = self._reopen(existing, edge, now)
-        else:
-            last_end = existing.closed_intervals[-1][1] if existing.closed_intervals else None
-            candidate = _with(
-                edge,
-                valid_from=_period_start(edge, last_end, existing.valid_from),
-                closed_intervals=existing.closed_intervals,
-            )
-            if content_hash(candidate) == content_hash(existing):
-                return _copy(existing)
-            stored = _with(
-                candidate,
-                created_at=existing.created_at,
-                updated_at=now,
-                version=existing.version + 1,
-            )
-
-        self._edges[stored.key] = stored
-        self._out.setdefault(stored.src, set()).add(stored.key)
-        self._in.setdefault(stored.dst, set()).add(stored.key)
-        return _copy(stored)
-
-    def _reopen(self, existing: Edge, edge: Edge, now: datetime) -> Edge:
-        """Keep the finished period in `closed_intervals` and start a new one."""
-        start = _period_start(edge, existing.valid_to, now)
-        if start < existing.valid_to:
-            raise ValueError(f"{edge.key} cannot reopen at {start}, before it closed")
-        return _with(
-            edge,
-            created_at=existing.created_at,
-            updated_at=now,
-            version=existing.version + 1,
-            valid_from=start,
-            closed_intervals=(*existing.closed_intervals, (existing.valid_from, existing.valid_to)),
-        )
+    def _store_edge(self, edge: Edge, action: WriteAction) -> Edge:
+        if action is not WriteAction.NOOP:
+            self._edges[edge.key] = edge
+            self._out.setdefault(edge.src, set()).add(edge.key)
+            self._in.setdefault(edge.dst, set()).add(edge.key)
+        return _copy(edge)
 
     def close_edge(
         self,
@@ -191,20 +114,12 @@ class InMemoryRepository:
         valid_to: datetime,
         qualifier: str | None = None,
     ) -> Edge:
-        if valid_to.tzinfo is None:
-            raise ValueError("valid_to must be timezone-aware")
-        key = EdgeKey(src, edge_type, dst, qualifier)
-        existing = self._edges.get(key)
+        require_aware(valid_to, "valid_to must be timezone-aware")
+        existing = self._edges.get(EdgeKey(src, edge_type, dst, qualifier))
         if existing is None:
             raise EdgeNotFoundError(f"no {edge_type} edge from {src!r} to {dst!r} ({qualifier})")
-        if existing.valid_to is not None:
-            return _copy(existing)
-        self._reject_future_end(valid_to)
-        stored = _with(
-            existing, valid_to=valid_to, updated_at=self._now(), version=existing.version + 1
-        )
-        self._edges[key] = stored
-        return _copy(stored)
+        plan = plan_close_edge(existing, valid_to, read_clock(self._clock))
+        return self._store_edge(plan.edge, plan.action)
 
     def neighbors(
         self,
@@ -241,12 +156,8 @@ class InMemoryRepository:
     # --- usage ---------------------------------------------------------------------------
 
     def append_usage(self, record: UsageRecord) -> None:
-        if record.tenant != self.tenant:
-            raise TenantMismatchError(f"usage record is in tenant {record.tenant!r}")
-        # Same identity as the DynamoDB key `U#{iso_ts}#{usage_id}`. The first write wins.
-        self._usage.setdefault(record.system_id, {}).setdefault(
-            (record.timestamp, str(record.usage_id)), record
-        )
+        ensure_tenant(self.tenant, record.tenant, "usage record")
+        self._usage.setdefault(record.system_id, {}).setdefault(usage_identity(record), record)
 
     def usage_records(
         self,
@@ -255,9 +166,7 @@ class InMemoryRepository:
         since: datetime | None = None,
         until: datetime | None = None,
     ) -> list[UsageRecord]:
-        for bound in (since, until):
-            if bound is not None and bound.tzinfo is None:
-                raise ValueError("since and until must be timezone-aware")
+        check_usage_bounds(since, until)
         records = (self._usage.get(system_id) or {}).items()
         return [
             record
