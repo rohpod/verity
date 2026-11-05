@@ -208,7 +208,7 @@ Every node and edge carries `tenant`, `source` (discovered · declared · seeded
 - `subject`: the node it is about, matched by an `ABOUT` edge
 - `collector`: `crawler@<ver>`, `cli@<ver>` or `person:<id>`
 - `collected_at` and `valid_until`
-- `content`: inline JSON up to a cap set from M2 measurements (D14; 50 KB until then), *or* `content_ref` pointing to a git-versioned file under `evidence/`
+- `content`: inline JSON up to a cap of 16 KB, set from M2 measurements (D14, ADR 0013), *or* `content_ref` pointing to a git-versioned file under `evidence/`
 - `sha256`
 
 Re-collecting evidence creates a new node and never overwrites the old one.

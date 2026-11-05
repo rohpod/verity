@@ -17,8 +17,8 @@ from verity_core.model.hashing import canonical_json, sha256_hex
 from verity_core.model.ids import check_id, node_type_of
 
 EVIDENCE_ID_HEX_LENGTH = 32  # 128 bits
-# Inline content cap in bytes of canonical JSON. M2 may lower it from measured item sizes (D14).
-INLINE_EVIDENCE_MAX_BYTES = 50 * 1024
+# Inline content cap in bytes of canonical JSON, set from M2's measured item sizes (D14, ADR 0013).
+INLINE_EVIDENCE_MAX_BYTES = 16 * 1024
 _AUTOMATED_COLLECTOR_PREFIXES = ("crawler@", "cli@")
 
 

@@ -49,9 +49,22 @@ def estate(repo):
     return repo
 
 
-@pytest.fixture
-def estate_graph(estate):
-    return estate.load_graph()
+@pytest.fixture(scope="module", params=["memory", "dynamodb"])
+def estate_graph(request):
+    """The loaded estate, built once per backend and module: traversal tests only read it.
+    A test that changes the graph must `.copy()` it first."""
+    from estate import load_estate
+
+    if request.param == "memory":
+        repo = InMemoryRepository(TENANT, FakeClock())
+        load_estate(repo)
+        return repo.load_graph()
+    with mock_aws():
+        client = boto3.client("dynamodb", region_name="eu-north-1")
+        client.create_table(**table_definition())
+        repo = DynamoDBRepository(TENANT, FakeClock(), client=client)
+        load_estate(repo)
+        return repo.load_graph()
 
 
 @pytest.fixture
