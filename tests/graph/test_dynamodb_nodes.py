@@ -9,11 +9,8 @@ from conftest import START
 from dynamo_support import SpyClient, kinds_of, put_edge, repo_for
 from factories import COMMON, TENANT, evidence, make_edge, one_of_each
 from verity_core.graph.dynamodb import items, keys
-from verity_core.graph.dynamodb.repository import (
-    REGION,
-    _is_conflict,
-    default_client,
-)
+from verity_core.graph.dynamodb.client import REGION, default_client
+from verity_core.graph.dynamodb.repository import _is_conflict
 from verity_core.graph.dynamodb.table import TABLE_NAME
 from verity_core.graph.errors import ConcurrentWriteError, InvalidEdgeError, RepositoryError
 from verity_core.model import ids

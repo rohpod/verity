@@ -28,7 +28,7 @@ M2 implements `DynamoDBRepository` behind the contract M1 fixed. That contract n
 **Usage and dependencies**
 - **`DynamoDBUsageSink` is one conditional `PutItem`,** so app roles need no read access (D8). `DynamoDBRepository` delegates to it.
 - **boto3 is an optional `aws` extra on `verity-core`.** The Lambda runtime already provides it, so zips stay small. moto is a dev dependency.
-- **Throttling uses boto3's built-in retries with backoff** (D14).
+- **Throttling is retried with backoff** (D14). Single calls use boto3's `standard` retry mode. boto3 does not retry a `TransactionCanceledException`, and AWS reports a transaction that ran out of capacity as a cancellation with reason `ProvisionedThroughputExceeded`, so the repository retries those itself: up to 8 attempts, pauses doubling from 0.2 s to a 10 s cap (about 22 s in all). It never retries when a conflict is among the reasons, because the data changed and repeating the write would not fix that. A cancelled transaction wrote nothing and the version checks run again on each attempt, so repeating is safe.
 
 ## Alternatives
 | Option | Why not chosen |
@@ -41,6 +41,9 @@ M2 implements `DynamoDBRepository` behind the contract M1 fixed. That contract n
 | A sentinel item for the one-Organisation rule | One more item type to guard a single-writer seed. `check_integrity` catches the case |
 
 ## Consequences
+- **Measured in M2** (PR 6, on the fixture estate, from AWS's published size and capacity rules): 276 items, 117 KB, averaging 425 bytes and all under 1 KB. `load_graph` costs about 29 read units strongly consistent, in 3 pages of 100 items, about 2 s of the table's 15 units. 29% of what a scan reads (the `R#` mirrors and usage records) is thrown away. A node write and an edge write each cost 4 write units.
+- **At the design target** (300 nodes, 1,000 edges, about 1 MB) a scan is about 264 read units, roughly 18 s at 15 per second. The first seed is about 5,200 write units, roughly 6 minutes.
+- A scan is not a snapshot: a node written while it runs can appear in an older version. Run it when no writer is active, as the daily crawl and the export are.
 - An edge write costs 4 WCU, so a first seed of about 300 nodes and 1,000 edges takes roughly 6 minutes of write capacity. Re-seeding writes almost nothing.
 - `load_graph` also reads `H#` and `U#` items. M2 measures that cost.
 - Ending a node with more than about 50 edges is not atomic as a whole, but it is retryable.

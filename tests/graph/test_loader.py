@@ -3,7 +3,7 @@ from uuid import uuid4
 
 import networkx as nx
 import pytest
-from conftest import START, unwrap
+from conftest import START
 from factories import COMMON, make_edge, one_of_each
 from verity_core.graph.loader import build_graph, in_edges, node_record, out_edges
 from verity_core.graph.repository import GraphRepository
@@ -93,7 +93,7 @@ def test_hop_helpers_are_ordered_and_tolerate_missing_nodes():
 
 
 def test_load_graph_is_in_the_protocol(repo):
-    assert isinstance(unwrap(repo), GraphRepository)
+    assert isinstance(repo, GraphRepository)
 
 
 def test_load_graph_returns_the_stored_graph(repo, clock):

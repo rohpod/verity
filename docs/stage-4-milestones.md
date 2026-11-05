@@ -77,8 +77,10 @@ Found while building and reviewing M1. Each is open until the named milestone cl
 
 | Milestone | Note |
 |---|---|
-| M2 | Measure what `load_graph` costs, since its Scan also reads `H#` and `U#` items |
 | M3 | The real round trip must check what moto cannot: the table class (moto ignores it), GSI delay, and transaction capacity |
+| M3 | Check how a throttled `TransactWriteItems` is reported on the real table: as `ProvisionedThroughputExceededException` (boto3 retries it) or as a cancellation with reason `ProvisionedThroughputExceeded` (the repository retries it). AWS's pages do not say which |
+| M4 | A first seed of about 300 nodes and 1,000 edges needs about 5,200 write units, roughly 6 minutes at the table's 15 per second ([ADR 0013](adr/0013-dynamodb-write-model.md)). `verity seed` should expect throttling waits and report progress. Re-seeding writes almost nothing |
+| M6 | `load_graph` reads every `U#` usage record in the table and discards it. If usage grows large, load without a scan: list nodes through the type index and read each node's partition |
 | M2, M6 | Daily `OBSERVED` edges could reach thousands of items by April 2027 and strain §H's size assumption. Measure it |
 | M5 | Art. 9 shows `unmapped` when only its sub-clause is mapped. Decide whether a parent inherits from its children |
 | M5 | `unmapped` covers both "never mapped" and "reviewed, `no_relationship`". Decide whether *Not addressed* (D2) treats them alike |
