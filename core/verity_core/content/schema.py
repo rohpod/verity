@@ -31,6 +31,7 @@ NonEmpty = Annotated[str, Field(min_length=1)]
 # One part of an ID, so it can never corrupt a `#`-delimited key (see `ids.make_id`).
 Slug = Annotated[str, Field(pattern=r"^[A-Za-z0-9._-]+$")]
 ControlCode = Annotated[str, Field(pattern=r"^VC-\d{3}$")]
+UseDomain = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]*$")]
 
 
 class _Strict(BaseModel):
@@ -112,12 +113,59 @@ class ObligationDatesFile(_Strict):
     dates: list[ObligationDate]
 
 
+# --- applicability rules (`rules/applicability.yaml`, ADR 0019) ----------------------------
+
+RequirementRef = Annotated[str, Field(pattern=r"^req:[A-Za-z0-9._-]+:[A-Za-z0-9._-]+$")]
+SystemFact = Literal["interacts_with_people", "generates_synthetic_content"]
+
+
+class ApplicabilityRule(_Strict):
+    """Which requirements apply to whom, and from when. The rules are our reading of the law,
+    not legal advice, so the owner reads this file (ADR 0019).
+
+    Give `requirements` (named) or `leaves_of` (every leaf requirement of those frameworks).
+    """
+
+    id: Slug
+    requirements: list[RequirementRef] = Field(default_factory=list)
+    leaves_of: list[Slug] = Field(default_factory=list)
+    target: Literal["organisation", "system"]
+    # `held` is for the organisation: one edge for each of provider and deployer that any
+    # system holds. Otherwise the edge has this role, and a system target must hold it.
+    role: Role | Literal["held"]
+    reads: list[SystemFact] = Field(default_factory=list)  # facts that must be true
+    high_risk: bool = False  # the system must be high-risk, or a candidate
+    date: Slug | None = None  # an obligation date ID
+    # Used instead of `date` when the system was first placed on the market before it
+    legacy_date: Slug | None = None
+    art_111_2: bool = False  # Art. 111(2) keeps a system already on the market out of scope
+
+    @model_validator(mode="after")
+    def _consistent(self):
+        if bool(self.requirements) == bool(self.leaves_of):
+            raise ValueError("give either requirements or leaves_of")
+        if self.role == "held" and self.target != "organisation":
+            raise ValueError("role held is for an organisation target")
+        if self.target == "organisation" and (self.reads or self.high_risk):
+            raise ValueError("reads and high_risk are facts about a system")
+        if (self.legacy_date or self.art_111_2) and self.date is None:
+            raise ValueError("legacy_date and art_111_2 need a date")
+        if self.art_111_2 and not self.high_risk:
+            raise ValueError("art_111_2 is for high-risk rules")
+        return self
+
+
+class ApplicabilityFile(_Strict):
+    # Annex III domains, as `use_domains` values, with where each is listed.
+    annex_iii_domains: dict[UseDomain, NonEmpty]
+    rules: list[ApplicabilityRule]
+
+
 # --- the fictional organisation and its AI estate (`org/*.yaml`) ----------------------------
 
 # The only provenance an organisation file may claim. `discovered` and `derived` come from the
 # crawler and the engine, and `seeded` is for the library (frameworks, controls, mappings).
 OrgSource = Literal[Source.DECLARED, Source.SYNTHETIC, Source.SIMULATED]
-UseDomain = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]*$")]
 
 
 class _Item(_Strict):

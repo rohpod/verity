@@ -75,6 +75,7 @@ def lint(content: Content, limits: LintLimits = LintLimits()) -> list[LintIssue]
         *_coverage(content, limits),
         *_estate(content),
         *_decisions(content),
+        *_rules(content),
         *_honesty(content),
     ]
     return sorted(issues, key=lambda i: (i.subject, i.code))
@@ -260,6 +261,26 @@ def _decisions(content: Content) -> Iterator[LintIssue]:
             yield LintIssue(
                 "simulated_not_labelled", subject, "statement must say 'simulated sign-off'"
             )
+
+
+def _rules(content: Content) -> Iterator[LintIssue]:
+    """A rule may only name requirements, frameworks and dates that exist."""
+    if content.rules is None:
+        return
+    requirements = {r.id for r in content.requirements}
+    frameworks = {f.id for f in content.frameworks}
+    dates = {d.id for d in content.dates}
+    for rule in content.rules.rules:
+        subject = f"rule:{rule.id}"
+        for req in rule.requirements:
+            if req not in requirements:
+                yield LintIssue("rule_unknown_requirement", subject, f"{req!r} does not exist")
+        for slug in rule.leaves_of:
+            if ids.framework_id(slug) not in frameworks:
+                yield LintIssue("rule_unknown_framework", subject, f"{slug!r} does not exist")
+        for date_id in (rule.date, rule.legacy_date):
+            if date_id is not None and date_id not in dates:
+                yield LintIssue("rule_unknown_date", subject, f"{date_id!r} does not exist")
 
 
 def _strings(content: Content) -> Iterator[tuple[str, str]]:
