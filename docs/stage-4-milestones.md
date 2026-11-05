@@ -37,7 +37,7 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/). Decisions by the owner:
 | | Milestone | Lead | AWS mutation | Status |
 |---|---|---|---|---|
 | **Core engine (local)** | | | | |
-| M0 | Foundations: uv workspace, ruff, pytest, CI without AWS credentials, Dependabot, mutating-command hook | Sonnet | no | ⬜ |
+| M0 | Foundations: uv workspace, ruff, pytest, CI without AWS credentials, Dependabot, mutating-command hook | Sonnet | no | ✅ |
 | M1 | Graph core: models, IDs, `GraphRepository`, `InMemoryRepository`, NetworkX loader, traversals | Opus, then Sonnet | no | ⬜ |
 | M2 | `DynamoDBRepository` (moto), shared contract suite | Sonnet | no | ⬜ |
 | **AWS baseline** | | | | |
