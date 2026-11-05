@@ -208,7 +208,7 @@ Every node and edge carries `tenant`, `source` (discovered · declared · seeded
 - `subject`: the node it is about, matched by an `ABOUT` edge
 - `collector`: `crawler@<ver>`, `cli@<ver>` or `person:<id>`
 - `collected_at` and `valid_until`
-- `content`: inline JSON up to a cap of 16 KB, set from M2 measurements (D14, ADR 0013), *or* `content_ref` pointing to a git-versioned file under `evidence/`
+- `content`: inline JSON up to a cap of 16 KB (D14, [ADR 0014](adr/0014-m2-measurements-and-evidence-cap.md)), *or* `content_ref` pointing to a git-versioned file under `evidence/`
 - `sha256`
 
 Re-collecting evidence creates a new node and never overwrites the old one.
@@ -257,7 +257,7 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
 - **Repository pattern:** the `GraphRepository` protocol exposes `get_node`, `upsert_node`, `upsert_edge`, `neighbors(direction, type)`, `nodes_by_type`, `history`, `append_usage`, `usage_records`, `close_edge` and `load_graph(as_of) → networkx.MultiDiGraph`. Each repository is bound to one tenant. `as_of` uses the node versions held at that time.
   - Implementations are `InMemoryRepository` (tests and local development) and `DynamoDBRepository`.
   - A future `Neo4jRepository` or `NeptuneRepository` would plug into the same interface. That is the migration path off DynamoDB.
-- **Traversal** happens in memory with NetworkX. The graph is hundreds to low thousands of items, so loading it whole is cheap.
+- **Traversal** happens in memory with NetworkX. The graph is hundreds to low thousands of items, so loading it whole is cheap. Daily evidence could take it far past that ([ADR 0014](adr/0014-m2-measurements-and-evidence-cap.md)), and M6 decides how to limit it.
 - **History:** edges are soft-deleted by setting `valid_to`. A reopened edge keeps its earlier periods in `closed_intervals`. Nodes keep append-only `H#` versions. Together these support "what did system S look like on date D?" queries.
 
 ## I. Interfaces
@@ -315,6 +315,7 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
 | [0011](adr/0011-region-eu-north-1.md) | Single region is eu-north-1 |
 | [0012](adr/0012-graph-schema-refinements.md) | Graph schema refinements: edge qualifier, closed intervals, tenant is the organisation, staleness cutoff |
 | [0013](adr/0013-dynamodb-write-model.md) | DynamoDB write model: transactions, JSON records, version checks |
+| [0014](adr/0014-m2-measurements-and-evidence-cap.md) | M2 results: throttling retries, measured costs, 16 KB inline evidence cap |
 
 ## L. Schema validation walkthrough
 

@@ -1,4 +1,4 @@
-"""`InMemoryRepository`: tests and local development. `DynamoDBRepository` (M2) must behave
+"""`InMemoryRepository`: tests and local development. `DynamoDBRepository` must behave
 identically, which the shared contract suite checks. Every write decision comes from
 `planning.py`; this class only stores the result."""
 

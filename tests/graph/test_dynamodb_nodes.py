@@ -9,12 +9,15 @@ from conftest import START
 from dynamo_support import SpyClient, kinds_of, put_edge, repo_for
 from factories import COMMON, TENANT, evidence, make_edge, one_of_each
 from verity_core.graph.dynamodb import items, keys
+from verity_core.graph.dynamodb.capacity import item_size, read_units, write_units
 from verity_core.graph.dynamodb.client import REGION, default_client
 from verity_core.graph.dynamodb.repository import _is_conflict
 from verity_core.graph.dynamodb.table import TABLE_NAME
 from verity_core.graph.errors import ConcurrentWriteError, InvalidEdgeError, RepositoryError
 from verity_core.model import ids
 from verity_core.model.enums import Direction, EdgeType, ModelOrigin, NodeType
+from verity_core.model.evidence import INLINE_EVIDENCE_MAX_BYTES
+from verity_core.model.hashing import canonical_json
 from verity_core.model.nodes import Organisation
 
 NODES = one_of_each()
@@ -428,14 +431,11 @@ def test_resending_an_unchanged_node_adds_no_history_item(table):
 
 
 def test_the_largest_inline_evidence_is_one_cheap_item_under_the_item_limit(table):
-    from verity_core.graph.dynamodb.capacity import item_size, write_units
-    from verity_core.model.evidence import INLINE_EVIDENCE_MAX_BYTES
-    from verity_core.model.hashing import canonical_json
-
+    assert INLINE_EVIDENCE_MAX_BYTES == 16 * 1024  # D14, ADR 0014
     overhead = len(canonical_json({"k": ""}).encode())
     biggest = evidence(content={"k": "x" * (INLINE_EVIDENCE_MAX_BYTES - overhead)})
     assert len(canonical_json(biggest.content).encode()) == INLINE_EVIDENCE_MAX_BYTES
     size = item_size(items.node_item(biggest))
     assert size < 400 * 1024  # DynamoDB's item limit
-    assert write_units(size) <= 20  # about one second of the table's 15 units
+    assert (write_units(size), read_units([size])) == (17, 5)
     repo_for(table).upsert_node(biggest)

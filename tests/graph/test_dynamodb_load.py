@@ -134,10 +134,11 @@ def test_loading_the_estate_costs_a_few_dozen_read_units(table):
     assert read_units(sizes) < 60  # about 29 when measured: 276 items, 117 KB
 
 
-def test_a_third_of_what_a_scan_reads_is_ignored(table):
-    # The mirrors are read and thrown away. This documents the waste so a change is noticed.
+def test_about_half_of_what_a_plain_load_reads_is_ignored(table):
+    # Mirrors, history and usage are read and thrown away (ADR 0014). This documents the waste
+    # so a change is noticed.
     repo = repo_for(table)
     load_estate(repo)
     found = table.client.scan(TableName=TABLE_NAME)["Items"]
-    ignored = sum(item_size(i) for i in found if keys.kind_of(i["SK"]["S"]) in ("R", "U"))
-    assert 0.2 < ignored / sum(item_size(i) for i in found) < 0.4
+    ignored = sum(item_size(i) for i in found if keys.kind_of(i["SK"]["S"]) in ("R", "H", "U"))
+    assert 0.4 < ignored / sum(item_size(i) for i in found) < 0.6

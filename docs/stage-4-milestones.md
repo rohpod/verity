@@ -29,10 +29,11 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/). Decisions by the owner:
 | D11 | Demo L4 sign-offs are labelled *simulated sign-off* in data and UI |
 | D12 | One `source` → badge mapping, with a Simulated badge added |
 | D13 | Provider-scoped inheritance resolves system → model → provider; in-house models resolve to Not applicable |
-| D14 | GSI projects keys only; `H#` written only on real change; writes retry with backoff; inline evidence cap set from M2 measurements |
+| D14 | GSI projects keys only; `H#` written only on real change; writes retry with backoff; inline evidence cap is 16 KB, provisional until M6 ([ADR 0014](adr/0014-m2-measurements-and-evidence-cap.md)) |
 | D15 | All 18 node types are kept, because the §L traversals need them |
 | D16 | Schema refinements found while planning M1. See [ADR 0012](adr/0012-graph-schema-refinements.md) |
 | D17 | How `DynamoDBRepository` writes and reads. See [ADR 0013](adr/0013-dynamodb-write-model.md) |
+| D18 | M2's results: throttling retries, measured costs and the evidence cap. See [ADR 0014](adr/0014-m2-measurements-and-evidence-cap.md) |
 
 ## Milestones
 
@@ -41,7 +42,7 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/). Decisions by the owner:
 | **Core engine (local)** | | | | |
 | M0 | Foundations: uv workspace, ruff, pytest, CI without AWS credentials, Dependabot, mutating-command hook | Sonnet | no | ✅ |
 | M1 | Graph core: models, IDs, `GraphRepository`, `InMemoryRepository`, NetworkX loader, traversals | Opus, then Sonnet | no | ✅ |
-| M2 | `DynamoDBRepository` (moto), shared contract suite | Sonnet | no | 🔄 |
+| M2 | `DynamoDBRepository` (moto), shared contract suite | Sonnet | no | ✅ |
 | **AWS baseline** | | | | |
 | M3 | Account baseline: non-root admin with MFA, region eu-north-1, `infra/` root, $0.01 budget, `verity-graph` | Opus (IAM), Sonnet | **yes, approval first** | ⬜ |
 | **Governance logic (local)** | | | | |
@@ -79,14 +80,16 @@ Found while building and reviewing M1. Each is open until the named milestone cl
 |---|---|
 | M3 | The real round trip must check what moto cannot: the table class (moto ignores it), GSI delay, and transaction capacity |
 | M3 | Check how a throttled `TransactWriteItems` is reported on the real table: as `ProvisionedThroughputExceededException` (boto3 retries it) or as a cancellation with reason `ProvisionedThroughputExceeded` (the repository retries it). AWS's pages do not say which |
-| M4 | A first seed of about 300 nodes and 1,000 edges needs about 5,200 write units, roughly 6 minutes at the table's 15 per second ([ADR 0013](adr/0013-dynamodb-write-model.md)). `verity seed` should expect throttling waits and report progress. Re-seeding writes almost nothing |
+| M4 | A first seed of about 300 nodes and 1,000 edges needs about 5,200 write units, roughly 6 minutes at the table's 15 per second ([ADR 0014](adr/0014-m2-measurements-and-evidence-cap.md)). `verity seed` should expect throttling waits and report progress. Re-seeding writes almost nothing |
 | M6 | `load_graph` reads every `U#` usage record in the table and discards it. If usage grows large, load without a scan: list nodes through the type index and read each node's partition |
-| M2, M6 | Daily `OBSERVED` edges could reach thousands of items by April 2027 and strain §H's size assumption. Measure it |
+| M6 | Estimated in M2: 150 daily crawls of 15 to 30 resources reach 19,000 to 35,000 items and a 2.5 to 4.5 minute scan, mostly from Evidence rather than `OBSERVED` ([ADR 0014](adr/0014-m2-measurements-and-evidence-cap.md)). It stays free, but decide how to limit it, for example writing evidence only on a change |
+| M6 | The 16 KB evidence cap comes from fixtures only. Measure real crawl evidence, including role policies, and decide what happens over the cap: `content_ref` is a git file, which a Lambda cannot write, so today the write fails |
 | M5 | Art. 9 shows `unmapped` when only its sub-clause is mapped. Decide whether a parent inherits from its children |
 | M5 | `unmapped` covers both "never mapped" and "reviewed, `no_relationship`". Decide whether *Not addressed* (D2) treats them alike |
 | M5 | `provider_unknown` must be a finding, never *Not applicable* |
 | M6 | Stamp `ChangeEvent.detected_at` at run start, so evidence collected in the same run survives. Leave `valid_from` unset on re-crawls, or every run writes history |
 | M6 | §D says "system → provider", but §E only has the path through Model. Decide how to record a provider with no known model |
+| M8 | Edge writes do not re-check the nodes they connect, which is safe with one writer at a time ([ADR 0014](adr/0014-m2-measurements-and-evidence-cap.md)). Do not run a seed and a crawl together |
 | M11 | D15 overstates its reason: Policy, Dataset, Candidate and DiscoveryRun appear in none of the 5 traversals. They stay, because other views need them |
 
 **AWS mutations happen only in M3, M8 and any M11 teardown or refresh.** Each needs its own approval, with what it creates, the verified price and how to delete it.
