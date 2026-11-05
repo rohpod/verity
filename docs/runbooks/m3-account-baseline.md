@@ -20,6 +20,8 @@ region = eu-north-1
 credential_process = aws configure export-credentials --profile default --format process
 ```
 
+The `credential_process` line is the command itself. Never paste its output there, because that puts live credentials in the file and breaks every AWS tool.
+
 Use it with `export AWS_PROFILE=verity`. A session lasts up to 12 hours, then run `aws login` again.
 
 If `aws` is not found when the profile runs, use the full path from `which aws`.
@@ -31,6 +33,15 @@ cp terraform.tfvars.example terraform.tfvars   # git-ignored: add your account I
 tofu init
 tofu plan
 ```
+
+## 4. Live tests (each run that writes needs approval)
+```sh
+AWS_PROFILE=verity VERITY_LIVE_AWS=1 uv run pytest tests/live/test_baseline.py -s         # read-only
+AWS_PROFILE=verity VERITY_LIVE_AWS=1 uv run pytest tests/live/test_round_trip.py tests/live/test_capacity.py -s
+AWS_PROFILE=verity VERITY_LIVE_AWS=1 uv run pytest tests/live/test_throttling_probe.py -s  # uses up the table's burst capacity
+```
+
+They write only under the fictional tenant `m3-probe` and remove what they wrote. Results are in [ADR 0016](../adr/0016-m3-live-results.md).
 
 ## Never run
 `aws ce ...`: Cost Explorer charges $0.01 per request. Read credits in the Billing console.

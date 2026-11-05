@@ -317,6 +317,7 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
 | [0013](adr/0013-dynamodb-write-model.md) | DynamoDB write model: transactions, JSON records, version checks |
 | [0014](adr/0014-m2-measurements-and-evidence-cap.md) | M2 results: throttling retries, measured costs, 16 KB inline evidence cap |
 | [0015](adr/0015-account-baseline.md) | Account baseline: identity outside OpenTofu, deny policy, `credential_process`, budget excludes credits |
+| [0016](adr/0016-m3-live-results.md) | M3 live results: capacity, GSI delay, how throttling is reported |
 
 ## L. Schema validation walkthrough
 

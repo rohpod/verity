@@ -35,6 +35,7 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/). Decisions by the owner:
 | D17 | How `DynamoDBRepository` writes and reads. See [ADR 0013](adr/0013-dynamodb-write-model.md) |
 | D18 | M2's results: throttling retries, measured costs and the evidence cap. See [ADR 0014](adr/0014-m2-measurements-and-evidence-cap.md) |
 | D19 | How the account is set up and guarded. See [ADR 0015](adr/0015-account-baseline.md) |
+| D20 | What the real table showed. See [ADR 0016](adr/0016-m3-live-results.md) |
 
 ## Milestones
 
