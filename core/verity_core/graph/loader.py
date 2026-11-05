@@ -6,7 +6,7 @@ attribute and the key `(type, qualifier)`, so the two APPLIES_TO roles between o
 nodes stay separate edges.
 """
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from datetime import datetime
 
 import networkx as nx
@@ -14,6 +14,13 @@ import networkx as nx
 from verity_core.model.edges import Edge
 from verity_core.model.enums import EdgeType
 from verity_core.model.nodes import Node
+
+
+def version_at(versions: Sequence[Node], as_of: datetime) -> Node:
+    """The version the graph held at `as_of`: the latest one written by then. If none was, the
+    first, so a node backdated with an earlier `valid_from` still answers for that period."""
+    written = [v for v in versions if v.updated_at is not None and v.updated_at <= as_of]
+    return written[-1] if written else versions[0]
 
 
 def build_graph(

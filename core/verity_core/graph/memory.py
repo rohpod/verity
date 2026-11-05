@@ -9,7 +9,7 @@ import networkx as nx
 from pydantic import BaseModel
 
 from verity_core.graph.errors import EdgeNotFoundError, ImmutableNodeError, TenantMismatchError
-from verity_core.graph.loader import build_graph
+from verity_core.graph.loader import build_graph, version_at
 from verity_core.model.edges import Edge, EdgeKey
 from verity_core.model.enums import Direction, EdgeType, NodeType
 from verity_core.model.evidence import Evidence
@@ -26,6 +26,19 @@ def _sort_key(key: EdgeKey) -> tuple[str, str, str, str]:
 def _with[R: BaseModel](record: R, **updates: Any) -> R:
     """Copy with changes, validated again (for example `valid_to` must not precede `valid_from`)."""
     return type(record).model_validate({**record.model_dump(), **updates})
+
+
+def _copy[R: BaseModel](record: R) -> R:
+    """Frozen models still hold mutable dicts and lists, so reads hand out deep copies."""
+    return record.model_copy(deep=True)
+
+
+def _period_start(edge: Edge, after: datetime | None, fallback: datetime) -> datetime:
+    """The edge's `valid_from`, unless it is absent or stale (earlier than `after`)."""
+    start = edge.valid_from
+    if start is None or (after is not None and start < after):
+        return fallback
+    return start
 
 
 class InMemoryRepository:
@@ -45,10 +58,15 @@ class InMemoryRepository:
             raise ValueError("the clock must return timezone-aware datetimes")
         return now.astimezone(UTC)
 
+    def _reject_future_end(self, valid_to: datetime | None) -> None:
+        if valid_to is not None and valid_to > self._now():
+            raise ValueError(f"valid_to {valid_to} is in the future")
+
     # --- nodes ---------------------------------------------------------------------------
 
     def get_node(self, node_id: str) -> Node | None:
-        return self._nodes.get(node_id)
+        node = self._nodes.get(node_id)
+        return _copy(node) if node else None
 
     def upsert_node(self, node: Node) -> Node:
         if node.tenant != self.tenant:
@@ -61,6 +79,7 @@ class InMemoryRepository:
             open_edges=self._open_edges_touching(node.id),
             organisation_ids=[n.id for n in self.nodes_by_type(NodeType.ORGANISATION)],
         )
+        self._reject_future_end(node.valid_to)
         now = self._now()
 
         if existing is None:
@@ -71,7 +90,7 @@ class InMemoryRepository:
             # A caller that does not know `valid_from` leaves it unset; keep the stored one.
             candidate = node if node.valid_from else _with(node, valid_from=existing.valid_from)
             if content_hash(candidate) == content_hash(existing):
-                return existing
+                return _copy(existing)
             if isinstance(existing, Evidence):
                 raise ImmutableNodeError(f"{node.id!r} is Evidence; collect new evidence instead")
             stored = _with(
@@ -83,13 +102,27 @@ class InMemoryRepository:
 
         self._nodes[stored.id] = stored
         self._history.setdefault(stored.id, []).append(stored)
-        return stored
+        if stored.valid_to is not None:
+            self._close_edges_of(stored)
+        return _copy(stored)
+
+    def _close_edges_of(self, node: Node) -> None:
+        """An ended node takes its edges with it, so `neighbors` and `load_graph` agree."""
+        for edge in self._open_edges_touching(node.id):
+            self.close_edge(
+                edge.src,
+                edge.type,
+                edge.dst,
+                valid_to=max(node.valid_to, edge.valid_from),
+                qualifier=edge.qualifier,
+            )
 
     def nodes_by_type(self, node_type: NodeType) -> list[Node]:
-        return sorted((n for n in self._nodes.values() if n.type is node_type), key=lambda n: n.id)
+        found = (n for n in self._nodes.values() if n.type is node_type)
+        return [_copy(n) for n in sorted(found, key=lambda n: n.id)]
 
     def history(self, node_id: str) -> list[Node]:
-        return list(self._history.get(node_id, []))
+        return [_copy(n) for n in self._history.get(node_id, [])]
 
     # --- edges ---------------------------------------------------------------------------
 
@@ -102,8 +135,9 @@ class InMemoryRepository:
             edge,
             self._nodes.get(edge.src),
             self._nodes.get(edge.dst),
-            open_out_edges=self._edges_from(edge.src, as_of=None),
+            open_out_edges=self.neighbors(edge.src, Direction.OUT),
         )
+        self._reject_future_end(edge.valid_to)
         now = self._now()
         existing = self._edges.get(edge.key)
 
@@ -111,16 +145,17 @@ class InMemoryRepository:
             stored = _with(edge, created_at=now, updated_at=now, version=1)
             if stored.valid_from is None:
                 stored = _with(stored, valid_from=now)
-        elif existing.valid_to is not None:
+        elif existing.valid_to is not None and edge.valid_to is None:
             stored = self._reopen(existing, edge, now)
         else:
+            last_end = existing.closed_intervals[-1][1] if existing.closed_intervals else None
             candidate = _with(
                 edge,
-                valid_from=edge.valid_from or existing.valid_from,
+                valid_from=_period_start(edge, last_end, existing.valid_from),
                 closed_intervals=existing.closed_intervals,
             )
             if content_hash(candidate) == content_hash(existing):
-                return existing
+                return _copy(existing)
             stored = _with(
                 candidate,
                 created_at=existing.created_at,
@@ -131,11 +166,11 @@ class InMemoryRepository:
         self._edges[stored.key] = stored
         self._out.setdefault(stored.src, set()).add(stored.key)
         self._in.setdefault(stored.dst, set()).add(stored.key)
-        return stored
+        return _copy(stored)
 
     def _reopen(self, existing: Edge, edge: Edge, now: datetime) -> Edge:
         """Keep the finished period in `closed_intervals` and start a new one."""
-        start = edge.valid_from or now
+        start = _period_start(edge, existing.valid_to, now)
         if start < existing.valid_to:
             raise ValueError(f"{edge.key} cannot reopen at {start}, before it closed")
         return _with(
@@ -163,12 +198,13 @@ class InMemoryRepository:
         if existing is None:
             raise EdgeNotFoundError(f"no {edge_type} edge from {src!r} to {dst!r} ({qualifier})")
         if existing.valid_to is not None:
-            return existing
+            return _copy(existing)
+        self._reject_future_end(valid_to)
         stored = _with(
             existing, valid_to=valid_to, updated_at=self._now(), version=existing.version + 1
         )
         self._edges[key] = stored
-        return stored
+        return _copy(stored)
 
     def neighbors(
         self,
@@ -182,17 +218,25 @@ class InMemoryRepository:
         keys = sorted(index.get(node_id, ()), key=_sort_key)
         edges = (self._edges[k] for k in keys)
         return [
-            e for e in edges if (edge_type is None or e.type is edge_type) and e.is_active(as_of)
+            _copy(e)
+            for e in edges
+            if (edge_type is None or e.type is edge_type) and e.is_active(as_of)
         ]
-
-    def _edges_from(self, node_id: str, *, as_of: datetime | None) -> list[Edge]:
-        return self.neighbors(node_id, Direction.OUT, as_of=as_of)
 
     def _open_edges_touching(self, node_id: str) -> list[Edge]:
         return self.neighbors(node_id, Direction.OUT) + self.neighbors(node_id, Direction.IN)
 
     def load_graph(self, *, as_of: datetime | None = None) -> nx.MultiDiGraph:
-        return build_graph(self._nodes.values(), self._edges.values(), as_of=as_of)
+        if as_of is not None and as_of.tzinfo is None:
+            raise ValueError("as_of must be timezone-aware")
+        nodes = (
+            self._nodes.values()
+            if as_of is None
+            else [version_at(versions, as_of) for versions in self._history.values()]
+        )
+        return build_graph(
+            [_copy(n) for n in nodes], [_copy(e) for e in self._edges.values()], as_of=as_of
+        )
 
     # --- usage ---------------------------------------------------------------------------
 

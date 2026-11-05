@@ -380,9 +380,153 @@ def test_an_edge_that_flaps_twice_keeps_both_earlier_periods(repo, clock):
 
 def test_an_edge_cannot_reopen_before_it_closed(repo, clock):
     repo.upsert_edge(owns(repo))
-    repo.close_edge(PERSON.id, EdgeType.OWNS, SYSTEM.id, valid_to=START + timedelta(days=10))
+    clock.advance(days=5)
+    repo.close_edge(PERSON.id, EdgeType.OWNS, SYSTEM.id, valid_to=clock.now)
+    clock.advance(days=-1)  # a clock that went backwards
     with pytest.raises(ValueError, match="before it closed"):
-        repo.upsert_edge(make_edge(EdgeType.OWNS, PERSON.id, SYSTEM.id))  # clock is still day 0
+        repo.upsert_edge(make_edge(EdgeType.OWNS, PERSON.id, SYSTEM.id))
+
+
+def test_seeding_the_same_closed_edge_twice_changes_nothing(repo, clock):
+    repo.upsert_node(PERSON)
+    repo.upsert_node(SYSTEM)
+    historic = make_edge(
+        EdgeType.OWNS,
+        PERSON.id,
+        SYSTEM.id,
+        valid_from=START - timedelta(days=9),
+        valid_to=START - timedelta(days=1),
+    )
+    first = repo.upsert_edge(historic)
+    clock.advance(days=1)
+    assert repo.upsert_edge(historic) == first
+    assert first.version == 1 and first.closed_intervals == ()
+
+
+def test_a_correction_to_a_closed_edge_keeps_it_closed(repo):
+    repo.upsert_node(PERSON)
+    repo.upsert_node(SYSTEM)
+    start = START - timedelta(days=9)
+    repo.upsert_edge(
+        make_edge(
+            EdgeType.OWNS,
+            PERSON.id,
+            SYSTEM.id,
+            valid_from=start,
+            valid_to=start + timedelta(days=1),
+        )
+    )
+    corrected = repo.upsert_edge(
+        make_edge(
+            EdgeType.OWNS,
+            PERSON.id,
+            SYSTEM.id,
+            valid_from=start,
+            valid_to=start + timedelta(days=2),
+        )
+    )
+    assert corrected.valid_to == start + timedelta(days=2)
+    assert corrected.version == 2 and corrected.closed_intervals == ()
+
+
+def test_reseeding_an_edge_that_was_closed_reopens_it_without_overlap(repo, clock):
+    repo.upsert_node(PERSON)
+    repo.upsert_node(SYSTEM)
+    seeded = make_edge(EdgeType.OWNS, PERSON.id, SYSTEM.id, valid_from=START)
+    repo.upsert_edge(seeded)
+    clock.advance(days=2)
+    closed_at = clock.now
+    repo.close_edge(PERSON.id, EdgeType.OWNS, SYSTEM.id, valid_to=closed_at)
+    clock.advance(days=3)
+    reopened = repo.upsert_edge(seeded)  # its valid_from predates the close, so it is stale
+    assert reopened.valid_from == clock.now
+    assert reopened.closed_intervals == ((START, closed_at),)
+    clock.advance(days=1)
+    assert repo.upsert_edge(seeded) == reopened  # seeding once more changes nothing
+
+
+def test_a_closed_edge_cannot_be_given_a_future_end(repo, clock):
+    repo.upsert_edge(owns(repo))
+    with pytest.raises(ValueError, match="future"):
+        repo.close_edge(
+            PERSON.id, EdgeType.OWNS, SYSTEM.id, valid_to=clock.now + timedelta(days=30)
+        )
+    assert len(repo.neighbors(PERSON.id, Direction.OUT)) == 1
+
+
+def test_records_cannot_be_written_with_a_future_end(repo, clock):
+    later = clock.now + timedelta(days=1)
+    with pytest.raises(ValueError, match="future"):
+        repo.upsert_node(SYSTEM.model_copy(update={"valid_from": clock.now, "valid_to": later}))
+    edge = owns(repo)
+    with pytest.raises(ValueError, match="future"):
+        repo.upsert_edge(edge.model_copy(update={"valid_from": clock.now, "valid_to": later}))
+    assert repo.neighbors(PERSON.id, Direction.OUT) == []
+
+
+# --- what the repository hands back --------------------------------------------------------
+
+
+def test_changing_a_returned_record_never_changes_what_is_stored(repo):
+    stored = repo.upsert_node(evidence())
+    original = dict(stored.content)
+    stored.content["runtime"] = "tampered"  # through the upsert result
+    repo.get_node(stored.id).content["runtime"] = "tampered"
+    repo.history(stored.id)[0].content["runtime"] = "tampered"
+    repo.nodes_by_type(NodeType.EVIDENCE)[0].content["runtime"] = "tampered"
+    repo.load_graph().nodes[stored.id]["record"].content["runtime"] = "tampered"
+    assert repo.get_node(stored.id).content == original
+    assert repo.history(stored.id)[0].content == original
+
+
+def test_changing_a_source_dict_after_writing_does_not_reach_the_store(repo):
+    content = {"runtime": "python3.12"}
+    e = evidence(content=content)
+    repo.upsert_node(e)
+    e.content["runtime"] = "tampered"
+    assert repo.get_node(e.id).content == {"runtime": "python3.12"}
+
+
+# --- ending a node -------------------------------------------------------------------------
+
+
+def end(node, clock):
+    return node.model_copy(update={"valid_from": START, "valid_to": clock.now})
+
+
+def test_ending_a_node_closes_its_edges(repo, clock):
+    repo.upsert_edge(owns(repo))
+    repo.upsert_node(RISK)
+    repo.upsert_edge(make_edge(EdgeType.HAS_RISK, SYSTEM.id, RISK.id))
+    clock.advance(days=2)
+    repo.upsert_node(end(SYSTEM, clock))
+    assert repo.neighbors(PERSON.id, Direction.OUT) == []  # incoming edge closed
+    assert repo.neighbors(RISK.id, Direction.IN) == []  # outgoing edge closed
+    assert repo.load_graph().number_of_edges() == 0
+    day_one = START + timedelta(days=1)
+    assert len(repo.neighbors(PERSON.id, Direction.OUT, as_of=day_one)) == 1
+    assert repo.load_graph(as_of=day_one).number_of_edges() == 2
+
+
+def test_an_open_edge_to_an_ended_node_is_refused(repo, clock):
+    repo.upsert_node(PERSON)
+    repo.upsert_node(SYSTEM)
+    clock.advance(days=1)
+    repo.upsert_node(end(SYSTEM, clock))
+    with pytest.raises(InvalidEdgeError) as caught:
+        repo.upsert_edge(make_edge(EdgeType.OWNS, PERSON.id, SYSTEM.id))
+    assert caught.value.rule == "endpoint_ended"
+
+
+def test_a_node_that_returns_can_take_edges_again(repo, clock):
+    repo.upsert_edge(owns(repo))
+    clock.advance(days=1)
+    repo.upsert_node(end(SYSTEM, clock))
+    clock.advance(days=1)
+    repo.upsert_node(SYSTEM.model_copy(update={"valid_from": START}))  # rediscovered
+    assert repo.neighbors(PERSON.id, Direction.OUT) == []  # edges come back only when re-sent
+    edge = repo.upsert_edge(make_edge(EdgeType.OWNS, PERSON.id, SYSTEM.id))
+    assert len(edge.closed_intervals) == 1
 
 
 # --- usage (D7, D8) ------------------------------------------------------------------------

@@ -5,6 +5,9 @@ A repository is bound to one tenant. Contract, shared by every implementation:
 
 - Time comes from an injected clock. The repository stamps `created_at`, `updated_at`,
   `version` and, if absent, `valid_from`. Nothing here calls `now()` anywhere else.
+- `valid_to` may not be in the future: `as_of=None` means "open", read without a clock, so a
+  future end would make a record vanish early.
+- Records handed back are copies. Changing one never changes what is stored.
 - Re-upserting an unchanged record writes nothing, including no history entry (D14).
 - Nodes must exist before the edges that connect them. Rule violations raise
   `GraphValidationError` and leave the graph untouched.
@@ -39,13 +42,17 @@ class GraphRepository(UsageSink, Protocol):
     def upsert_node(self, node: Node) -> Node:
         """Insert or update. A new node gets version 1. A real change bumps the version and
         adds a history entry; an unchanged node is returned as stored. Changing Evidence
-        raises `ImmutableNodeError`."""
+        raises `ImmutableNodeError`. Ending a node (`valid_to`) closes its open edges too."""
         ...
 
     def upsert_edge(self, edge: Edge) -> Edge:
         """Insert or update. Identity is `(src, type, dst, qualifier)`, so one system can
-        have an APPLIES_TO edge per role. Upserting a closed edge reopens it: the earlier
-        period moves to `closed_intervals`. It may not reopen before it closed."""
+        have an APPLIES_TO edge per role.
+
+        An open edge sent for a closed one reopens it: the earlier period moves to
+        `closed_intervals`. A `valid_from` before that period ended is a stale value, as when
+        seeding again, so the new period starts now. Sending the same closed edge again changes
+        nothing."""
         ...
 
     def close_edge(
@@ -59,7 +66,8 @@ class GraphRepository(UsageSink, Protocol):
     ) -> Edge:
         """Soft-delete (D7). `valid_to` is explicit (D5). Closing an already closed edge keeps
         its first `valid_to`. `qualifier` closes one role or purpose only. Raises
-        `EdgeNotFoundError`, or `ValueError` if `valid_to` precedes `valid_from`."""
+        `EdgeNotFoundError`, or `ValueError` if `valid_to` precedes `valid_from` or is in the
+        future."""
         ...
 
     def neighbors(
@@ -84,8 +92,9 @@ class GraphRepository(UsageSink, Protocol):
 
     def load_graph(self, *, as_of: datetime | None = None) -> nx.MultiDiGraph:
         """The whole tenant graph, ready to traverse. Nodes and edges are open now, or valid
-        at `as_of`. Usage records are not included. Node attributes are those of the current
-        version; only validity is time-travelled."""
+        at `as_of`. With `as_of`, each node is the version the graph held then, so a past
+        status is the status of that date. Edge properties are always current (ADR 0012).
+        Usage records are not included."""
         ...
 
     def usage_records(
