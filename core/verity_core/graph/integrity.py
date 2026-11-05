@@ -13,6 +13,7 @@ from verity_core.model.enums import (
     ModelOrigin,
     NodeType,
 )
+from verity_core.model.ids import ca_id
 from verity_core.model.nodes import Control, ControlAssessment, Evidence, Model
 
 
@@ -55,6 +56,11 @@ def _check_assessment(graph: nx.MultiDiGraph, ca: ControlAssessment) -> list[Int
     if not scopes:
         issues.append(IntegrityIssue("assessment_without_scope", ca.id, "no SCOPED_TO"))
     if controls and scopes:
+        expected_id = ca_id(controls[0].dst, scopes[0].dst)
+        if ca.id != expected_id:
+            issues.append(
+                IntegrityIssue("assessment_id_mismatch", ca.id, f"its edges say {expected_id}")
+            )
         control = node_record(graph, controls[0].dst)
         scope = node_record(graph, scopes[0].dst)
         if isinstance(control, Control) and scope is not None:

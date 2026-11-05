@@ -9,7 +9,14 @@ from verity_core.model.enums import (
     NodeType,
     ScopeLevel,
 )
-from verity_core.model.nodes import AISystem, Control, ControlAssessment, Person, parse_node
+from verity_core.model.nodes import (
+    AISystem,
+    AWSResource,
+    Control,
+    ControlAssessment,
+    Person,
+    parse_node,
+)
 
 NODES = one_of_each()
 
@@ -122,3 +129,24 @@ def test_no_model_shadows_an_envelope_field():
     for cls in classes:
         for name, field in Envelope.model_fields.items():
             assert cls.model_fields[name].annotation == field.annotation, (cls.__name__, name)
+
+
+def resource(*names):
+    return AWSResource(
+        id="res:lambda:eu-north-1:x",
+        resource_type="lambda",
+        region="eu-north-1",
+        name="x",
+        env_var_names=list(names),
+        **COMMON,
+    )
+
+
+def test_env_var_names_are_accepted():
+    assert resource("OPENAI_BASE_URL", "_private", "lower1").env_var_names
+
+
+@pytest.mark.parametrize("smuggled", ["API_KEY=sk-canary", "sk-canary", "https://x", "", "1ABC"])
+def test_a_value_cannot_be_stored_as_an_env_var_name(smuggled):
+    with pytest.raises(ValidationError):
+        resource(smuggled)

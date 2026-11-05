@@ -27,6 +27,7 @@ from verity_core.model.evidence import Evidence
 from verity_core.model.ids import check_id
 
 NonEmpty = Annotated[str, Field(min_length=1)]
+EnvVarName = Annotated[str, Field(pattern=r"^[A-Za-z_][A-Za-z0-9_]*$")]
 
 
 class Organisation(NodeBase):
@@ -69,8 +70,9 @@ class AWSResource(NodeBase):
     region: NonEmpty
     name: NonEmpty
     tags: dict[str, str] = Field(default_factory=dict)
-    # Names only. Values are discarded at the collector boundary and cannot be stored (D1).
-    env_var_names: list[str] = Field(default_factory=list)
+    # Names only: the collector discards values on receipt (D1). The pattern is a second line
+    # of defence that refuses `NAME=value`; it cannot recognise a bare value as one.
+    env_var_names: list[EnvVarName] = Field(default_factory=list)
     config_hash: str | None = None  # compared between runs to produce ChangeEvents
 
 
