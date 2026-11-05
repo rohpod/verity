@@ -23,7 +23,7 @@ jobs:
       - run: uv run pytest
       - uses: opentofu/setup-opentofu@v2.0.2
         with:
-          tofu_version: 1.13.5
+          tofu_version: 1.13.8
           tofu_wrapper: false
       - run: tofu fmt -check -recursive
         working-directory: infra
