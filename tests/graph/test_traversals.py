@@ -1,20 +1,36 @@
 """The section E traversals as executable tests, for the three use cases.
 
-Traversals 1 and 5 are here; PR 9 adds 2, 3 and 4. The estate (`estate.py`) is fictional and
+All five traversals, for all three use cases. The estate (`estate.py`) is fictional and
 its mappings are placeholders, so these tests check graph behaviour, not legal content.
 """
 
+import dataclasses
+from datetime import timedelta
+
 import estate as E
 import pytest
+from factories import evidence as make_evidence
+from factories import make_edge
 from verity_core.graph.integrity import check_integrity
 from verity_core.graph.loader import build_graph
-from verity_core.graph.traversals import Resolution, audit_trail, obligations_for
+from verity_core.graph.traversals import (
+    DerivedLink,
+    Resolution,
+    audit_trail,
+    crosswalk,
+    obligations_for,
+    provider_impact,
+    stale_by_change,
+)
+from verity_core.model import ids
 from verity_core.model.enums import (
     AssuranceLevel,
+    EdgeType,
     EvidenceKind,
     ImplementationStatus,
     Role,
     Source,
+    StrmType,
 )
 
 R = Resolution
@@ -88,9 +104,10 @@ OBLIGATIONS = {
         ),
     ],
     # Art. 9 has no control of its own (unmapped); its sub-clause's bias test has an assessment
-    # but no evidence (a gap); human oversight is signed off; the in-house model has no provider.
+    # but no evidence (a gap); human oversight is signed off and has a person's attestation plus
+    # a crawler snapshot; the in-house model has no provider.
     E.TALENT: [
-        (E.ART14, Role.PROVIDER, E.VC_OVERSIGHT, R.DIRECT, None, E.ca(E.VC_OVERSIGHT, E.TALENT), 1),
+        (E.ART14, Role.PROVIDER, E.VC_OVERSIGHT, R.DIRECT, None, E.ca(E.VC_OVERSIGHT, E.TALENT), 2),
         *ART4_ROWS,
         (E.ART9, Role.PROVIDER, None, R.UNMAPPED, None, None, 0),
         (
@@ -207,9 +224,10 @@ def test_audit_trail_talent_screening_is_verified_by_a_named_person_and_labelled
     assert link.assessed_by == E.VERIFIER
     assert link.signoff_source is Source.SIMULATED  # D11
     assert link.assessment_source is Source.SIMULATED
-    (evidence,) = link.evidence
-    assert evidence.kind is EvidenceKind.ATTESTATION and evidence.collector == E.VERIFIER
-    assert evidence.source is Source.SIMULATED
+    snapshot, attestation = link.evidence  # oldest first
+    assert snapshot.kind is EvidenceKind.CONFIG_SNAPSHOT and snapshot.collector == "crawler@0.1.0"
+    assert attestation.kind is EvidenceKind.ATTESTATION and attestation.collector == E.VERIFIER
+    assert attestation.source is Source.SIMULATED
 
 
 def test_audit_trail_talent_screening_bias_test_is_an_assessment_with_no_proof(estate_graph):
@@ -300,3 +318,249 @@ def test_traversals_work_on_a_graph_built_directly(estate_graph):
     edges = [d["record"] for _, _, d in estate_graph.edges(data=True)]
     rebuilt = build_graph(nodes, edges)
     assert project(obligations_for(rebuilt, E.TALENT)) == OBLIGATIONS[E.TALENT]
+
+
+# --- 2. Impact of an incident at provider P -----------------------------------------------
+
+
+def system_ids(impact):
+    return [s.system_id for s in impact.systems]
+
+
+def test_provider_impact_support_assistant_reaches_its_owner_risks_and_requirements(estate_graph):
+    impact = provider_impact(estate_graph, E.BEDROCK)
+    assert impact.assessment_ids == (E.ca(E.VC_SUPPLIER_DPA, E.BEDROCK),)
+    (system,) = impact.systems
+    assert system.system_id == E.SUPPORT
+    assert system.model_ids == (ids.model_id("bedrock-fm"),)
+    assert system.owner_ids == (E.SUPPORT_LEAD,)
+    assert system.risk_ids == (E.RISK_SUPPORT,)
+    assert system.requirement_ids == (E.ART50_1, E.ISO_A10_3)
+
+
+def test_provider_impact_contract_insights_reaches_the_provider_scoped_assessment(estate_graph):
+    impact = provider_impact(estate_graph, E.OPENAI)
+    assert impact.assessment_ids == (E.ca(E.VC_SUPPLIER_DPA, E.OPENAI),)
+    (system,) = impact.systems
+    assert system.system_id == E.CONTRACT
+    assert (system.owner_ids, system.risk_ids) == ((E.VERIFIER,), (E.RISK_CONTRACT,))
+    assert system.requirement_ids == (E.ISO_A10_3,)
+
+
+def test_provider_impact_never_reaches_a_system_with_an_in_house_model(estate_graph):
+    reached = [
+        s for p in (E.BEDROCK, E.OPENAI) for s in system_ids(provider_impact(estate_graph, p))
+    ]
+    assert E.TALENT not in reached
+    assert sorted(reached) == [E.CONTRACT, E.SUPPORT]
+
+
+def test_provider_impact_does_not_leak_between_providers(estate_graph):
+    bedrock = provider_impact(estate_graph, E.BEDROCK)
+    openai = provider_impact(estate_graph, E.OPENAI)
+    assert E.CONTRACT not in system_ids(bedrock) and E.SUPPORT not in system_ids(openai)
+    # Both systems share the supplier requirement, but that does not connect them.
+    assert not set(bedrock.systems[0].owner_ids) & set(openai.systems[0].owner_ids)
+
+
+def test_provider_impact_with_no_models_is_empty(estate_graph):
+    graph = estate_graph.copy()
+    graph.remove_node(ids.model_id("bedrock-fm"))
+    impact = provider_impact(graph, E.BEDROCK)
+    assert impact.systems == () and impact.assessment_ids == (E.ca(E.VC_SUPPLIER_DPA, E.BEDROCK),)
+
+
+def test_provider_impact_needs_a_provider(estate_graph):
+    for bad in (E.SUPPORT, "prov:nope"):
+        with pytest.raises(ValueError, match="Provider"):
+            provider_impact(estate_graph, bad)
+
+
+# --- 3. Crosswalk --------------------------------------------------------------------------
+
+
+def test_crosswalk_support_assistant_derived_link_takes_the_weaker_strength(estate_graph):
+    (link,) = crosswalk(estate_graph, E.ART50_1, E.ISO)
+    assert (link.via_control_id, link.target_requirement_id) == (E.VC_DISCLOSURE, E.ISO_A8_2)
+    assert (link.left.strength, link.right.strength) == (8, 5)
+    assert link.strength == 5
+    # Both spokes are kept, with their own relationship types.
+    assert link.left.strm is StrmType.SUBSET_OF and link.right.strm is StrmType.INTERSECTS_WITH
+
+
+def test_a_derived_link_has_no_strm_type(estate_graph):
+    (link,) = crosswalk(estate_graph, E.ART50_1, E.ISO)
+    assert "strm" not in {f.name for f in dataclasses.fields(DerivedLink)}
+    assert not hasattr(link, "strm")  # D6: composing two spokes gives no trustworthy type
+
+
+def test_crosswalk_talent_screening_sub_clause_resolves_through_part_of(estate_graph):
+    # ART9_2A maps to the bias control, which an ISO sub-clause (A.9.3, under A.9) also maps to.
+    (link,) = crosswalk(estate_graph, E.ART9_2A, E.ISO)
+    assert (link.via_control_id, link.target_requirement_id) == (E.VC_BIAS_TEST, E.ISO_A9_3)
+    assert link.strength == 6
+
+
+def test_crosswalk_works_in_both_directions_and_through_nested_clauses(estate_graph):
+    (forward,) = crosswalk(estate_graph, E.ART14, E.ISO)
+    assert (
+        forward.target_requirement_id == E.ISO_A6_2_4
+    )  # A.6.2.4 is under A.6, under the framework
+    assert forward.strength == 7
+    (back,) = crosswalk(estate_graph, E.ISO_A6_2_4, E.EUAIA)
+    assert back.target_requirement_id == E.ART14 and back.strength == 7
+
+
+def test_crosswalk_contract_insights_no_relationship_does_not_compose(estate_graph):
+    # ART25 maps to the supplier control only as no_relationship, so it is not a related
+    # requirement of the supplier clause.
+    assert crosswalk(estate_graph, E.ISO_A10_3, E.EUAIA) == []
+    # And a requirement whose own spoke is no_relationship has nothing to compose from.
+    assert crosswalk(estate_graph, E.ART25, E.ISO) == []
+
+
+def test_crosswalk_excludes_the_requirement_itself_and_other_frameworks(estate_graph):
+    assert crosswalk(estate_graph, E.ART14, E.EUAIA) == []  # nothing else in the EU Act on VC-014
+    assert all(
+        link.target_requirement_id.startswith("req:iso42001:")
+        for link in crosswalk(estate_graph, E.ART14, E.ISO)
+    )
+
+
+def test_crosswalk_stops_on_a_part_of_cycle(estate_graph):
+    nodes = [d["record"] for _, d in estate_graph.nodes(data=True)]
+    edges = [d["record"] for _, _, d in estate_graph.edges(data=True)]
+    loop = make_edge(EdgeType.PART_OF, E.ISO_A9, E.ISO_A9_3)  # A.9.3 is under A.9, and now back
+    graph = build_graph(nodes, [*edges, loop])
+    assert crosswalk(graph, E.ART9_2A, E.EUAIA) == []  # walks the cycle once, finds no framework
+    assert len(crosswalk(graph, E.ART9_2A, E.ISO)) == 1
+
+
+def test_crosswalk_needs_a_requirement_and_a_framework(estate_graph):
+    with pytest.raises(ValueError, match="Requirement"):
+        crosswalk(estate_graph, E.SUPPORT, E.ISO)
+    with pytest.raises(ValueError, match="Framework"):
+        crosswalk(estate_graph, E.ART14, E.ART4)
+
+
+# --- 4. Evidence made stale by a change ----------------------------------------------------
+
+
+def evidence_ids(graph, subject, kind):
+    return [
+        n
+        for n, d in graph.nodes(data=True)
+        if d["record"].type.value == "Evidence"
+        and d["record"].subject == subject
+        and d["record"].kind is kind
+    ]
+
+
+def test_stale_support_assistant_earlier_evidence_is_hit_and_later_evidence_is_not(estate):
+    graph = estate.load_graph()
+    (test_run,) = evidence_ids(graph, E.SUPPORT, EvidenceKind.AUTOMATED_TEST)
+    impact = stale_by_change(graph, E.CHG_SUPPORT)
+    assert [(s.evidence_id, s.resource_id) for s in impact.evidence] == [(test_run, E.RES_SUPPORT)]
+    assert impact.assessment_ids == (E.ca(E.VC_DISCLOSURE, E.SUPPORT),)
+
+    # The crawler collects again after the change: the new evidence is fresh, the old stays stale.
+    recollected = make_evidence(
+        subject=E.SUPPORT,
+        content={"banner_shown": True, "rechecked": True},
+        collected_at=E.CHANGE_DETECTED_AT + timedelta(hours=1),
+        valid_until=E.CHANGE_DETECTED_AT + timedelta(days=30),
+    )
+    estate.upsert_node(recollected)
+    for edge in (
+        make_edge(EdgeType.ABOUT, recollected.id, E.SUPPORT),
+        make_edge(EdgeType.SUPPORTS, recollected.id, E.ca(E.VC_DISCLOSURE, E.SUPPORT)),
+        make_edge(EdgeType.COLLECTED_FROM, recollected.id, E.RES_SUPPORT),
+    ):
+        estate.upsert_edge(edge)
+    after = stale_by_change(estate.load_graph(), E.CHG_SUPPORT)
+    assert [s.evidence_id for s in after.evidence] == [test_run]
+
+
+def test_evidence_collected_at_the_moment_of_the_change_is_not_stale(estate):
+    same_run = make_evidence(
+        subject=E.SUPPORT,
+        content={"same": "run"},
+        collected_at=E.CHANGE_DETECTED_AT,
+        valid_until=E.CHANGE_DETECTED_AT + timedelta(days=30),
+    )
+    estate.upsert_node(same_run)
+    estate.upsert_edge(make_edge(EdgeType.COLLECTED_FROM, same_run.id, E.RES_SUPPORT))
+    stale = stale_by_change(estate.load_graph(), E.CHG_SUPPORT)
+    assert same_run.id not in [s.evidence_id for s in stale.evidence]  # collected_at < detected_at
+
+
+def test_stale_talent_screening_returns_the_assessment_but_spares_the_attestation(estate_graph):
+    (snapshot,) = evidence_ids(estate_graph, E.TALENT, EvidenceKind.CONFIG_SNAPSHOT)
+    (attestation,) = evidence_ids(estate_graph, E.TALENT, EvidenceKind.ATTESTATION)
+    impact = stale_by_change(estate_graph, E.CHG_TALENT)
+    assert [s.evidence_id for s in impact.evidence] == [snapshot]
+    assert attestation not in [s.evidence_id for s in impact.evidence]  # a person, not a resource
+    assert impact.assessment_ids == (E.ca(E.VC_OVERSIGHT, E.TALENT),)  # the CA is returned
+
+
+def test_stale_contract_insights_with_nothing_collected_stales_nothing(estate_graph):
+    impact = stale_by_change(estate_graph, E.CHG_CONTRACT)
+    assert impact.evidence == () and impact.assessment_ids == ()
+
+
+def test_a_change_never_stales_another_systems_evidence_or_a_provider_document(estate_graph):
+    (dpa,) = evidence_ids(estate_graph, E.BEDROCK, EvidenceKind.DOCUMENT_REF)
+    touched = {
+        s.evidence_id
+        for c in (E.CHG_SUPPORT, E.CHG_TALENT, E.CHG_CONTRACT)
+        for s in stale_by_change(estate_graph, c).evidence
+    }
+    assert dpa not in touched  # ABOUT a provider and never COLLECTED_FROM a resource
+    support = {s.evidence_id for s in stale_by_change(estate_graph, E.CHG_SUPPORT).evidence}
+    talent = {s.evidence_id for s in stale_by_change(estate_graph, E.CHG_TALENT).evidence}
+    assert not support & talent
+
+
+def test_stale_evidence_with_no_assessment_is_still_listed(estate_graph):
+    graph = estate_graph.copy()
+    for src, dst, key in list(graph.out_edges(keys=True)):
+        if key[0] is EdgeType.SUPPORTS and dst == E.ca(E.VC_DISCLOSURE, E.SUPPORT):
+            graph.remove_edge(src, dst, key)
+    impact = stale_by_change(graph, E.CHG_SUPPORT)
+    assert len(impact.evidence) == 1 and impact.evidence[0].assessment_ids == ()
+    assert impact.assessment_ids == ()
+
+
+def test_stale_needs_a_change_event(estate_graph):
+    for bad in (E.RES_SUPPORT, "chg:nope"):
+        with pytest.raises(ValueError, match="ChangeEvent"):
+            stale_by_change(estate_graph, bad)
+
+
+# --- The M1 matrix: all five traversals, for each of the three use cases -------------------
+
+USE_CASES = {
+    # system, its provider (None: in-house), a requirement to crosswalk, its change, a trail
+    "support-assistant": (E.SUPPORT, E.BEDROCK, E.ART50_1, E.ISO, E.CHG_SUPPORT, E.ART50_1),
+    "talent-screening": (E.TALENT, None, E.ART9_2A, E.ISO, E.CHG_TALENT, E.ART14),
+    "contract-insights": (E.CONTRACT, E.OPENAI, E.ISO_A10_3, E.EUAIA, E.CHG_CONTRACT, E.ISO_A10_3),
+}
+CROSSWALK_LINKS = {"support-assistant": 1, "talent-screening": 1, "contract-insights": 0}
+STALE_EVIDENCE = {"support-assistant": 1, "talent-screening": 1, "contract-insights": 0}
+
+
+@pytest.mark.parametrize("name", USE_CASES)
+def test_all_five_traversals_for_each_use_case(estate_graph, name):
+    system, provider, requirement, framework, change, trail_requirement = USE_CASES[name]
+
+    assert obligations_for(estate_graph, system)  # 1: what applies, and what proves it
+    if provider is not None:  # 2: impact of the provider incident
+        assert system in system_ids(provider_impact(estate_graph, provider))
+    else:
+        assert all(
+            system not in system_ids(provider_impact(estate_graph, p))
+            for p in (E.BEDROCK, E.OPENAI)
+        )
+    assert len(crosswalk(estate_graph, requirement, framework)) == CROSSWALK_LINKS[name]  # 3
+    assert len(stale_by_change(estate_graph, change).evidence) == STALE_EVIDENCE[name]  # 4
+    assert audit_trail(estate_graph, trail_requirement, system).links  # 5: audit trail

@@ -18,6 +18,7 @@ from verity_core.model.enums import (
     EvidenceKind,
     ImplementationStatus,
     ModelOrigin,
+    NodeType,
     RationaleType,
     Role,
     ScopeLevel,
@@ -28,6 +29,8 @@ from verity_core.model.enums import (
 )
 from verity_core.model.nodes import (
     AISystem,
+    AWSResource,
+    ChangeEvent,
     Control,
     ControlAssessment,
     Framework,
@@ -36,6 +39,7 @@ from verity_core.model.nodes import (
     Person,
     Provider,
     Requirement,
+    Risk,
 )
 
 SIMULATED = {"tenant": TENANT, "source": Source.SIMULATED}
@@ -43,11 +47,26 @@ NOTE = "Test fixture, not verified content."
 
 # --- IDs -----------------------------------------------------------------------------------
 ORG = ids.organisation_id("kestrel")
-VERIFIER = ids.person_id("l-ivanova")
+VERIFIER = ids.person_id(
+    "l-ivanova"
+)  # Head of Legal: owns Contract Insights, verifies Talent oversight
+HR_LEAD = ids.person_id("a-singh")  # owns Talent Screening
+SUPPORT_LEAD = ids.person_id("m-okafor")  # owns Support Assistant
 
 SUPPORT = ids.system_id("support-assistant")
 TALENT = ids.system_id("talent-screening")
 CONTRACT = ids.system_id("contract-insights")
+
+RES_SUPPORT = ids.resource_id("lambda", "eu-north-1", "support-assistant")
+RES_TALENT = ids.resource_id("lambda", "eu-north-1", "talent-screening")
+RES_CONTRACT = ids.resource_id("lambda", "eu-north-1", "contract-insights")
+RISK_SUPPORT = ids.risk_id("chatbot-misinformation")
+RISK_TALENT = ids.risk_id("screening-bias")
+RISK_CONTRACT = ids.risk_id("vendor-data-transfer")
+CHG_SUPPORT = ids.make_id(NodeType.CHANGE_EVENT, "support-assistant-1")
+CHG_TALENT = ids.make_id(NodeType.CHANGE_EVENT, "talent-screening-1")
+CHG_CONTRACT = ids.make_id(NodeType.CHANGE_EVENT, "contract-insights-1")
+CHANGE_DETECTED_AT = T0 + timedelta(days=1)
 
 BEDROCK = ids.provider_id("mock-bedrock")
 OPENAI = ids.provider_id("mock-openai")
@@ -164,6 +183,15 @@ def load_estate(repo) -> None:
         source=Source.SIMULATED,
         content={"statement": "simulated sign-off"},
     )
+    # A crawler snapshot of the Talent Screening function. It supports the same assessment as
+    # the person's attestation, but only the snapshot was collected from the resource.
+    talent_config = _evidence(
+        TALENT,
+        "crawler@0.1.0",
+        EvidenceKind.CONFIG_SNAPSHOT,
+        content={"human_review_enabled": True},
+        collected_at=T0 - timedelta(days=1),
+    )
     bedrock_dpa = _evidence(
         BEDROCK,
         VERIFIER,
@@ -176,6 +204,28 @@ def load_estate(repo) -> None:
     nodes = [
         Organisation(id=ORG, name="Kestrel Cloud Ltd", **COMMON),
         Person(id=VERIFIER, name="Lena Ivanova", job_title="Head of Legal", **COMMON),
+        Person(id=HR_LEAD, name="Asha Singh", job_title="Head of People", **COMMON),
+        Person(id=SUPPORT_LEAD, name="Mateo Okafor", job_title="Support Lead", **COMMON),
+        *(
+            AWSResource(id=res_id, resource_type="lambda", region="eu-north-1", name=name, **COMMON)
+            for res_id, name in (
+                (RES_SUPPORT, "support-assistant"),
+                (RES_TALENT, "talent-screening"),
+                (RES_CONTRACT, "contract-insights"),
+            )
+        ),
+        *(
+            Risk(id=risk_id, title=title, description=NOTE, **COMMON)
+            for risk_id, title in (
+                (RISK_SUPPORT, "Chatbot gives wrong answers"),
+                (RISK_TALENT, "Ranking is biased"),
+                (RISK_CONTRACT, "Contract data leaves the EU"),
+            )
+        ),
+        *(
+            ChangeEvent(id=chg_id, detected_at=CHANGE_DETECTED_AT, **COMMON)
+            for chg_id in (CHG_SUPPORT, CHG_TALENT, CHG_CONTRACT)
+        ),
         AISystem(
             id=SUPPORT,
             name="Support Assistant",
@@ -295,12 +345,33 @@ def load_estate(repo) -> None:
         ),
         disclosure_test,
         oversight_signoff,
+        talent_config,
         bedrock_dpa,
     ]
     for node in nodes:
         repo.upsert_node(node)
 
     edges = [
+        # Who runs, owns and is exposed to what
+        make_edge(EdgeType.RUNS_ON, SUPPORT, RES_SUPPORT),
+        make_edge(EdgeType.RUNS_ON, TALENT, RES_TALENT),
+        make_edge(EdgeType.RUNS_ON, CONTRACT, RES_CONTRACT),
+        make_edge(EdgeType.OWNS, SUPPORT_LEAD, SUPPORT),
+        make_edge(EdgeType.OWNS, HR_LEAD, TALENT),
+        make_edge(EdgeType.OWNS, VERIFIER, CONTRACT),
+        make_edge(EdgeType.HAS_RISK, SUPPORT, RISK_SUPPORT),
+        make_edge(EdgeType.HAS_RISK, TALENT, RISK_TALENT),
+        make_edge(EdgeType.HAS_RISK, CONTRACT, RISK_CONTRACT),
+        make_edge(EdgeType.OWNS, SUPPORT_LEAD, RISK_SUPPORT),
+        make_edge(EdgeType.OWNS, HR_LEAD, RISK_TALENT),
+        make_edge(EdgeType.OWNS, VERIFIER, RISK_CONTRACT),
+        make_edge(EdgeType.MITIGATED_BY, RISK_SUPPORT, VC_DISCLOSURE),
+        make_edge(EdgeType.MITIGATED_BY, RISK_TALENT, VC_BIAS_TEST),
+        make_edge(EdgeType.MITIGATED_BY, RISK_CONTRACT, VC_SUPPLIER_DPA),
+        # Changes the crawler would have detected
+        make_edge(EdgeType.AFFECTS, CHG_SUPPORT, RES_SUPPORT),
+        make_edge(EdgeType.AFFECTS, CHG_TALENT, RES_TALENT),
+        make_edge(EdgeType.AFFECTS, CHG_CONTRACT, RES_CONTRACT),
         # Models and providers
         make_edge(EdgeType.USES_MODEL, SUPPORT, ids.model_id("bedrock-fm")),
         make_edge(EdgeType.USES_MODEL, CONTRACT, ids.model_id("gpt-class")),
@@ -360,6 +431,10 @@ def load_estate(repo) -> None:
             ca(VC_OVERSIGHT, TALENT),
             source=Source.SIMULATED,
         ),
+        make_edge(EdgeType.COLLECTED_FROM, disclosure_test.id, RES_SUPPORT),
+        make_edge(EdgeType.ABOUT, talent_config.id, TALENT),
+        make_edge(EdgeType.SUPPORTS, talent_config.id, ca(VC_OVERSIGHT, TALENT)),
+        make_edge(EdgeType.COLLECTED_FROM, talent_config.id, RES_TALENT),
         make_edge(EdgeType.ABOUT, bedrock_dpa.id, BEDROCK),
         make_edge(EdgeType.SUPPORTS, bedrock_dpa.id, ca(VC_SUPPLIER_DPA, BEDROCK)),
     ]

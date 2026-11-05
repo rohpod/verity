@@ -195,6 +195,155 @@ def obligations_for(graph: nx.MultiDiGraph, system_id: str) -> list[ObligationRo
     )
 
 
+# --- 2. Impact of an incident at provider P -----------------------------------------------
+
+
+@dataclass(frozen=True)
+class SystemImpact:
+    system_id: str
+    model_ids: tuple[str, ...]  # this provider's models the system uses
+    owner_ids: tuple[str, ...]
+    risk_ids: tuple[str, ...]
+    requirement_ids: tuple[str, ...]  # requirements aimed at this system itself
+
+
+@dataclass(frozen=True)
+class ProviderImpact:
+    provider_id: str
+    assessment_ids: tuple[str, ...]  # assessments scoped to the provider
+    systems: tuple[SystemImpact, ...]
+
+
+def provider_impact(graph: nx.MultiDiGraph, provider_id: str) -> ProviderImpact:
+    """`P <-PROVIDED_BY- Model <-USES_MODEL- AISystem -> {owners, risks, requirements}`, plus
+    the assessments scoped to P.
+
+    Three hops from P at most. A system with only in-house models is never reached, and one
+    system's requirements cannot lead to another, because every hop is typed.
+    """
+    _require(graph, provider_id, NodeType.PROVIDER)
+    models = sorted(e.src for e in in_edges(graph, provider_id, EdgeType.PROVIDED_BY))
+    used_by: dict[str, set[str]] = {}
+    for model_id in models:
+        for uses in in_edges(graph, model_id, EdgeType.USES_MODEL):
+            used_by.setdefault(uses.src, set()).add(model_id)
+    systems = tuple(
+        SystemImpact(
+            system_id=system_id,
+            model_ids=tuple(sorted(used_by[system_id])),
+            owner_ids=tuple(e.src for e in in_edges(graph, system_id, EdgeType.OWNS)),
+            risk_ids=tuple(e.dst for e in out_edges(graph, system_id, EdgeType.HAS_RISK)),
+            requirement_ids=tuple(
+                sorted({e.src for e in in_edges(graph, system_id, EdgeType.APPLIES_TO)})
+            ),
+        )
+        for system_id in sorted(used_by)
+    )
+    assessments = tuple(sorted(e.src for e in in_edges(graph, provider_id, EdgeType.SCOPED_TO)))
+    return ProviderImpact(provider_id, assessments, systems)
+
+
+# --- 3. Crosswalk: requirement R in one framework to another -------------------------------
+
+
+@dataclass(frozen=True)
+class DerivedLink:
+    """Two requirements related through one hub control (D6).
+
+    It has no STRM type, because composing two relationships does not give a third one that
+    can be trusted. Both spokes are kept so the reader sees what each claims.
+    """
+
+    via_control_id: str
+    target_requirement_id: str
+    left: MapsToEdge  # the source requirement to the control
+    right: MapsToEdge  # the target requirement to the control
+
+    @property
+    def strength(self) -> int:
+        """The weaker of the two spokes."""
+        return min(self.left.strength, self.right.strength)
+
+
+def _in_framework(graph: nx.MultiDiGraph, requirement_id: str, framework_id: str) -> bool:
+    """Is the requirement under the framework, through any chain of PART_OF?"""
+    seen: set[str] = set()
+    stack = [requirement_id]
+    while stack:
+        current = stack.pop()
+        if current in seen:
+            continue
+        seen.add(current)
+        for part_of in out_edges(graph, current, EdgeType.PART_OF):
+            if part_of.dst == framework_id:
+                return True
+            stack.append(part_of.dst)
+    return False
+
+
+def crosswalk(
+    graph: nx.MultiDiGraph, requirement_id: str, target_framework_id: str
+) -> list[DerivedLink]:
+    """`R -MAPS_TO-> Ctl <-MAPS_TO- R'` where R' is under the target framework.
+
+    A `no_relationship` spoke never composes, on either side.
+    """
+    _require(graph, requirement_id, NodeType.REQUIREMENT)
+    _require(graph, target_framework_id, NodeType.FRAMEWORK)
+    links = []
+    for left, control in _usable_mappings(graph, requirement_id):
+        for right in in_edges(graph, control.id, EdgeType.MAPS_TO):
+            if (
+                isinstance(right, MapsToEdge)
+                and right.strm is not StrmType.NO_RELATIONSHIP
+                and right.src != requirement_id
+                and _in_framework(graph, right.src, target_framework_id)
+            ):
+                links.append(DerivedLink(control.id, right.src, left, right))
+    return sorted(links, key=lambda link: (link.via_control_id, link.target_requirement_id))
+
+
+# --- 4. Evidence made stale by a change ----------------------------------------------------
+
+
+@dataclass(frozen=True)
+class StaleEvidence:
+    evidence_id: str
+    resource_id: str
+    assessment_ids: tuple[str, ...]  # the assessments this evidence supports
+
+
+@dataclass(frozen=True)
+class StaleImpact:
+    change_id: str
+    evidence: tuple[StaleEvidence, ...]
+
+    @property
+    def assessment_ids(self) -> tuple[str, ...]:
+        return tuple(sorted({a for item in self.evidence for a in item.assessment_ids}))
+
+
+def stale_by_change(graph: nx.MultiDiGraph, change_id: str) -> StaleImpact:
+    """`ChangeEvent -AFFECTS-> Resource <-COLLECTED_FROM- Evidence -SUPPORTS-> CA`.
+
+    Only evidence collected before the change was detected is stale (ADR 0012), so evidence
+    collected afterwards recovers the assessment. Evidence not collected from the resource,
+    such as a signed document or a person's attestation, is never touched.
+    """
+    change = _require(graph, change_id, NodeType.CHANGE_EVENT)
+    found = []
+    for affects in out_edges(graph, change.id, EdgeType.AFFECTS):
+        for collected in in_edges(graph, affects.dst, EdgeType.COLLECTED_FROM):
+            evidence = node_record(graph, collected.src)
+            if isinstance(evidence, Evidence) and evidence.collected_at < change.detected_at:
+                supports = tuple(
+                    sorted(e.dst for e in out_edges(graph, evidence.id, EdgeType.SUPPORTS))
+                )
+                found.append(StaleEvidence(evidence.id, affects.dst, supports))
+    found.sort(key=lambda item: (item.evidence_id, item.resource_id))
+    return StaleImpact(change.id, tuple(found))
+
+
 # --- 5. Audit trail -----------------------------------------------------------------------
 
 
