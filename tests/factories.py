@@ -138,6 +138,7 @@ def one_of_each() -> dict[NodeType, object]:
             source_version="test fixture",
             source_url="https://example.invalid/test-fixture",
             last_verified=date(2026, 11, 5),
+            binding=True,
             **COMMON,
         ),
         evidence(),

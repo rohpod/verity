@@ -6,7 +6,7 @@ The organisation, people and companies under `org/` are fictional. The mappings 
 
 | Path | Holds |
 |---|---|
-| `frameworks/` | Requirements of the four instruments |
+| `frameworks/` | Requirements of the four instruments. Each file says whether the framework is `binding` law or a standard Kestrel adopted, which sets how urgent a missing piece of evidence is ([ADR 0020](../docs/adr/0020-m5-review-fixes.md)) |
 | `controls.yaml` | The Verity Control Library, the hub |
 | `mappings/` | Requirement to control, with an STRM type |
 | `rules/obligation_dates.yaml` | When EU AI Act obligations apply |

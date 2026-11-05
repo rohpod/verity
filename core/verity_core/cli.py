@@ -145,16 +145,23 @@ def _print_assessment(
             f"{applicability[a]} {a.value}" for a in ApplicabilityStatus if applicability[a]
         )
     )
-    if verbose:
-        for finding in result.findings:
-            line = f"{finding.severity.value:<6} {finding.code}  {finding.subject}"
-            print(f"  {line}  {finding.message}")
-    by_code = Counter((f.severity.value, f.code) for f in result.findings)
-    print(f"{len(result.findings)} finding(s)" + (":" if by_code else ""))
-    for (severity, code), n in sorted(
-        by_code.items(), key=lambda kv: (_SEVERITY[kv[0][0]], kv[0][1])
-    ):
-        print(f"  {severity:<6} {code}: {n}")
+    findings = result.findings
+    by_severity = Counter(f.severity.value for f in findings)
+    print(
+        f"{len(findings)} finding(s): "
+        + ", ".join(f"{by_severity[s]} {s}" for s in _SEVERITY if by_severity[s])
+    )
+    # High findings are always listed. The rest are counted by code, unless --verbose lists them.
+    shown = findings if verbose else [f for f in findings if f.severity.value == "high"]
+    for finding in shown:
+        line = f"{finding.severity.value:<6} {finding.code}  {finding.subject}"
+        print(f"  {line}  {finding.message}")
+    if not verbose:
+        rest = Counter((f.severity.value, f.code) for f in findings if f.severity.value != "high")
+        for (severity, code), n in sorted(
+            rest.items(), key=lambda kv: (_SEVERITY[kv[0][0]], kv[0][1])
+        ):
+            print(f"  {severity:<6} {code}: {n}")
     written = ", ".join(f"{n} {kind}" for kind, n in sorted(result.written.items())) or "nothing"
     print(f"{verb}: {written}")
 

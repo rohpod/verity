@@ -82,6 +82,7 @@ def load_content(root: Path | str, *, tenant: str = DEFAULT_TENANT) -> Content:
                     source_version=fw.source_version,
                     source_url=fw.source_url,
                     last_verified=fw.last_verified,
+                    binding=fw.binding,
                     **common,
                 )
             )

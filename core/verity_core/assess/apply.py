@@ -10,6 +10,8 @@ Steps:
    and `ASSESSED` for L4. A `SUPPORTS` or `ASSESSED` edge the new assessment no longer produces
    is closed, so the graph never shows evidence that no longer decides it.
 
+4. End every open ControlAssessment in scope that this run did not produce (ADR 0020).
+
 A re-run with nothing changed writes nothing: the repository skips unchanged records (D14), the
 stored `assessed_at` is kept while status and level are unchanged, and only open edges are closed.
 """
@@ -25,7 +27,7 @@ from verity_core.assess.controls import ControlAssessor, ControlResult
 from verity_core.assess.findings import derive_findings
 from verity_core.assess.requirements import RequirementStatus, requirement_statuses
 from verity_core.content.schema import ApplicabilityFile, ObligationDate
-from verity_core.graph.loader import in_edges, node_record
+from verity_core.graph.loader import in_edges, node_record, out_edges
 from verity_core.graph.memory import InMemoryRepository
 from verity_core.graph.repository import GraphRepository
 from verity_core.model import ids
@@ -113,12 +115,29 @@ def apply_assessment(
     results = assessor.results()
     for result in results:
         _store(repo, graph, result, as_of, clock, note)
+    _end_orphans(repo, graph, results, system_id, clock, note)
     unchanged = len(results) - written["assessments"]
     findings = derive_findings(graph, as_of, results, statuses, applicability_findings)
     if system_id is not None:
         shown = {system_id, *(r.scope_id for r in results)}
         findings = [f for f in findings if f.subject in shown]
     return ApplyResult(written, unchanged, tuple(statuses), tuple(results), tuple(findings))
+
+
+def _end_orphans(repo, graph, results, system_id, clock, note) -> None:
+    """End an open ControlAssessment this run did not produce, which closes its edges too. A
+    later run that produces it again reopens it. With `system_id`, only assessments scoped to
+    that system are touched, because the others may still be wanted by other systems (ADR 0020).
+    """
+    produced = {ids.ca_id(r.control_id, r.scope_id) for r in results}
+    for node_id in _ids_of(graph, NodeType.CONTROL_ASSESSMENT):
+        if node_id in produced:
+            continue
+        scopes = {e.dst for e in out_edges(graph, node_id, EdgeType.SCOPED_TO)}
+        if system_id is not None and system_id not in scopes:
+            continue
+        ended = graph.nodes[node_id]["record"].model_copy(update={"valid_to": clock()})
+        note("assessments_ended", repo.upsert_node(ended))
 
 
 def _store(repo, graph, result: ControlResult, as_of, clock, note) -> None:

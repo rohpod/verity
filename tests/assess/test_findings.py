@@ -11,6 +11,7 @@ from assess_support import (
     control,
     findings_of,
     maps,
+    requirement,
     technical,
     verification,
     world,
@@ -21,7 +22,7 @@ from verity_core.model.enums import (
     ScopeLevel,
     Source,
 )
-from verity_core.model.nodes import AISystem
+from verity_core.model.nodes import AISystem, Framework
 from verity_core.rules.finding import Finding, Severity
 
 
@@ -80,6 +81,64 @@ def test_no_evidence_turns_high_on_the_day_the_requirement_comes_into_force():
     after = findings_of(graph, AS_OF + timedelta(days=1))
     assert [f.severity for f in before if f.code == "no_evidence"] == [Severity.MEDIUM]
     assert [f.severity for f in after if f.code == "no_evidence"] == [Severity.HIGH]
+
+
+# --- severity follows binding law (ADR 0020) ---------------------------------------------------
+
+
+def no_evidence(graph):
+    return [f.severity for f in findings_of(graph) if f.code == "no_evidence"]
+
+
+def adopted(application=None):
+    """One requirement of an adopted standard, which `maps` and `applies` do not build."""
+    other = ids.requirement_id("iso42001", "a1")
+    return world(
+        controls=[control("VC-001")],
+        requirements=["a1"],
+        framework="iso42001",
+        binding=False,
+        mappings=[maps("a1", "VC-001").model_copy(update={"src": other})],
+        applications=[(application or applies("a1")).model_copy(update={"src": other})],
+    )
+
+
+def test_no_evidence_behind_a_standard_kestrel_adopted_is_only_medium():
+    assert no_evidence(adopted()) == [Severity.MEDIUM]
+
+
+def test_a_conditional_standard_requirement_is_medium_too():
+    conditional = applies("a1", condition=AppliesCondition.LEGACY_SIGNIFICANT_CHANGE)
+    assert no_evidence(adopted(conditional)) == [Severity.MEDIUM]
+
+
+def test_one_binding_requirement_is_enough_to_make_it_high():
+    other = ids.requirement_id("iso42001", "b1")
+    iso = Framework(
+        id=ids.framework_id("iso42001"),
+        name="ISO",
+        source_version="test",
+        source_url="https://example.invalid/iso",
+        last_verified=date(2026, 11, 5),
+        binding=False,
+        **COMMON,
+    )
+    graph = world(
+        controls=[control("VC-001")],
+        requirements=["a1"],
+        mappings=[maps("a1", "VC-001"), maps("a1", "VC-001").model_copy(update={"src": other})],
+        applications=[applies("a1"), applies("a1").model_copy(update={"src": other})],
+        extra_nodes=[iso, requirement("b1", "iso42001")],
+    )
+    assert no_evidence(graph) == [Severity.HIGH]
+    only_iso = world(
+        controls=[control("VC-001")],
+        requirements=[],
+        mappings=[maps("a1", "VC-001").model_copy(update={"src": other})],
+        applications=[applies("a1").model_copy(update={"src": other})],
+        extra_nodes=[iso, requirement("b1", "iso42001")],
+    )
+    assert no_evidence(only_iso) == [Severity.MEDIUM]
 
 
 def test_one_in_force_requirement_is_enough_to_make_it_high():

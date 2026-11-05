@@ -8,6 +8,7 @@ framework:
   source_url: https://www.iso.org/standard/42001
   source_version: ISO/IEC 42001:2023
   last_verified: 2026-11-05
+  binding: false
   copyrighted: true
 requirements:
 - id: A.2.2

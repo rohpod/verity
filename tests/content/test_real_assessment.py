@@ -160,3 +160,17 @@ def test_every_satisfied_requirement_in_the_demo_rests_on_a_simulated_sign_off(r
     satisfied = [s for s in run[1].statuses if s.state is RequirementState.SATISFIED]
     assert satisfied
     assert all(s.simulated for s in satisfied)
+
+
+def test_only_gaps_behind_binding_law_are_high(run):
+    high = [f for f in findings(run, "no_evidence") if f.severity.value == "high"]
+    assert len(high) == 22
+    assert not [f for f in high if f.subject.startswith("prov:")]
+
+
+def test_the_bias_test_gap_is_high_and_the_dpa_gap_is_medium(run):
+    (bias,) = [
+        f for f in findings(run, "no_evidence", "sys:talent-screening") if "VC-014" in f.message
+    ]
+    (dpa,) = [f for f in findings(run, "no_evidence", "prov:mock-openai") if "VC-050" in f.message]
+    assert (bias.severity.value, dpa.severity.value) == ("high", "medium")

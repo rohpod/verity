@@ -44,6 +44,7 @@ class FrameworkIn(_Strict):
     source_url: NonEmpty
     source_version: NonEmpty
     last_verified: date
+    binding: bool  # law that binds the organisation, not a standard it adopted (ADR 0020)
     # ISO text is copyrighted: such a framework holds IDs and original summaries only.
     copyrighted: bool = False
 

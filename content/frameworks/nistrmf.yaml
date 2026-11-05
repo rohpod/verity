@@ -6,6 +6,7 @@ framework:
   source_url: https://airc.nist.gov/airmf-resources/airmf/5-sec-core/
   source_version: AI RMF 1.0 (NIST AI 100-1)
   last_verified: 2026-11-05
+  binding: false
 requirements:
 - id: GOVERN-1.1
   ref: GOVERN 1.1
