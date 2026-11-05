@@ -1,0 +1,29 @@
+[project]
+name = "verity"
+version = "0.0.0"
+description = "Verity workspace root: AI governance, risk and compliance platform"
+requires-python = ">=3.12,<3.13"
+dependencies = ["verity-core"]
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.8"]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["core"]
+
+[tool.uv.sources]
+verity-core = { workspace = true }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = [".venv", "web"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
