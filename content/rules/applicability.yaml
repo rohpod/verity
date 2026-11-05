@@ -1,0 +1,68 @@
+# Which requirements apply to whom, and from when (ADR 0019).
+#
+# These rules are our reading of Regulation (EU) 2024/1689 as amended by (EU) 2026/1744. They are
+# not legal advice, and the owner reads this file. A date is an obligation date ID from
+# obligation_dates.yaml. High-risk is a candidate until a person decides it, and the engine
+# applies Art. 111(2) to the rules marked `art_111_2`.
+
+annex_iii_domains:
+  employment: "Annex III, point 4"
+
+rules:
+  - id: eu-literacy
+    requirements:
+      - req:euaia:art4
+    target: organisation
+    role: held  # one edge for each of provider and deployer that any system holds
+    date: euaia-chapters-1-2
+
+  - id: eu-disclosure
+    requirements:
+      - req:euaia:art50-1
+    target: system
+    role: provider
+    reads: [interacts_with_people]
+    date: euaia-general
+
+  - id: eu-marking
+    requirements:
+      - req:euaia:art50-2
+    target: system
+    role: provider
+    reads: [generates_synthetic_content]
+    date: euaia-general
+    legacy_date: euaia-art50-2-legacy  # for a system placed on the market before `date`
+
+  - id: eu-high-risk-provider
+    requirements:
+      - req:euaia:art9
+      - req:euaia:art9-2a
+      - req:euaia:art10
+      - req:euaia:art10-2ah
+      - req:euaia:art10-2fg
+      - req:euaia:art11
+      - req:euaia:art12
+      - req:euaia:art13
+      - req:euaia:art14
+      - req:euaia:art25-4
+    target: system
+    role: provider
+    high_risk: true
+    date: euaia-high-risk-annex-iii
+    art_111_2: true
+
+  - id: eu-high-risk-deployer
+    requirements:
+      - req:euaia:art26
+      - req:euaia:art26-2
+      - req:euaia:art26-7
+    target: system
+    role: deployer
+    high_risk: true
+    date: euaia-high-risk-annex-iii
+    art_111_2: true
+
+  - id: adopted-frameworks  # Kestrel has adopted these, so every leaf requirement applies
+    leaves_of: [nistrmf, iso42001, iso27001]
+    target: organisation
+    role: any

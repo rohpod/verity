@@ -10,6 +10,7 @@ The organisation, people and companies under `org/` are fictional. The mappings 
 | `controls.yaml` | The Verity Control Library, the hub |
 | `mappings/` | Requirement to control, with an STRM type |
 | `rules/obligation_dates.yaml` | When EU AI Act obligations apply |
+| `rules/applicability.yaml` | Which requirements apply to whom, and from which date. Our reading of the law, not legal advice: the owner reads it ([ADR 0019](../docs/adr/0019-m5-rules-and-assessment.md)) |
 | `org/` | Kestrel Cloud Ltd and its AI estate |
 | `decisions/` | Human decisions, one file each: risk tier, attestation, verification, document. The approving PR is the approval record ([ADR 0019](../docs/adr/0019-m5-rules-and-assessment.md)). The demo ones are all simulated sign-offs |
 
