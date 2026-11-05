@@ -7,16 +7,22 @@ can be read.
 """
 
 from datetime import date
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from verity_core.model.enums import (
     ControlKind,
+    DataClassification,
+    ModelOrigin,
+    Purpose,
     RationaleType,
+    Role,
     ScopeLevel,
+    Source,
     StrmType,
     Sufficiency,
+    SystemKind,
     VerifiedAgainst,
 )
 
@@ -103,3 +109,107 @@ class ObligationDate(_Strict):
 
 class ObligationDatesFile(_Strict):
     dates: list[ObligationDate]
+
+
+# --- the fictional organisation and its AI estate (`org/*.yaml`) ----------------------------
+
+# The only provenance an organisation file may claim. `discovered` and `derived` come from the
+# crawler and the engine, and `seeded` is for the library (frameworks, controls, mappings).
+OrgSource = Literal[Source.DECLARED, Source.SYNTHETIC, Source.SIMULATED]
+UseDomain = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]*$")]
+
+
+class _Item(_Strict):
+    """Anything with its own provenance. The file's `source` applies unless the item has one."""
+
+    source: OrgSource | None = None
+
+
+class OrganisationIn(_Item):
+    slug: Slug
+    name: NonEmpty
+
+
+class DepartmentIn(_Item):
+    slug: Slug
+    name: NonEmpty
+
+
+class PersonIn(_Item):
+    slug: Slug
+    name: NonEmpty
+    job_title: NonEmpty
+    department: Slug
+
+
+class ProviderIn(_Item):
+    slug: Slug
+    name: NonEmpty
+    simulated: bool = False
+
+
+class ModelIn(_Item):
+    slug: Slug
+    name: NonEmpty
+    origin: ModelOrigin
+    provider: Slug | None = None  # a third-party model's provider
+    trained_on: list[Slug] = Field(default_factory=list)
+
+
+class DatasetIn(_Item):
+    slug: Slug
+    name: NonEmpty
+    classification: DataClassification
+    personal_data: bool
+
+
+class PolicyIn(_Item):
+    slug: Slug
+    title: NonEmpty
+    summary: NonEmpty
+
+
+class RiskIn(_Item):
+    slug: Slug
+    title: NonEmpty
+    description: NonEmpty
+    owner: Slug | None = None
+
+
+class DatasetUseIn(_Strict):
+    dataset: Slug
+    purpose: Purpose
+
+
+class SystemIn(_Item):
+    slug: Slug
+    name: NonEmpty
+    purpose: NonEmpty
+    kind: SystemKind
+    owner: Slug | None = None  # a system with no owner is a deliberate gap in the demo data
+    developers: list[Slug] = Field(default_factory=list)
+    risk_approver: Slug | None = None
+    models: list[Slug] = Field(default_factory=list)
+    datasets: list[DatasetUseIn] = Field(default_factory=list)
+    risks: list[Slug] = Field(default_factory=list)
+    # Facts for the applicability rules (ADR 0017). Left out means unknown.
+    roles: list[Role] = Field(default_factory=list)
+    use_domains: list[UseDomain] = Field(default_factory=list)
+    interacts_with_people: bool | None = None
+    generates_synthetic_content: bool | None = None
+    first_placed_on_market: date | None = None
+
+
+class OrgFile(_Strict):
+    """One file may hold any part of the estate. References between records can cross files."""
+
+    source: OrgSource = Source.SYNTHETIC
+    organisation: OrganisationIn | None = None
+    departments: list[DepartmentIn] = Field(default_factory=list)
+    people: list[PersonIn] = Field(default_factory=list)
+    providers: list[ProviderIn] = Field(default_factory=list)
+    models: list[ModelIn] = Field(default_factory=list)
+    datasets: list[DatasetIn] = Field(default_factory=list)
+    policies: list[PolicyIn] = Field(default_factory=list)
+    risks: list[RiskIn] = Field(default_factory=list)
+    systems: list[SystemIn] = Field(default_factory=list)

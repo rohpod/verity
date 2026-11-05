@@ -1,0 +1,397 @@
+# 25 further AI systems at Kestrel Cloud Ltd, so the dashboard has realistic volume (architecture
+# section C). All FICTIONAL and `synthetic`: they have no AWS resources, and the four suppliers
+# below are invented companies. Gaps are on purpose, for the assessment engine to find:
+#   legacy-faq-bot        has no owner
+#   meeting-minutes-draft records no model, so its provider is unknown (D13)
+# Five systems run on the simulated Bedrock and four on the simulated OpenAI (with the demo ones).
+source: synthetic
+
+providers:
+  - {slug: corvid-labs, name: Corvid Labs Ltd}
+  - {slug: halden-analytics, name: Halden Analytics GmbH}
+  - {slug: lumenfield-ai, name: Lumenfield AI Ltd}
+  - {slug: pinewood-speech, name: Pinewood Speech Ltd}
+
+models:
+  - {slug: corvid-chat, name: Corvid Chat, origin: third_party, provider: corvid-labs}
+  - {slug: corvid-embed, name: Corvid Embed, origin: third_party, provider: corvid-labs}
+  - {slug: halden-forecast, name: Halden Forecast, origin: third_party, provider: halden-analytics}
+  - {slug: lumenfield-vision, name: Lumenfield Vision, origin: third_party, provider: lumenfield-ai}
+  - {slug: pinewood-asr, name: Pinewood ASR, origin: third_party, provider: pinewood-speech}
+  - {slug: ticket-classifier, name: Ticket classifier, origin: in_house, trained_on: [support-tickets]}
+  - {slug: churn-gbm, name: Churn gradient-boosted trees, origin: in_house, trained_on: [billing-history, usage-telemetry]}
+  - {slug: fraud-iforest, name: Payment fraud isolation forest, origin: in_house, trained_on: [billing-history]}
+  - {slug: lead-scorer, name: Lead scorer, origin: in_house, trained_on: [crm-records]}
+  - {slug: recommender-als, name: Feature recommender, origin: in_house, trained_on: [usage-telemetry]}
+  - {slug: doc-ranker, name: Document ranker, origin: in_house, trained_on: [product-docs]}
+  - {slug: anomaly-ae, name: Log anomaly autoencoder, origin: in_house, trained_on: [security-logs]}
+  - {slug: cv-parser, name: CV field extractor, origin: in_house, trained_on: [applicants]}
+
+datasets:
+  - {slug: product-docs, name: Product documentation, classification: public, personal_data: false}
+  - {slug: usage-telemetry, name: Product usage telemetry, classification: internal, personal_data: false}
+  - {slug: sales-pipeline, name: Sales pipeline, classification: internal, personal_data: false}
+  - {slug: crm-records, name: CRM records, classification: confidential, personal_data: true}
+  - {slug: support-tickets, name: Support tickets, classification: confidential, personal_data: true}
+  - {slug: invoice-images, name: Invoice images, classification: confidential, personal_data: true}
+  - {slug: billing-history, name: Billing history, classification: restricted, personal_data: true}
+  - {slug: call-recordings, name: Support call recordings, classification: restricted, personal_data: true}
+  - {slug: id-scans, name: Identity document scans, classification: restricted, personal_data: true}
+  - {slug: security-logs, name: Security logs, classification: internal, personal_data: true}
+
+risks:
+  - slug: faq-outdated-answers
+    title: Retired bot gives outdated answers
+    description: The old FAQ bot keeps answering from documentation nobody maintains.
+    owner: b-adeyemi
+  - slug: customer-data-in-prompts
+    title: Customer data in prompts
+    description: Staff or tools send customer personal data to an AI supplier that has no agreement to receive it.
+    owner: s-brennan
+  - slug: cv-parsing-errors
+    title: CV parsing drops or misreads candidate details
+    description: Extraction errors disadvantage candidates before any person looks at them.
+    owner: p-ferreira
+  - slug: id-check-false-rejects
+    title: Identity check rejects genuine customers
+    description: Genuine customers are refused, unevenly across groups, with no quick route to a person.
+    owner: j-oyelaran
+  - slug: recording-consent
+    title: Recorded calls lack a consent basis
+    description: Calls are transcribed or reused without a clear basis for the recording.
+    owner: s-brennan
+  - slug: forecast-overreliance
+    title: Forecast taken as fact
+    description: A forecast drives hiring or spending decisions without a human check on its assumptions.
+    owner: d-kowalski
+  - slug: ocr-misclassification
+    title: Invoices booked to the wrong account
+    description: A misread invoice is booked and paid before anyone notices.
+    owner: d-kowalski
+  - slug: churn-model-drift
+    title: Churn model drifts
+    description: The model's accuracy falls as products and customers change, and nobody notices.
+    owner: k-nilsson
+
+systems:
+  # --- on the simulated Bedrock -----------------------------------------------------------
+  - slug: internal-knowledge-search
+    name: Internal Knowledge Search
+    purpose: Answer staff questions from internal documentation
+    kind: generative_ai
+    owner: c-moreau
+    developers: [e-vasquez]
+    models: [bedrock-fm]
+    datasets: [{dataset: product-docs, purpose: retrieval}]
+    roles: [deployer]
+    use_domains: [internal_productivity]
+    interacts_with_people: true
+    generates_synthetic_content: true
+    first_placed_on_market: 2026-02-10
+  - slug: sales-email-drafter
+    name: Sales Email Drafter
+    purpose: Draft outreach emails for sales staff to review and send
+    kind: generative_ai
+    owner: n-petrova
+    models: [bedrock-fm]
+    datasets: [{dataset: crm-records, purpose: inference}]
+    risks: [customer-data-in-prompts]
+    roles: [deployer]
+    use_domains: [sales]
+    interacts_with_people: true
+    generates_synthetic_content: true
+    first_placed_on_market: 2026-05-04
+  - slug: legacy-faq-bot
+    name: Legacy FAQ Bot
+    purpose: Answer product questions on the old help site
+    kind: generative_ai
+    models: [bedrock-fm]
+    datasets: [{dataset: product-docs, purpose: retrieval}]
+    risks: [faq-outdated-answers]
+    roles: [provider, deployer]
+    use_domains: [customer_support]
+    interacts_with_people: true
+    generates_synthetic_content: true
+    first_placed_on_market: 2025-09-01
+  - slug: onboarding-coach
+    name: Onboarding Coach
+    purpose: Guide new hires through their first weeks
+    kind: generative_ai
+    owner: a-singh
+    models: [bedrock-fm]
+    datasets: []
+    roles: [deployer]
+    use_domains: [employment]
+    interacts_with_people: true
+    generates_synthetic_content: true
+    first_placed_on_market: 2026-07-13
+  # --- on the simulated OpenAI ------------------------------------------------------------
+  - slug: release-notes-writer
+    name: Release Notes Writer
+    purpose: Turn change logs into customer-facing release notes
+    kind: generative_ai
+    owner: c-moreau
+    models: [gpt-class]
+    datasets: [{dataset: product-docs, purpose: retrieval}]
+    roles: [provider, deployer]
+    use_domains: [marketing]
+    interacts_with_people: false
+    generates_synthetic_content: true
+    first_placed_on_market: 2026-01-19
+  - slug: rfp-response-assistant
+    name: RFP Response Assistant
+    purpose: Draft answers to customer security and procurement questionnaires
+    kind: external_ai_api
+    owner: n-petrova
+    models: [gpt-class]
+    datasets: [{dataset: crm-records, purpose: inference}]
+    risks: [customer-data-in-prompts]
+    roles: [deployer]
+    use_domains: [sales]
+    interacts_with_people: false
+    generates_synthetic_content: true
+    first_placed_on_market: 2026-03-23
+  - slug: code-review-helper
+    name: Code Review Helper
+    purpose: Suggest changes on pull requests for engineers to accept or ignore
+    kind: external_ai_api
+    owner: t-lindqvist
+    models: [gpt-class]
+    datasets: []
+    roles: [deployer]
+    use_domains: [software_engineering]
+    interacts_with_people: false
+    generates_synthetic_content: true
+    first_placed_on_market: 2025-11-17
+  # --- in-house classical ML --------------------------------------------------------------
+  - slug: ticket-triage
+    name: Ticket Triage
+    purpose: Route and prioritise incoming support tickets
+    kind: classical_ml
+    owner: b-adeyemi
+    developers: [h-tanaka]
+    models: [ticket-classifier]
+    datasets: [{dataset: support-tickets, purpose: inference}]
+    roles: [provider, deployer]
+    use_domains: [customer_support]
+    interacts_with_people: false
+    generates_synthetic_content: false
+    first_placed_on_market: 2025-10-06
+  - slug: churn-predictor
+    name: Churn Predictor
+    purpose: Flag accounts likely to cancel, for account managers
+    kind: classical_ml
+    owner: k-nilsson
+    developers: [h-tanaka]
+    models: [churn-gbm]
+    datasets: [{dataset: billing-history, purpose: inference}]
+    risks: [churn-model-drift]
+    roles: [provider, deployer]
+    use_domains: [sales]
+    interacts_with_people: false
+    generates_synthetic_content: false
+    first_placed_on_market: 2026-02-23
+  - slug: payment-fraud-screening
+    name: Payment Fraud Screening
+    purpose: Hold suspicious card payments for manual review
+    kind: classical_ml
+    owner: d-kowalski
+    developers: [h-tanaka]
+    models: [fraud-iforest]
+    datasets: [{dataset: billing-history, purpose: inference}]
+    roles: [provider, deployer]
+    use_domains: [payments]
+    interacts_with_people: false
+    generates_synthetic_content: false
+    first_placed_on_market: 2025-12-01
+  - slug: lead-scoring
+    name: Lead Scoring
+    purpose: Rank inbound leads for the sales team
+    kind: classical_ml
+    owner: n-petrova
+    developers: [h-tanaka]
+    models: [lead-scorer]
+    datasets: [{dataset: crm-records, purpose: inference}]
+    roles: [provider, deployer]
+    use_domains: [sales]
+    interacts_with_people: false
+    generates_synthetic_content: false
+    first_placed_on_market: 2026-04-06
+  - slug: feature-recommender
+    name: Feature Recommender
+    purpose: Suggest product features to customers inside the app
+    kind: classical_ml
+    owner: c-moreau
+    developers: [h-tanaka]
+    models: [recommender-als]
+    datasets: [{dataset: usage-telemetry, purpose: inference}]
+    roles: [provider]
+    use_domains: [product]
+    interacts_with_people: true
+    generates_synthetic_content: false
+    first_placed_on_market: 2026-06-01
+  - slug: doc-search-ranker
+    name: Document Search Ranker
+    purpose: Order help-centre search results
+    kind: classical_ml
+    owner: e-vasquez
+    models: [doc-ranker]
+    datasets: [{dataset: product-docs, purpose: inference}]
+    roles: [provider]
+    use_domains: [customer_support]
+    interacts_with_people: false
+    generates_synthetic_content: false
+    first_placed_on_market: 2025-08-11
+  - slug: log-anomaly-detector
+    name: Log Anomaly Detector
+    purpose: Raise unusual patterns in security logs for analysts
+    kind: classical_ml
+    owner: j-oyelaran
+    developers: [h-tanaka]
+    models: [anomaly-ae]
+    datasets: [{dataset: security-logs, purpose: inference}]
+    roles: [deployer]
+    use_domains: [cybersecurity]
+    interacts_with_people: false
+    generates_synthetic_content: false
+    first_placed_on_market: 2026-03-09
+  - slug: candidate-cv-parser
+    name: Candidate CV Parser
+    purpose: Extract fields from CVs into the recruiting system
+    kind: classical_ml
+    owner: p-ferreira
+    developers: [h-tanaka]
+    models: [cv-parser]
+    datasets: [{dataset: applicants, purpose: inference}]
+    risks: [cv-parsing-errors]
+    roles: [provider, deployer]
+    use_domains: [employment]
+    interacts_with_people: false
+    generates_synthetic_content: false
+    first_placed_on_market: 2026-05-18
+  # --- on invented third-party suppliers --------------------------------------------------
+  - slug: customer-chat-translator
+    name: Customer Chat Translator
+    purpose: Translate support chats between customer and agent
+    kind: external_ai_api
+    owner: b-adeyemi
+    models: [corvid-chat]
+    datasets: [{dataset: support-tickets, purpose: inference}]
+    risks: [customer-data-in-prompts]
+    roles: [deployer]
+    use_domains: [customer_support]
+    interacts_with_people: true
+    generates_synthetic_content: true
+    first_placed_on_market: 2026-04-13
+  - slug: sentiment-monitor
+    name: Sentiment Monitor
+    purpose: Score the mood of support conversations for team leads
+    kind: external_ai_api
+    owner: b-adeyemi
+    models: [corvid-chat]
+    datasets: [{dataset: support-tickets, purpose: inference}]
+    roles: [deployer]
+    use_domains: [customer_support]
+    interacts_with_people: false
+    generates_synthetic_content: false
+    first_placed_on_market: 2026-06-22
+  - slug: doc-embedding-service
+    name: Document Embedding Service
+    purpose: Create search embeddings for documents
+    kind: external_ai_api
+    owner: e-vasquez
+    models: [corvid-embed]
+    datasets: [{dataset: product-docs, purpose: retrieval}]
+    roles: [deployer]
+    use_domains: [internal_productivity]
+    interacts_with_people: false
+    generates_synthetic_content: false
+    first_placed_on_market: 2026-01-12
+  - slug: revenue-forecaster
+    name: Revenue Forecaster
+    purpose: Forecast quarterly revenue for finance
+    kind: external_ai_api
+    owner: d-kowalski
+    models: [halden-forecast]
+    datasets:
+      - {dataset: billing-history, purpose: inference}
+      - {dataset: sales-pipeline, purpose: inference}
+    risks: [forecast-overreliance]
+    roles: [deployer]
+    use_domains: [finance]
+    interacts_with_people: false
+    generates_synthetic_content: false
+    first_placed_on_market: 2025-12-15
+  - slug: capacity-planner
+    name: Capacity Planner
+    purpose: Forecast infrastructure demand for engineering
+    kind: external_ai_api
+    owner: t-lindqvist
+    models: [halden-forecast]
+    datasets: [{dataset: usage-telemetry, purpose: inference}]
+    roles: [deployer]
+    use_domains: [infrastructure]
+    interacts_with_people: false
+    generates_synthetic_content: false
+    first_placed_on_market: 2026-02-02
+  - slug: invoice-ocr-classifier
+    name: Invoice OCR Classifier
+    purpose: Read supplier invoices and propose an account code
+    kind: external_ai_api
+    owner: d-kowalski
+    models: [lumenfield-vision]
+    datasets: [{dataset: invoice-images, purpose: inference}]
+    risks: [ocr-misclassification]
+    roles: [deployer]
+    use_domains: [finance]
+    interacts_with_people: false
+    generates_synthetic_content: false
+    first_placed_on_market: 2026-03-30
+  - slug: id-document-checker
+    name: ID Document Checker
+    purpose: Check identity documents when a customer signs up
+    kind: external_ai_api
+    owner: j-oyelaran
+    models: [lumenfield-vision]
+    datasets: [{dataset: id-scans, purpose: inference}]
+    risks: [id-check-false-rejects]
+    roles: [deployer]
+    use_domains: [identity_verification]
+    interacts_with_people: true
+    generates_synthetic_content: false
+    first_placed_on_market: 2026-05-25
+  - slug: call-transcriber
+    name: Call Transcriber
+    purpose: Transcribe support calls for quality review
+    kind: external_ai_api
+    owner: b-adeyemi
+    models: [pinewood-asr]
+    datasets: [{dataset: call-recordings, purpose: inference}]
+    risks: [recording-consent]
+    roles: [deployer]
+    use_domains: [customer_support]
+    interacts_with_people: false
+    generates_synthetic_content: true
+    first_placed_on_market: 2026-02-16
+  - slug: voice-agent-prototype
+    name: Voice Agent Prototype
+    purpose: Trial a spoken assistant for first-line support
+    kind: external_ai_api
+    owner: c-moreau
+    models: [pinewood-asr]
+    datasets: [{dataset: call-recordings, purpose: training}]
+    risks: [recording-consent]
+    roles: [deployer]
+    use_domains: [customer_support]
+    interacts_with_people: true
+    generates_synthetic_content: true
+  # --- records no model -------------------------------------------------------------------
+  - slug: meeting-minutes-draft
+    name: Meeting Minutes Draft
+    purpose: Draft minutes from meeting notes
+    kind: generative_ai
+    owner: e-vasquez
+    roles: [deployer]
+    use_domains: [internal_productivity]
+    interacts_with_people: false
+    generates_synthetic_content: true

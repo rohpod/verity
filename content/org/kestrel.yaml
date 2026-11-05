@@ -1,0 +1,47 @@
+# Kestrel Cloud Ltd: a FICTIONAL mid-size EU SaaS company, the customer in the Verity demo.
+# Every person, department and policy here is invented. Any resemblance to a real person or
+# company is a coincidence. No email addresses, and nothing here is real personal data.
+source: synthetic
+
+organisation:
+  slug: kestrel
+  name: Kestrel Cloud Ltd
+
+departments:
+  - {slug: engineering, name: Engineering}
+  - {slug: product, name: Product}
+  - {slug: data-science, name: Data Science}
+  - {slug: people, name: People}
+  - {slug: support, name: Customer Support}
+  - {slug: legal, name: Legal and Compliance}
+  - {slug: security, name: Security}
+  - {slug: sales, name: Sales}
+  - {slug: finance, name: Finance}
+
+people:
+  - {slug: l-ivanova, name: Lena Ivanova, job_title: Head of Legal, department: legal}
+  - {slug: s-brennan, name: Sinead Brennan, job_title: Data Protection Officer, department: legal}
+  - {slug: a-singh, name: Asha Singh, job_title: Head of People, department: people}
+  - {slug: p-ferreira, name: Paulo Ferreira, job_title: Recruitment Partner, department: people}
+  - {slug: m-okafor, name: Mateo Okafor, job_title: Support Lead, department: support}
+  - {slug: b-adeyemi, name: Bola Adeyemi, job_title: Support Operations Manager, department: support}
+  - {slug: t-lindqvist, name: Tove Lindqvist, job_title: Chief Technology Officer, department: engineering}
+  - {slug: e-vasquez, name: Elena Vasquez, job_title: Platform Engineer, department: engineering}
+  - {slug: r-haddad, name: Rami Haddad, job_title: Head of Data Science, department: data-science}
+  - {slug: h-tanaka, name: Hiro Tanaka, job_title: ML Engineer, department: data-science}
+  - {slug: c-moreau, name: Camille Moreau, job_title: Product Director, department: product}
+  - {slug: j-oyelaran, name: Jide Oyelaran, job_title: Security Lead, department: security}
+  - {slug: n-petrova, name: Nadia Petrova, job_title: Head of Sales, department: sales}
+  - {slug: k-nilsson, name: Karl Nilsson, job_title: Revenue Operations Lead, department: sales}
+  - {slug: d-kowalski, name: Dawid Kowalski, job_title: Finance Controller, department: finance}
+
+policies:
+  - slug: ai-policy
+    title: AI policy
+    summary: Sets who may approve, buy or build an AI system at Kestrel and what they must record first.
+  - slug: ai-acceptable-use
+    title: Acceptable use of AI tools
+    summary: Says what staff may and may not put into AI tools, with customer data and candidate data off limits.
+  - slug: ai-supplier-policy
+    title: Third-party AI supplier policy
+    summary: Requires a data processing agreement and a transfer check before any supplier receives personal data.

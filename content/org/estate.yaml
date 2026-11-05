@@ -1,0 +1,94 @@
+# The three demo AI systems of architecture section C, plus the providers, models and data they
+# use. The systems are `declared`: this is what Kestrel says it runs. The two providers and their
+# models are `simulated` (ADR 0007): Bedrock and OpenAI are mock-only and are never invoked.
+# AWS resources are not listed here. The crawler discovers them (M6) and RUNS_ON links them.
+source: synthetic
+
+providers:
+  - {slug: mock-bedrock, name: Bedrock (simulated), simulated: true, source: simulated}
+  - {slug: mock-openai, name: OpenAI (simulated), simulated: true, source: simulated}
+
+models:
+  - {slug: bedrock-fm, name: Bedrock FM, origin: third_party, provider: mock-bedrock, source: simulated}
+  - {slug: gpt-class, name: GPT-class, origin: third_party, provider: mock-openai, source: simulated}
+  - slug: screening-lr
+    name: Screening logistic regression
+    origin: in_house
+    trained_on: [applicants]
+    source: declared
+
+datasets:
+  - {slug: help-articles, name: Help-centre articles, classification: public, personal_data: false}
+  - {slug: customer-messages, name: Customer support messages, classification: confidential, personal_data: true}
+  - {slug: applicants, name: Applicant profiles, classification: restricted, personal_data: true}
+  - {slug: customer-contracts, name: Customer contracts, classification: confidential, personal_data: true}
+
+risks:
+  - slug: chatbot-misinformation
+    title: Chatbot gives wrong answers
+    description: The assistant states something false about the product or a customer's account, and the customer acts on it.
+    owner: m-okafor
+  - slug: screening-bias
+    title: Ranking is biased
+    description: The ranking scores applicants differently by a protected characteristic, directly or through a proxy.
+    owner: a-singh
+  - slug: vendor-data-transfer
+    title: Contract data leaves the EU
+    description: Contract text, which includes personal data, reaches an AI supplier without a data processing agreement or transfer check.
+    owner: l-ivanova
+
+systems:
+  - slug: support-assistant
+    name: Support Assistant
+    purpose: Answer customer support questions
+    kind: generative_ai
+    source: declared
+    owner: m-okafor
+    developers: [e-vasquez]
+    risk_approver: t-lindqvist
+    models: [bedrock-fm]
+    datasets:
+      - {dataset: help-articles, purpose: retrieval}
+      - {dataset: customer-messages, purpose: inference}
+    risks: [chatbot-misinformation]
+    roles: [provider, deployer]
+    use_domains: [customer_support]
+    interacts_with_people: true
+    generates_synthetic_content: true
+    first_placed_on_market: 2026-03-02
+
+  - slug: talent-screening
+    name: Talent Screening
+    purpose: Rank job applicants for recruiters
+    kind: classical_ml
+    source: declared
+    owner: a-singh
+    developers: [h-tanaka]
+    risk_approver: l-ivanova
+    models: [screening-lr]
+    datasets:
+      - {dataset: applicants, purpose: inference}
+    risks: [screening-bias]
+    roles: [provider, deployer]
+    use_domains: [employment]
+    interacts_with_people: false
+    generates_synthetic_content: false
+    first_placed_on_market: 2026-06-15
+
+  - slug: contract-insights
+    name: Contract Insights
+    purpose: Summarise customer contracts for sales and legal
+    kind: external_ai_api
+    source: declared
+    owner: l-ivanova
+    developers: [e-vasquez]
+    risk_approver: s-brennan
+    models: [gpt-class]
+    datasets:
+      - {dataset: customer-contracts, purpose: inference}
+    risks: [vendor-data-transfer]
+    roles: [deployer]
+    use_domains: [contract_review]
+    interacts_with_people: false
+    generates_synthetic_content: true
+    first_placed_on_market: 2026-04-20

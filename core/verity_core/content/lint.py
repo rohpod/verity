@@ -13,7 +13,15 @@ from urllib.parse import urlparse
 
 from verity_core.content.loader import Content
 from verity_core.model.edges import MapsToEdge
-from verity_core.model.enums import EdgeType, RationaleType, StrmType, Sufficiency, VerifiedAgainst
+from verity_core.model.enums import (
+    EdgeType,
+    RationaleType,
+    Source,
+    StrmType,
+    Sufficiency,
+    VerifiedAgainst,
+)
+from verity_core.model.nodes import Model, Organisation, Provider
 
 EU_FRAMEWORK = "euaia"
 EU_SOURCE_VERSION = "2024/1689 as amended by 2026/1744"
@@ -27,6 +35,15 @@ _QUOTES = ('"', "“", "”")
 _SHALL = re.compile(r"\bshall\b", re.IGNORECASE)
 _YEAR = re.compile(r"\b(?:19|20)\d\d\b")
 _ACCOUNT_ID = re.compile(r"(?<!\d)\d{12}(?!\d)")
+# Real AI vendors and products. Only a simulated provider or model may carry such a name, and
+# then only with its provenance saying so (CLAUDE.md, honesty rules). A small list, not a
+# complete one: it catches the likely slips, and the owner reads the estate files.
+_REAL_VENDORS = re.compile(
+    r"\b(openai|gpt|chatgpt|anthropic|claude|google|gemini|deepmind|microsoft|azure|copilot|"
+    r"amazon|aws|bedrock|titan|nova|meta|llama|mistral|cohere|nvidia|ibm|watson|"
+    r"huggingface|stability)\b",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -52,6 +69,7 @@ def lint(content: Content, limits: LintLimits = LintLimits()) -> list[LintIssue]
         *_iso_entries(content),
         *_mappings(content),
         *_coverage(content, limits),
+        *_estate(content),
         *_honesty(content),
     ]
     return sorted(issues, key=lambda i: (i.subject, i.code))
@@ -155,6 +173,38 @@ def _coverage(content: Content, limits: LintLimits) -> Iterator[LintIssue]:
             "controls",
             f"{count} controls; expected {limits.min_controls} to {limits.max_controls}",
         )
+
+
+def _estate(content: Content) -> Iterator[LintIssue]:
+    """The demo organisation must not pass real vendors off as fictional ones, and a simulated
+    component must say so in its name and in its provenance."""
+    if content.estate and not any(isinstance(n, Organisation) for n in content.estate):
+        yield LintIssue("no_organisation", "org", "the estate has no organisation (ADR 0012)")
+    simulated_providers = set()
+    for node in content.estate:
+        if isinstance(node, Provider):
+            if node.simulated:
+                simulated_providers.add(node.id)
+                if "simulated" not in node.name.lower():
+                    yield LintIssue("simulated_not_labelled", node.id, "name must say 'simulated'")
+            if node.simulated != (node.source is Source.SIMULATED):
+                yield LintIssue(
+                    "simulated_source_mismatch", node.id, "`simulated` and source disagree"
+                )
+        real_vendor = (
+            isinstance(node, Provider | Model)
+            and node.source is not Source.SIMULATED
+            and _REAL_VENDORS.search(node.name)
+        )
+        if real_vendor:
+            yield LintIssue("real_vendor_name", node.id, f"{node.name!r} names a real vendor")
+    for edge in content.edges:
+        if edge.type is EdgeType.PROVIDED_BY and edge.dst in simulated_providers:
+            model = next(n for n in content.estate if n.id == edge.src)
+            if model.source is not Source.SIMULATED:
+                yield LintIssue(
+                    "model_source_mismatch", model.id, "a simulated provider's model is simulated"
+                )
 
 
 def _strings(content: Content) -> Iterator[tuple[str, str]]:
