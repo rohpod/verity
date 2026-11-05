@@ -26,14 +26,14 @@ PARENT = NODES[NodeType.REQUIREMENT]
 CHILD = PARENT.model_copy(update={"id": ids.requirement_id("euaia", "art50-2")})
 
 
-def sound(*, nodes=(), drop=(), extra_edges=()):
+def sound(*, nodes=(), drop=(), extra_edges=(), ca=CA):
     """A graph with no issues. `drop` removes named edges; `nodes` replaces nodes by ID."""
-    base = [SYSTEM, CONTROL, CA, ORG, PROVIDER, PERSON, MODEL, EVIDENCE, PARENT, CHILD]
+    base = [SYSTEM, CONTROL, ca, ORG, PROVIDER, PERSON, MODEL, EVIDENCE, PARENT, CHILD]
     replaced = {n.id: n for n in nodes}
     edges = {
         "provided_by": make_edge(EdgeType.PROVIDED_BY, MODEL.id, PROVIDER.id),
-        "assesses": make_edge(EdgeType.ASSESSES, CA.id, CONTROL.id),
-        "scoped_to": make_edge(EdgeType.SCOPED_TO, CA.id, SYSTEM.id),
+        "assesses": make_edge(EdgeType.ASSESSES, ca.id, CONTROL.id),
+        "scoped_to": make_edge(EdgeType.SCOPED_TO, ca.id, SYSTEM.id),
         "about": make_edge(EdgeType.ABOUT, EVIDENCE.id, SYSTEM.id),
         "part_of": make_edge(EdgeType.PART_OF, CHILD.id, PARENT.id),
     }
@@ -82,9 +82,20 @@ def test_assessment_missing_its_control_or_scope():
 )
 def test_the_scope_must_match_the_controls_scope_level(scope_level, scope, ok):
     control = CONTROL.model_copy(update={"scope_level": scope_level})
-    rescoped = make_edge(EdgeType.SCOPED_TO, CA.id, scope.id)
-    graph = sound(nodes=[control], drop=["scoped_to"], extra_edges=[rescoped])
+    ca = CA.model_copy(update={"id": ids.ca_id(CONTROL.id, scope.id)})
+    rescoped = make_edge(EdgeType.SCOPED_TO, ca.id, scope.id)
+    graph = sound(nodes=[control], drop=["scoped_to"], extra_edges=[rescoped], ca=ca)
     assert codes(graph) == ([] if ok else ["scope_level_mismatch"])
+
+
+def test_an_assessment_id_must_match_its_control_and_scope():
+    other_control = CONTROL.model_copy(update={"id": ids.control_id("VC-999")})
+    pointed_elsewhere = make_edge(EdgeType.ASSESSES, CA.id, other_control.id)
+    graph = build_graph(
+        [CA, other_control, SYSTEM],
+        [pointed_elsewhere, make_edge(EdgeType.SCOPED_TO, CA.id, SYSTEM.id)],
+    )
+    assert codes(graph) == ["assessment_id_mismatch"]
 
 
 def test_l4_needs_an_assessed_edge_from_the_named_person():

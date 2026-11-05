@@ -41,6 +41,7 @@ def test_records_are_frozen_and_strict():
         ("token_estimate", -1),
         ("timestamp", datetime(2026, 11, 5)),
         ("tenant", ""),
+        ("tenant", "a#b"),
     ],
 )
 def test_invalid_fields_are_rejected(field, value):

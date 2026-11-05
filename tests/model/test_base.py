@@ -48,3 +48,9 @@ def test_tenant_and_source_are_required_and_validated():
         envelope(tenant="")
     with pytest.raises(ValidationError):
         envelope(source="made-up")
+
+
+@pytest.mark.parametrize("tenant", ["a#b", "a b", "a:b", "a/b"])
+def test_a_tenant_cannot_contain_key_delimiters(tenant):
+    with pytest.raises(ValidationError):
+        envelope(tenant=tenant)

@@ -20,13 +20,14 @@ from verity_core.model.enums import (
     EdgeType,
     EvidenceKind,
     ImplementationStatus,
+    ModelOrigin,
     NodeType,
     Role,
     ScopeLevel,
     Source,
     StrmType,
 )
-from verity_core.model.nodes import Control, ControlAssessment, Evidence, Node
+from verity_core.model.nodes import Control, ControlAssessment, Evidence, Model, Node
 
 
 class Resolution(StrEnum):
@@ -35,7 +36,8 @@ class Resolution(StrEnum):
     DIRECT = "direct"  # scoped to the system itself
     INHERITED_ORG = "inherited_org"  # the organisation's assessment
     INHERITED_PROVIDER = "inherited_provider"  # the model provider's assessment
-    NOT_APPLICABLE = "not_applicable"  # provider-level control, but no provider (D13)
+    NOT_APPLICABLE = "not_applicable"  # provider-level control, but only in-house models (D13)
+    PROVIDER_UNKNOWN = "provider_unknown"  # a provider should exist but is not recorded: a gap
     UNMAPPED = "unmapped"  # the requirement has no usable control mapping
 
 
@@ -63,14 +65,23 @@ def _organisation(graph: nx.MultiDiGraph) -> Node | None:
     return graph.nodes[orgs[0]]["record"] if orgs else None
 
 
-def _providers_of(graph: nx.MultiDiGraph, system_id: str) -> list[str]:
-    """System, then model, then provider. An in-house model has none."""
-    found = {
-        provided.dst
-        for used in out_edges(graph, system_id, EdgeType.USES_MODEL)
-        for provided in out_edges(graph, used.dst, EdgeType.PROVIDED_BY)
-    }
-    return sorted(found)
+def _provider_targets(graph: nx.MultiDiGraph, system_id: str) -> list[_Target]:
+    """System, then model, then provider. Only a system whose models are all known to be
+    in-house is `not_applicable` (D13). Anything else without a provider is a gap: no recorded
+    model, or a third-party model with no PROVIDED_BY."""
+    providers: set[str] = set()
+    unknown = False
+    models = out_edges(graph, system_id, EdgeType.USES_MODEL)
+    for used in models:
+        model = node_record(graph, used.dst)
+        provided = out_edges(graph, used.dst, EdgeType.PROVIDED_BY)
+        providers.update(e.dst for e in provided)
+        if isinstance(model, Model) and model.origin is ModelOrigin.THIRD_PARTY and not provided:
+            unknown = True
+    targets = [_Target(Resolution.INHERITED_PROVIDER, p, p) for p in sorted(providers)]
+    if unknown or not models:
+        targets.append(_Target(Resolution.PROVIDER_UNKNOWN, None, None))
+    return targets or [_Target(Resolution.NOT_APPLICABLE, None, None)]
 
 
 def _targets(graph: nx.MultiDiGraph, scope: Node, control: Control) -> list[_Target]:
@@ -82,10 +93,7 @@ def _targets(graph: nx.MultiDiGraph, scope: Node, control: Control) -> list[_Tar
         if level is ScopeLevel.ORGANISATION:
             org = _organisation(graph)
             return [_Target(Resolution.INHERITED_ORG, None, org.id if org else None)]
-        providers = _providers_of(graph, scope.id)
-        if not providers:
-            return [_Target(Resolution.NOT_APPLICABLE, None, None)]
-        return [_Target(Resolution.INHERITED_PROVIDER, p, p) for p in providers]
+        return _provider_targets(graph, scope.id)
     if SCOPE_NODE_TYPE[level] is scope.type:
         return [_Target(Resolution.DIRECT, None, scope.id)]
     return [_Target(Resolution.NOT_APPLICABLE, None, None)]
@@ -406,7 +414,10 @@ def _link(
     assessment_id = _assessment_for(graph, control.id, target.scope_id)
     ca = node_record(graph, assessment_id) if assessment_id else None
     assert ca is None or isinstance(ca, ControlAssessment)
-    assessed = in_edges(graph, assessment_id, EdgeType.ASSESSED)[:1] if assessment_id else []
+    assessed = in_edges(graph, assessment_id, EdgeType.ASSESSED) if assessment_id else []
+    # The named assessor, if an edge records them, rather than whichever edge sorts first.
+    signoff = next((e for e in assessed if ca and e.src == ca.assessor), None)
+    signoff = signoff or (assessed[0] if assessed else None)
     evidence = sorted(
         (
             node
@@ -424,8 +435,8 @@ def _link(
         status=ca.status if ca else None,
         assurance_level=ca.assurance_level if ca else None,
         assessment_source=ca.source if ca else None,
-        assessed_by=assessed[0].src if assessed else None,
-        signoff_source=assessed[0].source if assessed else None,
+        assessed_by=signoff.src if signoff else None,
+        signoff_source=signoff.source if signoff else None,
         evidence=tuple(
             AuditEvidence(
                 e.id, e.kind, e.collector, e.collected_at, e.valid_until, e.sha256, e.source

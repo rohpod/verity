@@ -17,6 +17,9 @@ def _to_utc(value: AwareDatetime) -> AwareDatetime:
 # take an explicit as_of (D5), and a naive value would make that comparison ambiguous.
 UtcDatetime = Annotated[AwareDatetime, AfterValidator(_to_utc)]
 
+# Tenants end up inside `#`-delimited DynamoDB keys, like IDs.
+Tenant = Annotated[str, Field(pattern=r"^[A-Za-z0-9._-]+$")]
+
 
 class VerityRecord(BaseModel):
     """Immutable and strict: unknown fields are errors, so nothing (such as an email
@@ -34,7 +37,7 @@ class Envelope(VerityRecord):
     says how long a piece of evidence stays fresh.
     """
 
-    tenant: str = Field(min_length=1)
+    tenant: Tenant
     source: Source
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
     created_at: UtcDatetime | None = None

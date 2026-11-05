@@ -91,12 +91,14 @@ ISO_A8_2 = req("iso42001", "A.8.2")
 ISO_A9 = req("iso42001", "A.9")
 ISO_A9_3 = req("iso42001", "A.9.3")  # sub-clause of ISO_A9
 ISO_A10_3 = req("iso42001", "A.10.3")
+ISO_A7_4 = req("iso42001", "A.7.4")
 
 VC_AI_LITERACY = ids.control_id("VC-001")  # organisation level
 VC_DISCLOSURE = ids.control_id("VC-012")  # technical and automatable
 VC_OVERSIGHT = ids.control_id("VC-014")
 VC_BIAS_TEST = ids.control_id("VC-021")
 VC_SUPPLIER_DPA = ids.control_id("VC-030")  # provider level
+VC_EGRESS = ids.control_id("VC-041")  # technical and automatable
 
 
 def ca(control: str, scope: str) -> str:
@@ -191,6 +193,22 @@ def load_estate(repo) -> None:
         EvidenceKind.CONFIG_SNAPSHOT,
         content={"human_review_enabled": True},
         collected_at=T0 - timedelta(days=1),
+    )
+    # Contract Insights' own control. Its DPA gap with the provider is a separate assessment.
+    contract_config = _evidence(
+        CONTRACT,
+        "crawler@0.1.0",
+        EvidenceKind.CONFIG_SNAPSHOT,
+        content={"egress_allowlist": ["mock-openai"]},
+        collected_at=T0 - timedelta(days=1),
+    )
+    contract_transfer_record = _evidence(
+        CONTRACT,
+        VERIFIER,
+        EvidenceKind.DOCUMENT_REF,
+        content=None,
+        content_ref="evidence/transfer-record-contract-insights.md",
+        file_sha256="e" * 64,
     )
     bedrock_dpa = _evidence(
         BEDROCK,
@@ -295,6 +313,7 @@ def load_estate(repo) -> None:
         _requirement("iso42001", "A.9", "A.9"),
         _requirement("iso42001", "A.9.3", "A.9.3"),
         _requirement("iso42001", "A.10.3", "A.10.3"),
+        _requirement("iso42001", "A.7.4", "A.7.4"),
         _control("VC-001", "AI literacy", ControlKind.ORGANISATIONAL, ScopeLevel.ORGANISATION),
         _control(
             "VC-012",
@@ -346,7 +365,19 @@ def load_estate(repo) -> None:
         disclosure_test,
         oversight_signoff,
         talent_config,
+        contract_config,
+        contract_transfer_record,
         bedrock_dpa,
+        _control(
+            "VC-041",
+            "Approved egress endpoints",
+            ControlKind.TECHNICAL,
+            ScopeLevel.SYSTEM,
+            automatable=True,
+        ),
+        _assessment(
+            VC_EGRESS, CONTRACT, ImplementationStatus.IMPLEMENTED, AssuranceLevel.L3_TESTED
+        ),
     ]
     for node in nodes:
         repo.upsert_node(node)
@@ -383,7 +414,10 @@ def load_estate(repo) -> None:
         # Requirement hierarchy
         *(make_edge(EdgeType.PART_OF, r, EUAIA) for r in (ART4, ART9, ART14, ART25, ART50_1)),
         make_edge(EdgeType.PART_OF, ART9_2A, ART9),
-        *(make_edge(EdgeType.PART_OF, r, ISO) for r in (ISO_A6, ISO_A8_2, ISO_A9, ISO_A10_3)),
+        *(
+            make_edge(EdgeType.PART_OF, r, ISO)
+            for r in (ISO_A6, ISO_A7_4, ISO_A8_2, ISO_A9, ISO_A10_3)
+        ),
         make_edge(EdgeType.PART_OF, ISO_A6_2_4, ISO_A6),
         make_edge(EdgeType.PART_OF, ISO_A9_3, ISO_A9),
         # Spokes: requirement to hub control
@@ -396,6 +430,7 @@ def load_estate(repo) -> None:
         _map(ISO_A9_3, VC_BIAS_TEST, StrmType.SUPERSET_OF, 6, partial),
         _map(ISO_A10_3, VC_SUPPLIER_DPA, subset, 7, full),
         _map(ART25, VC_SUPPLIER_DPA, StrmType.NO_RELATIONSHIP, None, None),
+        _map(ISO_A7_4, VC_EGRESS, subset, 6, full),
         # What applies to whom (one edge per role)
         _applies(ART4, ORG, Role.PROVIDER, "test-org-provider"),
         _applies(ART4, ORG, Role.DEPLOYER, "test-org-deployer"),
@@ -403,6 +438,7 @@ def load_estate(repo) -> None:
         _applies(ART9, TALENT, Role.PROVIDER, "test-high-risk"),
         _applies(ART9_2A, TALENT, Role.PROVIDER, "test-high-risk"),
         _applies(ART14, TALENT, Role.PROVIDER, "test-high-risk"),
+        _applies(ISO_A7_4, CONTRACT, Role.ANY, "test-data-flows"),
         *(_applies(ISO_A10_3, s, Role.ANY, "test-supplier") for s in (SUPPORT, TALENT, CONTRACT)),
         # Assessments: which control, for whom
         *(
@@ -414,6 +450,7 @@ def load_estate(repo) -> None:
                 (VC_BIAS_TEST, TALENT),
                 (VC_SUPPLIER_DPA, BEDROCK),
                 (VC_SUPPLIER_DPA, OPENAI),
+                (VC_EGRESS, CONTRACT),
             )
             for e in (
                 make_edge(EdgeType.ASSESSES, ca(control, scope), control),
@@ -435,6 +472,11 @@ def load_estate(repo) -> None:
         make_edge(EdgeType.ABOUT, talent_config.id, TALENT),
         make_edge(EdgeType.SUPPORTS, talent_config.id, ca(VC_OVERSIGHT, TALENT)),
         make_edge(EdgeType.COLLECTED_FROM, talent_config.id, RES_TALENT),
+        make_edge(EdgeType.ABOUT, contract_config.id, CONTRACT),
+        make_edge(EdgeType.SUPPORTS, contract_config.id, ca(VC_EGRESS, CONTRACT)),
+        make_edge(EdgeType.COLLECTED_FROM, contract_config.id, RES_CONTRACT),
+        make_edge(EdgeType.ABOUT, contract_transfer_record.id, CONTRACT),
+        make_edge(EdgeType.SUPPORTS, contract_transfer_record.id, ca(VC_EGRESS, CONTRACT)),
         make_edge(EdgeType.ABOUT, bedrock_dpa.id, BEDROCK),
         make_edge(EdgeType.SUPPORTS, bedrock_dpa.id, ca(VC_SUPPLIER_DPA, BEDROCK)),
     ]

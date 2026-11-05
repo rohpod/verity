@@ -101,6 +101,9 @@ def validate_edge(
         )
     if not (edge.tenant == src.tenant == dst.tenant):
         raise InvalidEdgeError("tenant_mismatch", f"{edge.type} edge crosses tenants")
+    if edge.valid_to is None and (src.valid_to is not None or dst.valid_to is not None):
+        ended = src.id if src.valid_to is not None else dst.id
+        raise InvalidEdgeError("endpoint_ended", f"{ended!r} has ended, so no edge can stay open")
 
     rule = EDGE_RULES[edge.type]
     if (src.type, dst.type) not in rule.pairs:

@@ -8,13 +8,13 @@ from uuid import UUID
 
 from pydantic import Field, field_validator
 
-from verity_core.model.base import UtcDatetime, VerityRecord
+from verity_core.model.base import Tenant, UtcDatetime, VerityRecord
 from verity_core.model.enums import NodeType, Source
 from verity_core.model.ids import check_id
 
 
 class UsageRecord(VerityRecord):
-    tenant: str = Field(min_length=1)
+    tenant: Tenant
     # Created once by the caller and reused on a retry, which makes a retried write idempotent.
     usage_id: UUID
     system_id: str

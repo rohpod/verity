@@ -70,4 +70,20 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/). Decisions by the owner:
 - **M10:** typecheck and build pass; `snapshot.json` is the only data source; every view shows provenance and timestamp; works at phone width; Pages URL works.
 - **M11:** every §L and ❓ item is closed or explicitly deferred; the README real-vs-simulated table matches what was built.
 
+## Notes for later milestones
+
+Found while building and reviewing M1. Each is open until the named milestone closes it.
+
+| Milestone | Note |
+|---|---|
+| M2 | Store Evidence `content` as a JSON string. boto3 returns numbers as `Decimal`, which `canonical_json` refuses, and a changed number would break `sha256` |
+| M2 | `close_edge`, reopening and the node-end cascade must update `E#` and `R#` together. `load_graph(as_of)` must read `H#` items through `version_at` |
+| M2, M6 | Daily `OBSERVED` edges could reach thousands of items by April 2027 and strain §H's size assumption. Measure it |
+| M5 | Art. 9 shows `unmapped` when only its sub-clause is mapped. Decide whether a parent inherits from its children |
+| M5 | `unmapped` covers both "never mapped" and "reviewed, `no_relationship`". Decide whether *Not addressed* (D2) treats them alike |
+| M5 | `provider_unknown` must be a finding, never *Not applicable* |
+| M6 | Stamp `ChangeEvent.detected_at` at run start, so evidence collected in the same run survives. Leave `valid_from` unset on re-crawls, or every run writes history |
+| M6 | §D says "system → provider", but §E only has the path through Model. Decide how to record a provider with no known model |
+| M11 | D15 overstates its reason: Policy, Dataset, Candidate and DiscoveryRun appear in none of the 5 traversals. They stay, because other views need them |
+
 **AWS mutations happen only in M3, M8 and any M11 teardown or refresh.** Each needs its own approval, with what it creates, the verified price and how to delete it.

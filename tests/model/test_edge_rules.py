@@ -1,7 +1,7 @@
 """Tier 2 rejection: which writes the graph refuses (ADR 0012)."""
 
 import pytest
-from factories import COMMON, make_edge, one_of_each, rule_nodes, twin
+from factories import COMMON, T0, make_edge, one_of_each, rule_nodes, twin
 from verity_core.model import ids
 from verity_core.model.enums import EdgeType, ModelOrigin, NodeType
 from verity_core.model.nodes import AWSResource, Model, Organisation
@@ -133,6 +133,14 @@ def test_missing_endpoint():
     edge = make_edge(EdgeType.OWNS, src.id, dst.id)
     rejects("missing_endpoint", edge, src, None)
     rejects("missing_endpoint", edge, None, dst)
+
+
+def test_an_open_edge_cannot_touch_an_ended_node():
+    src, dst = NODES[NodeType.PERSON], NODES[NodeType.AI_SYSTEM]
+    ended = dst.model_copy(update={"valid_to": T0})
+    rejects("endpoint_ended", make_edge(EdgeType.OWNS, src.id, dst.id), src, ended)
+    # A historic edge that was itself closed is a true record of the past.
+    validate_edge(make_edge(EdgeType.OWNS, src.id, dst.id, valid_to=T0), src, ended)
 
 
 def test_passed_nodes_must_be_the_edges_endpoints():

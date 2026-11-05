@@ -7,7 +7,7 @@ from conftest import START
 from factories import COMMON, make_edge, one_of_each
 from verity_core.graph.loader import build_graph, in_edges, node_record, out_edges
 from verity_core.graph.repository import GraphRepository
-from verity_core.model.enums import EdgeType, NodeType, Role, Source
+from verity_core.model.enums import EdgeType, ImplementationStatus, NodeType, Role, Source
 from verity_core.model.usage import UsageRecord
 
 NODES = one_of_each()
@@ -119,6 +119,44 @@ def test_load_graph_follows_close_and_reopen(repo, clock):
     assert repo.load_graph().number_of_edges() == 1
     assert repo.load_graph(as_of=START + timedelta(days=3)).number_of_edges() == 0  # the gap
     assert repo.load_graph(as_of=START + timedelta(days=1)).number_of_edges() == 1
+
+
+def statuses(repo, ca, **after):
+    graph = repo.load_graph(as_of=START + timedelta(**after))
+    return graph.nodes[ca.id]["record"].status if ca.id in graph else None
+
+
+def test_load_graph_as_of_returns_the_version_held_then(repo, clock):
+    ca = NODES[NodeType.CONTROL_ASSESSMENT]
+    old, new = ca.status, ImplementationStatus.IMPLEMENTED
+    repo.upsert_node(ca)
+    clock.advance(days=10)
+    repo.upsert_node(ca.model_copy(update={"status": new}))
+    assert statuses(repo, ca, days=1) == old
+    assert statuses(repo, ca, days=10) == new  # from the instant it was written
+    assert statuses(repo, ca, days=10, seconds=-1) == old
+    assert statuses(repo, ca, days=20) == new
+    assert repo.load_graph().nodes[ca.id]["record"].status == new
+
+
+def test_load_graph_as_of_leaves_out_a_node_not_yet_written(repo):
+    repo.upsert_node(SYSTEM)
+    assert SYSTEM.id not in repo.load_graph(as_of=START - timedelta(days=1))
+
+
+def test_load_graph_as_of_keeps_a_backdated_node(repo):
+    repo.upsert_node(SYSTEM.model_copy(update={"valid_from": START - timedelta(days=30)}))
+    assert SYSTEM.id in repo.load_graph(as_of=START - timedelta(days=1))
+
+
+def test_load_graph_as_of_shows_a_node_until_it_ended(repo, clock):
+    repo.upsert_node(SYSTEM)
+    clock.advance(days=5)
+    ended = {"valid_from": START, "valid_to": clock.now}
+    repo.upsert_node(SYSTEM.model_copy(update=ended))
+    assert SYSTEM.id in repo.load_graph(as_of=START + timedelta(days=1))
+    assert SYSTEM.id not in repo.load_graph(as_of=clock.now)
+    assert SYSTEM.id not in repo.load_graph()
 
 
 def test_load_graph_leaves_out_usage_records(repo):
