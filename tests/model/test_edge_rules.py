@@ -175,3 +175,15 @@ def test_model_and_aws_resource_fixtures_isolate_the_pair_rule():
     assert isinstance(NODES[NodeType.MODEL], Model)
     assert NODES[NodeType.MODEL].origin is ModelOrigin.THIRD_PARTY
     assert NODES[NodeType.AWS_RESOURCE].resource_type == "iam-role"
+
+
+def test_only_models_and_resources_look_at_a_nodes_edges():
+    # DynamoDBRepository skips reading a node's edges for every other type. If a new rule made
+    # another type depend on its edges, that repository would miss it, and this fails first.
+    every_edge = [make_edge(edge_type, "person:a", "sys:b") for edge_type in EdgeType] + [
+        make_edge(EdgeType.ASSUMES, "res:lambda:r:f", "res:iam-role:global:r")
+    ]
+    for node_type, node in one_of_each().items():
+        if node_type in (NodeType.MODEL, NodeType.AWS_RESOURCE):
+            continue
+        validate_node_change(node, open_edges=every_edge)
