@@ -1,6 +1,6 @@
 """Helpers for the DynamoDB tests: a client that counts and interferes, and table readers."""
 
-from collections import Counter
+from collections import Counter, defaultdict
 
 from botocore.exceptions import ClientError
 from conftest import TENANT
@@ -13,6 +13,15 @@ def aws_failure(code="InternalServerError", operation="TransactWriteItems"):
     return ClientError({"Error": {"Code": code, "Message": "simulated"}}, operation)
 
 
+def cancelled(*reasons):
+    """A cancelled transaction, with one reason per item as DynamoDB reports them."""
+    response = {
+        "Error": {"Code": "TransactionCanceledException", "Message": "simulated"},
+        "CancellationReasons": [{"Code": reason} for reason in reasons],
+    }
+    return ClientError(response, "TransactWriteItems")
+
+
 class SpyClient:
     """Wraps a client to count calls, and to run a hook just before one."""
 
@@ -21,6 +30,7 @@ class SpyClient:
         self.calls = Counter()
         self.before = {}
         self.fail = {}  # (operation, call number) -> the error to raise on that call
+        self.kwargs = defaultdict(list)  # operation -> the keyword arguments of each call
 
     def __getattr__(self, name):
         attribute = getattr(self._inner, name)
@@ -29,6 +39,7 @@ class SpyClient:
 
         def call(*args, **kwargs):
             self.calls[name] += 1
+            self.kwargs[name].append(kwargs)
             error = self.fail.pop((name, self.calls[name]), None)
             if error:
                 raise error

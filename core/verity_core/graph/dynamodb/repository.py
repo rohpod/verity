@@ -13,16 +13,18 @@ from collections.abc import Callable, Iterator
 from datetime import datetime
 from typing import Any
 
-import boto3
 import networkx as nx
-from botocore.config import Config
 from botocore.exceptions import ClientError
 
 from verity_core.graph.dynamodb import items, keys
+from verity_core.graph.dynamodb.client import default_client
 from verity_core.graph.dynamodb.table import TABLE_NAME
+from verity_core.graph.dynamodb.usage import DynamoDBUsageSink
 from verity_core.graph.errors import ConcurrentWriteError, EdgeNotFoundError, RepositoryError
+from verity_core.graph.loader import build_graph, version_at
 from verity_core.graph.planning import (
     WriteAction,
+    check_usage_bounds,
     edges_to_close,
     ensure_tenant,
     plan_close_edge,
@@ -38,19 +40,23 @@ from verity_core.model.nodes import Node
 from verity_core.model.usage import UsageRecord
 from verity_core.model.validation import EDGE_RULES, validate_edge, validate_node_change
 
-REGION = "eu-north-1"  # the only region Verity uses (ADR 0011)
 _BATCH_GET_LIMIT = 100
+# Items per page of the full-table scan. At about 0.6 KB an item, a page is roughly the
+# table's 15 read units for one second, so a scan paces itself instead of asking for 1 MB at once.
+_SCAN_PAGE_ITEMS = 100
 # A transaction holds 100 actions and an edge is two (`E#` and `R#`), so 50 edges at most.
 _EDGES_PER_TRANSACTION = 50
 _BATCH_GET_ATTEMPTS = 6
 _KEY = "ConsistentRead"
-
-
-def default_client() -> Any:
-    """A DynamoDB client that retries throttled calls with exponential backoff (D14). boto3's
-    default is the older `legacy` mode, so the retry mode is set explicitly."""
-    config = Config(retries={"mode": "standard", "total_max_attempts": 10})
-    return boto3.client("dynamodb", region_name=REGION, config=config)
+# boto3's retries do not cover a transaction that DynamoDB cancels for lack of capacity (it
+# raises TransactionCanceledException, which is not in botocore's list of throttling errors),
+# so the repository retries those itself. A cancelled transaction wrote nothing, and the version
+# conditions are checked again on each attempt, so repeating it is safe. The pauses add up to
+# about 22 s, long enough for a 15-unit table to refill a 50-edge chunk.
+_THROTTLE_REASONS = frozenset({"ProvisionedThroughputExceeded", "ThrottlingError"})
+_TRANSACTION_ATTEMPTS = 8
+_TRANSACTION_PAUSE = 0.2
+_TRANSACTION_PAUSE_CAP = 10.0
 
 
 def _is_conflict(error: ClientError) -> bool:
@@ -66,6 +72,15 @@ def _is_conflict(error: ClientError) -> bool:
     return False
 
 
+def _is_throttle(error: ClientError) -> bool:
+    """Was a transaction cancelled only because the table ran out of capacity? A conflict
+    anywhere in it means the data changed, which retrying the same write would not fix."""
+    if error.response["Error"]["Code"] != "TransactionCanceledException" or _is_conflict(error):
+        return False
+    reasons = {r.get("Code") for r in error.response.get("CancellationReasons") or []}
+    return bool(reasons & _THROTTLE_REASONS)
+
+
 class DynamoDBRepository:
     def __init__(
         self,
@@ -75,12 +90,15 @@ class DynamoDBRepository:
         client: Any = None,
         table_name: str = TABLE_NAME,
         sleep: Callable[[float], None] = time.sleep,
+        scan_page_items: int = _SCAN_PAGE_ITEMS,
     ):
         self.tenant = tenant
         self._clock = clock
         self._client = client if client is not None else default_client()
         self._table = table_name
         self._sleep = sleep
+        self._scan_page_items = scan_page_items
+        self._usage = DynamoDBUsageSink(tenant, client=self._client, table_name=table_name)
 
     # --- low-level reads -----------------------------------------------------------------
 
@@ -147,6 +165,17 @@ class DynamoDBRepository:
         self._write_node(stored, expected_version=existing.version if existing else None)
         return stored
 
+    def _transact(self, actions: list[dict[str, Any]]) -> None:
+        """`TransactWriteItems`, repeated with backoff while cancelled for lack of capacity."""
+        for attempt in range(_TRANSACTION_ATTEMPTS):
+            try:
+                self._client.transact_write_items(TransactItems=actions)
+                return
+            except ClientError as error:
+                if not _is_throttle(error) or attempt + 1 == _TRANSACTION_ATTEMPTS:
+                    raise
+                self._sleep(min(_TRANSACTION_PAUSE * 2**attempt, _TRANSACTION_PAUSE_CAP))
+
     def _write_node(self, node: Node, *, expected_version: int | None) -> None:
         """Insert (`expected_version=None`) or replace the version that was read.
 
@@ -165,8 +194,8 @@ class DynamoDBRepository:
             if isinstance(node, Evidence):
                 self._client.put_item(TableName=self._table, Item=meta, **condition)
             else:
-                self._client.transact_write_items(
-                    TransactItems=[
+                self._transact(
+                    [
                         {"Put": {"TableName": self._table, "Item": meta, **condition}},
                         {"Put": {"TableName": self._table, "Item": items.history_item(node)}},
                     ]
@@ -338,7 +367,7 @@ class DynamoDBRepository:
                     for item in items.edge_items(edge)
                 ]
             try:
-                self._client.transact_write_items(TransactItems=actions)
+                self._transact(actions)
             except ClientError as error:
                 if _is_conflict(error):
                     raise ConcurrentWriteError(
@@ -346,13 +375,60 @@ class DynamoDBRepository:
                     ) from error
                 raise
 
-    # --- load and usage (later PRs) ------------------------------------------------------
+    # --- load the whole graph ------------------------------------------------------------
 
     def load_graph(self, *, as_of: datetime | None = None) -> nx.MultiDiGraph:
-        raise NotImplementedError("load_graph arrives in PR 6")
+        """One consistent scan of the tenant's items, paged. With `as_of`, each node is the
+        version the graph held then, read from its `H#` items (ADR 0012).
+
+        A scan reads every item in the table, including the `R#` mirrors and usage records it
+        then ignores, and it is not a snapshot: a node written while it runs may appear in an
+        older version. Run it when no writer is active, as the daily crawl and the export are.
+        """
+        if as_of is not None:
+            require_aware(as_of, "as_of must be timezone-aware")
+        current: dict[str, Node] = {}
+        versions: dict[str, list[Node]] = {}
+        edges: list[Edge] = []
+        for item in self._scan_tenant():
+            kind = keys.kind_of(item["SK"]["S"])
+            if kind == "META":
+                node = items.node_from_item(item)
+                current[node.id] = node
+            elif kind == "H" and as_of is not None:
+                node = items.node_from_item(item)
+                versions.setdefault(node.id, []).append(node)
+            elif kind == "E":
+                edges.append(items.edge_from_item(item))
+        if as_of is None:
+            return build_graph(current.values(), edges)
+        # Evidence never changes, so it has no `H#` items and is its own only version.
+        nodes = [
+            version_at(sorted(versions.get(node_id) or [node], key=lambda n: n.version), as_of)
+            for node_id, node in current.items()
+        ]
+        return build_graph(nodes, edges, as_of=as_of)
+
+    def _scan_tenant(self) -> Iterator[items.Item]:
+        start: dict[str, Any] | None = None
+        while True:
+            page = self._client.scan(
+                TableName=self._table,
+                FilterExpression="begins_with(PK, :tenant)",
+                ExpressionAttributeValues={":tenant": {"S": keys.tenant_prefix(self.tenant)}},
+                ConsistentRead=True,
+                Limit=self._scan_page_items,
+                **({"ExclusiveStartKey": start} if start else {}),
+            )
+            yield from page.get("Items", [])
+            start = page.get("LastEvaluatedKey")
+            if not start:
+                return
+
+    # --- usage ---------------------------------------------------------------------------
 
     def append_usage(self, record: UsageRecord) -> None:
-        raise NotImplementedError("usage arrives in PR 6")
+        self._usage.append_usage(record)
 
     def usage_records(
         self,
@@ -361,7 +437,20 @@ class DynamoDBRepository:
         since: datetime | None = None,
         until: datetime | None = None,
     ) -> list[UsageRecord]:
-        raise NotImplementedError("usage arrives in PR 6")
+        check_usage_bounds(since, until)
+        if since is not None and until is not None and until <= since:
+            return []  # an empty interval; DynamoDB would reject a BETWEEN that runs backwards
+        low, high = keys.usage_sk_range(since, until)
+        found = self._query(
+            KeyConditionExpression="PK = :pk AND SK BETWEEN :low AND :high",
+            ExpressionAttributeValues={
+                ":pk": {"S": keys.node_pk(self.tenant, system_id)},
+                ":low": {"S": low},
+                ":high": {"S": high},
+            },
+            ConsistentRead=True,
+        )
+        return [items.usage_from_item(item) for item in found]
 
 
 def _reads_edges(node: Node) -> bool:
