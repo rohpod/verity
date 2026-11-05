@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
-from conftest import START
+from conftest import START, unwrap
 from factories import COMMON, evidence, make_edge, one_of_each
 from verity_core.graph.errors import (
     EdgeNotFoundError,
@@ -34,7 +34,7 @@ RISK = NODES[NodeType.RISK]
 
 
 def test_repository_satisfies_the_protocol(repo):
-    assert isinstance(repo, GraphRepository)
+    assert isinstance(unwrap(repo), GraphRepository)
 
 
 # --- nodes ------------------------------------------------------------------------------
@@ -547,7 +547,7 @@ def usage(minutes=0, **overrides):
 
 
 def test_usage_can_be_written_with_only_the_narrow_sink(repo):
-    assert isinstance(repo, UsageSink)
+    assert isinstance(unwrap(repo), UsageSink)
 
     class OnlyAppends:
         def append_usage(self, record): ...

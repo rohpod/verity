@@ -1,0 +1,286 @@
+"""`DynamoDBRepository`: the graph in the `verity-graph` table (ADR 0003, ADR 0013).
+
+Every write decision comes from `planning.py`, the same code `InMemoryRepository` uses; this
+class only reads items, asks for a plan, and writes it. This is one of the two modules allowed
+to import boto3 (the other is the usage sink).
+
+Writes check the version they read, so a stale write fails with `ConcurrentWriteError` instead
+of overwriting. A node and its history entry are written in one transaction.
+"""
+
+import time
+from collections.abc import Callable, Iterator
+from datetime import datetime
+from typing import Any
+
+import boto3
+import networkx as nx
+from botocore.config import Config
+from botocore.exceptions import ClientError
+
+from verity_core.graph.dynamodb import items, keys
+from verity_core.graph.dynamodb.table import TABLE_NAME
+from verity_core.graph.errors import ConcurrentWriteError, RepositoryError
+from verity_core.graph.planning import (
+    WriteAction,
+    edges_to_close,
+    ensure_tenant,
+    plan_node_write,
+    read_clock,
+)
+from verity_core.model.edges import Edge
+from verity_core.model.enums import Direction, EdgeType, NodeType
+from verity_core.model.evidence import Evidence
+from verity_core.model.nodes import Node
+from verity_core.model.usage import UsageRecord
+from verity_core.model.validation import validate_node_change
+
+REGION = "eu-north-1"  # the only region Verity uses (ADR 0011)
+_BATCH_GET_LIMIT = 100
+_BATCH_GET_ATTEMPTS = 6
+_KEY = "ConsistentRead"
+
+
+def default_client() -> Any:
+    """A DynamoDB client that retries throttled calls with exponential backoff (D14). boto3's
+    default is the older `legacy` mode, so the retry mode is set explicitly."""
+    config = Config(retries={"mode": "standard", "total_max_attempts": 10})
+    return boto3.client("dynamodb", region_name=REGION, config=config)
+
+
+def _is_conflict(error: ClientError) -> bool:
+    """Did a condition fail, or did another transaction touch the same item?"""
+    code = error.response["Error"]["Code"]
+    if code == "ConditionalCheckFailedException":
+        return True
+    if code == "TransactionCanceledException":
+        reasons = error.response.get("CancellationReasons") or []
+        return any(
+            r.get("Code") in ("ConditionalCheckFailed", "TransactionConflict") for r in reasons
+        )
+    return False
+
+
+class DynamoDBRepository:
+    def __init__(
+        self,
+        tenant: str,
+        clock: Callable[[], datetime],
+        *,
+        client: Any = None,
+        table_name: str = TABLE_NAME,
+        sleep: Callable[[float], None] = time.sleep,
+    ):
+        self.tenant = tenant
+        self._clock = clock
+        self._client = client if client is not None else default_client()
+        self._table = table_name
+        self._sleep = sleep
+
+    # --- low-level reads -----------------------------------------------------------------
+
+    def _get_item(self, pk: str, sk: str) -> items.Item | None:
+        response = self._client.get_item(
+            TableName=self._table,
+            Key={"PK": {"S": pk}, "SK": {"S": sk}},
+            ConsistentRead=True,
+        )
+        return response.get("Item")
+
+    def _query(self, **kwargs: Any) -> Iterator[items.Item]:
+        """Every item a query matches, following pagination."""
+        start: dict[str, Any] | None = None
+        while True:
+            page = self._client.query(
+                TableName=self._table,
+                **kwargs,
+                **({"ExclusiveStartKey": start} if start else {}),
+            )
+            yield from page.get("Items", [])
+            start = page.get("LastEvaluatedKey")
+            if not start:
+                return
+
+    def _partition(self, node_id: str, prefix: str) -> Iterator[items.Item]:
+        """A node's items whose sort key starts with `prefix`, in sort-key order."""
+        return self._query(
+            KeyConditionExpression="PK = :pk AND begins_with(SK, :prefix)",
+            ExpressionAttributeValues={
+                ":pk": {"S": keys.node_pk(self.tenant, node_id)},
+                ":prefix": {"S": prefix},
+            },
+            ConsistentRead=True,
+        )
+
+    # --- nodes ---------------------------------------------------------------------------
+
+    def get_node(self, node_id: str) -> Node | None:
+        item = self._get_item(keys.node_pk(self.tenant, node_id), keys.META)
+        return items.node_from_item(item) if item else None
+
+    def upsert_node(self, node: Node) -> Node:
+        ensure_tenant(self.tenant, node.tenant, repr(node.id))
+        item = self._get_item(keys.node_pk(self.tenant, node.id), keys.META)
+        existing = items.node_from_item(item) if item else None
+        validate_node_change(
+            node,
+            open_edges=self._open_edges_touching(node) if _reads_edges(node) else [],
+            organisation_ids=(
+                self._ids_by_type(NodeType.ORGANISATION)
+                if node.type is NodeType.ORGANISATION
+                else []
+            ),
+        )
+        plan = plan_node_write(existing, node, read_clock(self._clock))
+        if plan.action is WriteAction.NOOP:
+            return plan.node
+        stored = plan.node
+        if stored.valid_to is not None:
+            # Close the edges first. A run that fails part way can simply be repeated, because
+            # closing a closed edge changes nothing (ADR 0013).
+            self._close_edges_of(stored)
+        self._write_node(stored, expected_version=existing.version if existing else None)
+        return stored
+
+    def _write_node(self, node: Node, *, expected_version: int | None) -> None:
+        """Insert (`expected_version=None`) or replace the version that was read.
+
+        Evidence never changes, so it is one conditional write with no `H#` item. Anything else
+        writes `META` and its `H#` entry together, or neither.
+        """
+        meta = items.node_item(node)
+        if expected_version is None:
+            condition = {"ConditionExpression": "attribute_not_exists(PK)"}
+        else:
+            condition = {
+                "ConditionExpression": "ver = :expected",
+                "ExpressionAttributeValues": {":expected": {"N": str(expected_version)}},
+            }
+        try:
+            if isinstance(node, Evidence):
+                self._client.put_item(TableName=self._table, Item=meta, **condition)
+            else:
+                self._client.transact_write_items(
+                    TransactItems=[
+                        {"Put": {"TableName": self._table, "Item": meta, **condition}},
+                        {"Put": {"TableName": self._table, "Item": items.history_item(node)}},
+                    ]
+                )
+        except ClientError as error:
+            if _is_conflict(error):
+                raise ConcurrentWriteError(
+                    f"{node.id!r} changed after it was read; read it again and retry"
+                ) from error
+            raise
+
+    def _ids_by_type(self, node_type: NodeType) -> list[str]:
+        """Node IDs from the type index. The index is eventually consistent, so a node written
+        a moment ago may not be listed yet (ADR 0013)."""
+        found = self._query(
+            IndexName=keys.GSI1,
+            KeyConditionExpression="GSI1PK = :pk",
+            ExpressionAttributeValues={":pk": {"S": keys.gsi_type_pk(self.tenant, node_type)}},
+        )
+        return [item["GSI1SK"]["S"] for item in found]
+
+    def nodes_by_type(self, node_type: NodeType) -> list[Node]:
+        """The index holds keys only (D14), so list the IDs there, then fetch the nodes."""
+        wanted = [
+            {"PK": {"S": keys.node_pk(self.tenant, node_id)}, "SK": {"S": keys.META}}
+            for node_id in self._ids_by_type(node_type)
+        ]
+        nodes = [
+            items.node_from_item(item)
+            for start in range(0, len(wanted), _BATCH_GET_LIMIT)
+            for item in self._batch_get(wanted[start : start + _BATCH_GET_LIMIT])
+        ]
+        return sorted(nodes, key=lambda n: n.id)
+
+    def _batch_get(self, wanted: list[dict[str, Any]]) -> Iterator[items.Item]:
+        """`BatchGetItem` can return some keys unprocessed under load; ask again with backoff."""
+        pending, attempt = wanted, 0
+        while pending:
+            if attempt:
+                self._sleep(min(0.05 * 2**attempt, 2.0))
+            response = self._client.batch_get_item(
+                RequestItems={self._table: {"Keys": pending, _KEY: True}}
+            )
+            yield from response.get("Responses", {}).get(self._table, [])
+            pending = response.get("UnprocessedKeys", {}).get(self._table, {}).get("Keys", [])
+            attempt += 1
+            if pending and attempt >= _BATCH_GET_ATTEMPTS:
+                raise RepositoryError(f"{len(pending)} nodes were still unprocessed after retries")
+
+    def history(self, node_id: str) -> list[Node]:
+        versions = [items.node_from_item(i) for i in self._partition(node_id, "H#")]
+        if versions:
+            return versions
+        # Evidence never changes, so it has no `H#` items: its only version is the node itself.
+        node = self.get_node(node_id)
+        return [node] if isinstance(node, Evidence) else []
+
+    # --- edges (reads only until PR 5) ---------------------------------------------------
+
+    def neighbors(
+        self,
+        node_id: str,
+        direction: Direction,
+        edge_type: EdgeType | None = None,
+        *,
+        as_of: datetime | None = None,
+    ) -> list[Edge]:
+        if as_of is not None and as_of.tzinfo is None:
+            raise ValueError("as_of must be timezone-aware")
+        prefix = (
+            keys.edge_prefix(edge_type)
+            if direction is Direction.OUT
+            else keys.reverse_prefix(edge_type)
+        )
+        edges = (items.edge_from_item(i) for i in self._partition(node_id, prefix))
+        return [e for e in edges if e.is_active(as_of)]
+
+    def _open_edges_touching(self, node: Node) -> list[Edge]:
+        return self.neighbors(node.id, Direction.OUT) + self.neighbors(node.id, Direction.IN)
+
+    def _close_edges_of(self, node: Node) -> None:
+        for edge, valid_to in edges_to_close(node, self._open_edges_touching(node)):
+            self.close_edge(
+                edge.src, edge.type, edge.dst, valid_to=valid_to, qualifier=edge.qualifier
+            )
+
+    def upsert_edge(self, edge: Edge) -> Edge:
+        raise NotImplementedError("edge writes arrive in the next PR")
+
+    def close_edge(
+        self,
+        src: str,
+        edge_type: EdgeType,
+        dst: str,
+        *,
+        valid_to: datetime,
+        qualifier: str | None = None,
+    ) -> Edge:
+        raise NotImplementedError("edge writes arrive in the next PR")
+
+    # --- load and usage (later PRs) ------------------------------------------------------
+
+    def load_graph(self, *, as_of: datetime | None = None) -> nx.MultiDiGraph:
+        raise NotImplementedError("load_graph arrives in PR 6")
+
+    def append_usage(self, record: UsageRecord) -> None:
+        raise NotImplementedError("usage arrives in PR 6")
+
+    def usage_records(
+        self,
+        system_id: str,
+        *,
+        since: datetime | None = None,
+        until: datetime | None = None,
+    ) -> list[UsageRecord]:
+        raise NotImplementedError("usage arrives in PR 6")
+
+
+def _reads_edges(node: Node) -> bool:
+    """`validate_node_change` looks at a node's open edges only for these types, so the other
+    16 skip two queries per write. A test pins that assumption."""
+    return node.type in (NodeType.MODEL, NodeType.AWS_RESOURCE)

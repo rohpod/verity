@@ -8,6 +8,7 @@ from verity_core.model.validation import (
 )
 
 __all__ = [
+    "ConcurrentWriteError",
     "EdgeNotFoundError",
     "GraphValidationError",
     "ImmutableNodeError",
@@ -32,3 +33,8 @@ class ImmutableNodeError(RepositoryError):
 
 class EdgeNotFoundError(RepositoryError):
     """No edge with that source, type, target and qualifier."""
+
+
+class ConcurrentWriteError(RepositoryError):
+    """Another writer changed the record after it was read, so this write was refused instead
+    of overwriting theirs. Read again and retry (ADR 0013)."""
