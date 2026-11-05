@@ -414,3 +414,28 @@ def test_the_default_client_retries_throttling_with_backoff_in_the_one_region(ta
     client = default_client()
     assert client.meta.config.retries == {"mode": "standard", "total_max_attempts": 10}
     assert client.meta.region_name == "eu-north-1" == REGION
+
+
+def test_resending_an_unchanged_node_adds_no_history_item(table):
+    repo = repo_for(table)
+    repo.upsert_node(SYSTEM)
+    assert kinds_of(table, SYSTEM.id) == ["H", "META"]
+    for _ in range(3):
+        table.clock.advance(days=1)
+        repo.upsert_node(SYSTEM)
+    assert kinds_of(table, SYSTEM.id) == ["H", "META"]
+    assert [v.version for v in repo.history(SYSTEM.id)] == [1]
+
+
+def test_the_largest_inline_evidence_is_one_cheap_item_under_the_item_limit(table):
+    from verity_core.graph.dynamodb.capacity import item_size, write_units
+    from verity_core.model.evidence import INLINE_EVIDENCE_MAX_BYTES
+    from verity_core.model.hashing import canonical_json
+
+    overhead = len(canonical_json({"k": ""}).encode())
+    biggest = evidence(content={"k": "x" * (INLINE_EVIDENCE_MAX_BYTES - overhead)})
+    assert len(canonical_json(biggest.content).encode()) == INLINE_EVIDENCE_MAX_BYTES
+    size = item_size(items.node_item(biggest))
+    assert size < 400 * 1024  # DynamoDB's item limit
+    assert write_units(size) <= 20  # about one second of the table's 15 units
+    repo_for(table).upsert_node(biggest)

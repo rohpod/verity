@@ -36,12 +36,14 @@ M2 implements `DynamoDBRepository` behind the contract M1 fixed. That contract n
 | `BatchWriteItem` for edges | Half the capacity, but not atomic: a partial write leaves one direction of an edge missing |
 | `R#` holding keys only | Smaller, but every reverse lookup would need a second read |
 | Native DynamoDB attributes | Queryable fields are not needed, and numbers would return as `Decimal` |
-| `H#` copy for Evidence | A 50 KB item would cost 200 WCU instead of 50, for a copy of something that never changes |
+| `H#` copy for Evidence | A 16 KB item would cost 64 WCU instead of 16, for a copy of something that never changes |
 | No version check | A stale write would silently overwrite a newer one |
 | A sentinel item for the one-Organisation rule | One more item type to guard a single-writer seed. `check_integrity` catches the case |
 
 ## Consequences
 - **Measured in M2** (PR 6, on the fixture estate, from AWS's published size and capacity rules): 276 items, 117 KB, averaging 425 bytes and all under 1 KB. `load_graph` costs about 29 read units strongly consistent, in 3 pages of 100 items, about 2 s of the table's 15 units. 29% of what a scan reads (the `R#` mirrors and usage records) is thrown away. A node write and an edge write each cost 4 write units.
+- **Inline evidence is capped at 16 KB (D14),** down from the 50 KB placeholder. Every fixture item is under 1 KB, and a crawler record (resource settings and env var names) should stay in the low kilobytes. A 16 KB document stored as an item is about 17 KB: 17 write units to write and 5 read units to read. At 50 KB it was 51 write units (over 3 seconds of the table's 15) and 13 read units, and a scan reads every evidence item. Larger payloads go in a git-versioned file through `content_ref`. A test pins the largest case.
+- **A test fails if boto3 or botocore is imported outside `graph/dynamodb/`** (`tests/graph/test_boto3_boundary.py`). It reads every tracked source file outside `tests/`, so new packages are covered.
 - **At the design target** (300 nodes, 1,000 edges, about 1 MB) a scan is about 264 read units, roughly 18 s at 15 per second. The first seed is about 5,200 write units, roughly 6 minutes.
 - A scan is not a snapshot: a node written while it runs can appear in an older version. Run it when no writer is active, as the daily crawl and the export are.
 - An edge write costs 4 WCU, so a first seed of about 300 nodes and 1,000 edges takes roughly 6 minutes of write capacity. Re-seeding writes almost nothing.
