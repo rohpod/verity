@@ -78,7 +78,7 @@ Found while building and reviewing M1. Each is open until the named milestone cl
 | Milestone | Note |
 |---|---|
 | M2 | Measure what `load_graph` costs, since its Scan also reads `H#` and `U#` items |
-| M3 | The real round trip must check what moto cannot: GSI delay, and transaction capacity |
+| M3 | The real round trip must check what moto cannot: the table class (moto ignores it), GSI delay, and transaction capacity |
 | M2, M6 | Daily `OBSERVED` edges could reach thousands of items by April 2027 and strain §H's size assumption. Measure it |
 | M5 | Art. 9 shows `unmapped` when only its sub-clause is mapped. Decide whether a parent inherits from its children |
 | M5 | `unmapped` covers both "never mapped" and "reviewed, `no_relationship`". Decide whether *Not addressed* (D2) treats them alike |
