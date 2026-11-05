@@ -16,10 +16,22 @@ from typing import Protocol, runtime_checkable
 from verity_core.model.edges import Edge
 from verity_core.model.enums import Direction, EdgeType, NodeType
 from verity_core.model.nodes import Node
+from verity_core.model.usage import UsageRecord
 
 
 @runtime_checkable
-class GraphRepository(Protocol):
+class UsageSink(Protocol):
+    """All that the `verity_ai` adapters receive (D8). An app role can be limited to its own
+    partition, so this cannot read the graph or check that the system exists."""
+
+    def append_usage(self, record: UsageRecord) -> None:
+        """Append-only. A record with the same system, timestamp and `usage_id` is written once,
+        so a retry is safe: the first write wins."""
+        ...
+
+
+@runtime_checkable
+class GraphRepository(UsageSink, Protocol):
     def get_node(self, node_id: str) -> Node | None: ...
 
     def upsert_node(self, node: Node) -> Node:
@@ -30,7 +42,22 @@ class GraphRepository(Protocol):
 
     def upsert_edge(self, edge: Edge) -> Edge:
         """Insert or update. Identity is `(src, type, dst, qualifier)`, so one system can
-        have an APPLIES_TO edge per role."""
+        have an APPLIES_TO edge per role. Upserting a closed edge reopens it: the earlier
+        period moves to `closed_intervals`. It may not reopen before it closed."""
+        ...
+
+    def close_edge(
+        self,
+        src: str,
+        edge_type: EdgeType,
+        dst: str,
+        *,
+        valid_to: datetime,
+        qualifier: str | None = None,
+    ) -> Edge:
+        """Soft-delete (D7). `valid_to` is explicit (D5). Closing an already closed edge keeps
+        its first `valid_to`. `qualifier` closes one role or purpose only. Raises
+        `EdgeNotFoundError`, or `ValueError` if `valid_to` precedes `valid_from`."""
         ...
 
     def neighbors(
@@ -51,4 +78,14 @@ class GraphRepository(Protocol):
 
     def history(self, node_id: str) -> list[Node]:
         """Every real version, oldest first, including the current one."""
+        ...
+
+    def usage_records(
+        self,
+        system_id: str,
+        *,
+        since: datetime | None = None,
+        until: datetime | None = None,
+    ) -> list[UsageRecord]:
+        """Oldest first, within `[since, until)`."""
         ...
