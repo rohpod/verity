@@ -1,8 +1,8 @@
 """`DynamoDBRepository`: the graph in the `verity-graph` table (ADR 0003, ADR 0013).
 
 Every write decision comes from `planning.py`, the same code `InMemoryRepository` uses; this
-class only reads items, asks for a plan, and writes it. This is one of the two modules allowed
-to import boto3 (the other is the usage sink).
+class only reads items, asks for a plan, and writes it. Only this package may import boto3
+(ADR 0014).
 
 Writes check the version they read, so a stale write fails with `ConcurrentWriteError` instead
 of overwriting. A node and its history entry are written in one transaction.
