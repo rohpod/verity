@@ -15,10 +15,13 @@ from verity_core.model.enums import (
     AppliesCondition,
     EdgeType,
     EvidenceKind,
+    NodeType,
     Role,
     Source,
 )
+from verity_core.model.evidence import Evidence
 
+EVIDENCE = NodeType.EVIDENCE
 REAL = Path(__file__).parents[2] / "content"
 STATEMENT = "Simulated sign-off by a fictional person. The control was checked."
 
@@ -376,3 +379,171 @@ def test_the_gaps_the_demo_needs_stay_open(real):
 
 def test_the_demo_dpa_says_it_is_fictional():
     assert "fictional" in (REAL.parent / "evidence" / "dpa-mock-bedrock.md").read_text().lower()
+
+
+# --- supersession and revocation (ADR 0020) ---------------------------------------------------
+
+
+def revocation(**fields) -> dict:
+    base = {
+        "id": "r1",
+        "kind": "revocation",
+        "decided_on": date(2026, 11, 6),
+        "by": "person:l-ivanova",
+        "valid_until": date(2027, 11, 6),
+        "simulated": True,
+        "statement": "Simulated sign-off by a fictional person. The earlier decision is withdrawn.",
+        "subject": "sys:faq-bot",
+        "supersedes": ["d1"],
+    }
+    return base | fields
+
+
+def test_a_decision_without_supersedes_keeps_the_content_it_had_before(tmp_path):
+    (ev,) = load(tmp_path, decision()).decisions
+    assert "supersedes" not in ev.content
+
+
+def test_supersedes_is_recorded_in_the_content(tmp_path):
+    first, second = load(
+        tmp_path, decision(), decision(id="d2", status="not_implemented", supersedes=["d1"])
+    ).decisions
+    assert second.content["supersedes"] == ["d1"]
+
+
+def test_a_revocation_is_attestation_evidence_that_names_no_control(tmp_path):
+    content = load(tmp_path, decision(), revocation())
+    ev = next(e for e in content.decisions if e.content["decision_id"] == "r1")
+    assert ev.kind is EvidenceKind.ATTESTATION
+    assert ev.subject == "sys:faq-bot"
+    assert ev.content["decision_kind"] == "revocation"
+    assert ev.content["supersedes"] == ["d1"]
+    assert "control" not in ev.content and "scope" not in ev.content
+    assert codes(content) == set()
+
+
+def test_a_revocation_must_name_what_it_supersedes(tmp_path):
+    with pytest.raises(ContentError, match="must name the decisions it supersedes"):
+        load(tmp_path, revocation(supersedes=[]))
+
+
+def test_a_lint_issue_for_a_supersedes_target_that_does_not_exist(tmp_path):
+    content = load(tmp_path, decision(id="d2", supersedes=["nope"]))
+    assert "decision_unknown_supersedes" in codes(content)
+
+
+def test_a_decision_cannot_supersede_one_about_another_node(tmp_path):
+    content = load(tmp_path, decision(), decision(id="d2", scope="org:kestrel", supersedes=["d1"]))
+    assert "decision_supersedes_mismatch" in codes(content)
+
+
+def test_a_decision_cannot_supersede_one_decided_later(tmp_path):
+    content = load(
+        tmp_path, decision(), decision(id="d2", decided_on=date(2026, 11, 4), supersedes=["d1"])
+    )
+    assert "decision_supersedes_mismatch" in codes(content)
+
+
+def test_two_decisions_cannot_supersede_each_other(tmp_path):
+    content = load(
+        tmp_path,
+        decision(supersedes=["d2"]),
+        decision(id="d2", statement=STATEMENT + " Again.", supersedes=["d1"]),
+    )
+    assert "decision_supersedes_mismatch" in codes(content)
+
+
+def test_a_correction_on_the_same_day_may_supersede(tmp_path):
+    content = load(
+        tmp_path, decision(), decision(id="d2", status="not_implemented", supersedes=["d1"])
+    )
+    assert codes(content) == set()
+
+
+def test_two_decisions_in_force_on_the_same_day_are_a_conflict(tmp_path):
+    content = load(tmp_path, decision(), decision(id="d2", status="not_implemented"))
+    assert "decision_conflict" in codes(content)
+
+
+def test_a_superseded_decision_is_not_a_conflict(tmp_path):
+    content = load(
+        tmp_path, decision(), decision(id="d2", status="not_implemented", supersedes=["d1"])
+    )
+    assert "decision_conflict" not in codes(content)
+
+
+def test_decisions_on_different_days_are_not_a_conflict(tmp_path):
+    content = load(tmp_path, decision(), decision(id="d2", decided_on=date(2026, 11, 6)))
+    assert "decision_conflict" not in codes(content)
+
+
+def test_two_revocations_do_not_conflict(tmp_path):
+    content = load(
+        tmp_path,
+        decision(),
+        decision(id="d2", decided_on=date(2026, 11, 6)),
+        revocation(id="r1", supersedes=["d1"]),
+        revocation(id="r2", supersedes=["d2"], statement=revocation()["statement"] + " Also."),
+    )
+    assert "decision_conflict" not in codes(content)
+
+
+def rewrite(path: Path, **changes) -> None:
+    data = yaml.safe_load(path.read_text())
+    path.write_text(yaml.safe_dump(data | changes, sort_keys=False))
+
+
+def seeded(tmp_path, repo, clock, *decisions):
+    root = tree(tmp_path, *decisions)
+    seed(repo, load_content(root), clock)
+    return root
+
+
+def test_seeding_the_same_decisions_again_is_accepted(tmp_path, repo, clock):
+    root = seeded(tmp_path, repo, clock, decision())
+    clock.now += timedelta(minutes=5)
+    report = seed(repo, load_content(root), clock)
+    assert report.written == 0
+
+
+def test_an_edited_seeded_decision_is_refused_before_anything_is_written(tmp_path, repo, clock):
+    root = seeded(tmp_path, repo, clock, decision())
+    rewrite(root / "decisions" / "d1.yaml", statement=STATEMENT + " Edited.")
+    before = len(repo.nodes_by_type(EVIDENCE))
+    with pytest.raises(ContentError, match=r"decision_edited.*supersedes: \[d1\]"):
+        seed(repo, load_content(root), clock)
+    assert len(repo.nodes_by_type(EVIDENCE)) == before
+
+
+def test_a_removed_seeded_decision_is_refused(tmp_path, repo, clock):
+    root = seeded(tmp_path, repo, clock, decision())
+    (root / "decisions" / "d1.yaml").unlink()
+    with pytest.raises(ContentError, match=r"decision_removed.*revocation"):
+        seed(repo, load_content(root), clock)
+
+
+def test_a_superseding_decision_is_accepted_beside_the_old_one(tmp_path, repo, clock):
+    root = seeded(tmp_path, repo, clock, decision())
+    new = decision(id="d2", status="not_implemented", supersedes=["d1"])
+    (root / "decisions" / "d2.yaml").write_text(yaml.safe_dump(new, sort_keys=False))
+    clock.now += timedelta(minutes=5)
+    report = seed(repo, load_content(root), clock)
+    assert report.written > 0
+    assert len(repo.nodes_by_type(EVIDENCE)) == 2
+
+
+def test_evidence_that_is_not_a_decision_is_ignored_by_the_guard(tmp_path, repo, clock):
+    root = seeded(tmp_path, repo, clock, decision())
+    repo.upsert_node(
+        Evidence.build(
+            subject="sys:faq-bot",
+            collector="crawler@0.1.0",
+            collected_at=datetime(2026, 11, 5, tzinfo=UTC),
+            valid_until=datetime(2026, 12, 5, tzinfo=UTC),
+            kind=EvidenceKind.CONFIG_SNAPSHOT,
+            content={"anything": 1},
+            tenant="kestrel",
+            source=Source.DERIVED,
+        )
+    )
+    seed(repo, load_content(root), clock)

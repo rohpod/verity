@@ -10,6 +10,7 @@ from rules_support import (
     date_of,
     decision,
     edges_to,
+    revocation,
     run,
     system,
 )
@@ -232,6 +233,49 @@ def test_the_latest_decision_wins():
         ),
     )
     assert chapter_iii(edges, s)
+
+
+def test_a_superseding_decision_wins_whatever_the_ids_hash_to():
+    for n in range(30):  # the Evidence ID used to break a same-day tie
+        s = hr(f"hr{n}")
+        old = decision(s.id, "high_risk", date(2026, 11, 5), "old")
+        new = decision(s.id, "not_high_risk", date(2026, 11, 5), f"new{n}", supersedes=["old"])
+        edges, _ = run(s, decisions=(old, new))
+        assert chapter_iii(edges, s) == set(), n
+        new = decision(s.id, "high_risk", date(2026, 11, 5), f"new{n}", supersedes=["old"])
+        old = decision(s.id, "not_high_risk", date(2026, 11, 5), "old")
+        edges, _ = run(s, decisions=(old, new))
+        assert chapter_iii(edges, s), n
+
+
+def test_a_revocation_returns_the_system_to_its_facts_with_a_finding():
+    s = hr()
+    revoked = revocation(s.id, date(2026, 11, 6), ["d"])
+    edges, findings = run(s, decisions=(confirmed(s), revoked))
+    assert chapter_iii(edges, s)  # still an Annex III candidate, so the rules still apply
+    assert "risk_tier_unconfirmed" in codes(findings, s.id)
+
+
+def test_a_revocation_of_a_decision_on_a_system_outside_annex_iii_removes_the_duties():
+    s = hr(use_domains=["customer_support"])
+    revoked = revocation(s.id, date(2026, 11, 6), ["d"])
+    edges, findings = run(s, decisions=(confirmed(s), revoked))
+    assert chapter_iii(edges, s) == set()
+    assert codes(findings, s.id) == []
+
+
+def test_a_revocation_does_not_count_before_it_was_made():
+    s = hr(use_domains=["customer_support"])
+    revoked = revocation(s.id, date(2026, 11, 20), ["d"])
+    edges, _ = run(s, decisions=(confirmed(s), revoked), as_of=datetime(2026, 11, 19, tzinfo=UTC))
+    assert chapter_iii(edges, s)
+    edges, _ = run(s, decisions=(confirmed(s), revoked), as_of=datetime(2026, 11, 20, tzinfo=UTC))
+    assert chapter_iii(edges, s) == set()
+
+
+def test_a_naive_as_of_is_refused():
+    with pytest.raises(ValueError, match="timezone-aware"):
+        run(hr(), as_of=datetime(2026, 11, 10))
 
 
 def test_another_systems_decision_does_not_count():

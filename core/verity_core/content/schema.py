@@ -287,6 +287,8 @@ class _Decision(_Strict):
     statement: NonEmpty
     # A demo sign-off by a fictional person. The statement must say "simulated sign-off" (D11).
     simulated: bool = False
+    # IDs of earlier decisions this one replaces. A seeded decision is never edited (ADR 0020).
+    supersedes: list[Slug] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _expires_after_it_is_made(self):
@@ -317,6 +319,20 @@ class RiskTierDecision(_Decision):
         return self
 
 
+class RevocationDecision(_Decision):
+    """Withdraws earlier decisions without replacing them (ADR 0020). It is not an assessment:
+    it names no control."""
+
+    kind: Literal["revocation"]
+    subject: NonEmpty  # the organisation, system or provider the revoked decisions are about
+
+    @model_validator(mode="after")
+    def _names_what_it_revokes(self):
+        if not self.supersedes:
+            raise ValueError("a revocation must name the decisions it supersedes")
+        return self
+
+
 class _ControlDecision(_Decision):
     control: ControlCode
     scope: NonEmpty  # the ID of the organisation, system or provider the control is assessed for
@@ -337,7 +353,13 @@ class DocumentDecision(_ControlDecision):
     path: NonEmpty  # a file under evidence/
 
 
-DecisionIn = RiskTierDecision | AttestationDecision | VerificationDecision | DocumentDecision
+DecisionIn = (
+    RiskTierDecision
+    | AttestationDecision
+    | VerificationDecision
+    | DocumentDecision
+    | RevocationDecision
+)
 
 
 class DecisionFile(RootModel[DecisionIn]):

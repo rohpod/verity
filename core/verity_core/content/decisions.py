@@ -1,6 +1,7 @@
 """Reads `decisions/*.yaml`: the human decisions that governance as code keeps in git.
 
-Each decision becomes an Evidence node with inline content, plus an `ABOUT` edge to the node it
+Each decision (a risk tier, an attestation, a verification, a document or a revocation)
+becomes an Evidence node with inline content, plus an `ABOUT` edge to the node it
 concerns (ADR 0019). `Evidence.content_ref` has to sit under `evidence/`, so the decision file
 is recorded by path and sha256 inside the content instead. The commit SHA is not recorded here:
 it would change the hash on every commit, so it is looked up at export (D10).
@@ -14,6 +15,7 @@ from verity_core.content.schema import (
     DecisionFile,
     DecisionIn,
     DocumentDecision,
+    RevocationDecision,
     RiskTierDecision,
 )
 from verity_core.content.yamlio import ContentError, parse, reading
@@ -66,6 +68,10 @@ def _evidence(decision: DecisionIn, path: Path, repo_root: Path, tenant: str) ->
         if decision.condition is not None:
             content |= {"condition": decision.condition, "profiling": decision.profiling}
         kind = EvidenceKind.ATTESTATION
+    elif isinstance(decision, RevocationDecision):
+        subject = _scope_id(decision.subject)
+        content["subject"] = subject
+        kind = EvidenceKind.ATTESTATION
     else:
         subject = _scope_id(decision.scope)
         content |= {"control": ids.control_id(decision.control), "scope": subject}
@@ -78,6 +84,8 @@ def _evidence(decision: DecisionIn, path: Path, repo_root: Path, tenant: str) ->
         else:
             content["status"] = decision.status
             kind = EvidenceKind.ATTESTATION
+    if decision.supersedes:  # left out when empty, so a decision's hash does not change (ADR 0020)
+        content["supersedes"] = list(decision.supersedes)
     return Evidence.build(
         subject=subject,
         collector=decision.by,

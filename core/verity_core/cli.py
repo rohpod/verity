@@ -94,7 +94,11 @@ def cmd_seed(args: argparse.Namespace) -> int:
 
     repo = DynamoDBRepository(args.tenant, _utc_now)
     print("seeding the real table, expect pauses while it throttles...", file=sys.stderr)
-    report = seed(repo, loaded, _utc_now, _print_progress)
+    try:
+        report = seed(repo, loaded, _utc_now, _print_progress)
+    except ContentError as exc:
+        print(f"refused, nothing was written: {exc}", file=sys.stderr)
+        return REFUSED
     print(
         f"nodes: {report.nodes_written} written, {report.nodes_unchanged} unchanged; "
         f"edges: {report.edges_written} written, {report.edges_unchanged} unchanged"

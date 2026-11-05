@@ -79,7 +79,7 @@ def apply_assessment(
     in_scope.discard(None)
 
     # 1. applicable edges
-    edges, applicability_findings = applicable_edges(graph, rules, dates)
+    edges, applicability_findings = applicable_edges(graph, rules, dates, as_of)
     produced = {(e.src, e.dst, e.role) for e in edges}
     for edge in edges:
         if edge.dst in in_scope:

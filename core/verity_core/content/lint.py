@@ -7,7 +7,7 @@ not that the mapping is right, so the owner still reads the mappings (ADR 0017).
 
 import re
 from collections import Counter
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from urllib.parse import urlparse
 
@@ -23,6 +23,7 @@ from verity_core.model.enums import (
     Sufficiency,
     VerifiedAgainst,
 )
+from verity_core.model.evidence import Evidence
 from verity_core.model.nodes import Control, Model, Organisation, Person, Provider
 
 EU_FRAMEWORK = "euaia"
@@ -239,6 +240,8 @@ def _decisions(content: Content) -> Iterator[LintIssue]:
     estate = {n.id for n in content.estate}
     people = {n.id for n in content.estate if isinstance(n, Person)}
     controls = {c.id: c for c in content.controls if isinstance(c, Control)}
+    by_id = {ev.content["decision_id"]: ev for ev in content.decisions}
+    yield from _conflicts(content.decisions)
     for ev in content.decisions:
         subject = f"{ev.content['decision_id']}"
         if ev.collector not in people:
@@ -255,11 +258,51 @@ def _decisions(content: Content) -> Iterator[LintIssue]:
                     subject,
                     f"{control.id} is assessed at {control.scope_level} level",
                 )
+        yield from _supersession(ev, by_id)
         if ev.source is Source.SIMULATED and "simulated sign-off" not in (
             ev.content["statement"].lower()
         ):
             yield LintIssue(
                 "simulated_not_labelled", subject, "statement must say 'simulated sign-off'"
+            )
+
+
+def _supersession(ev: Evidence, by_id: dict[str, Evidence]) -> Iterator[LintIssue]:
+    """A decision may replace only an existing decision about the same node, made no later than
+    itself, and not one that replaces it back (ADR 0020)."""
+    me = ev.content["decision_id"]
+    for target_id in ev.content.get("supersedes", ()):
+        target = by_id.get(target_id)
+        if target is None:
+            yield LintIssue("decision_unknown_supersedes", me, f"{target_id!r} does not exist")
+            continue
+        problem = None
+        if target_id == me or me in target.content.get("supersedes", ()):
+            problem = "decisions cannot replace each other"
+        elif target.subject != ev.subject:
+            problem = f"{target_id!r} is about {target.subject!r}, not {ev.subject!r}"
+        elif ev.collected_at < target.collected_at:
+            problem = f"{target_id!r} was decided later"
+        if problem:
+            yield LintIssue("decision_supersedes_mismatch", me, problem)
+
+
+def _conflicts(decisions: Sequence[Evidence]) -> Iterator[LintIssue]:
+    """Two decisions in force with the same kind, subject, control and day would tie, and the
+    Evidence ID would pick the winner. A revocation competes with nothing."""
+    named = {t for ev in decisions for t in ev.content.get("supersedes", ())}
+    groups: dict[tuple, list[str]] = {}
+    for ev in decisions:
+        kind = ev.content["decision_kind"]
+        if kind == "revocation" or ev.content["decision_id"] in named:
+            continue
+        key = (kind, ev.subject, ev.content.get("control"), ev.collected_at)
+        groups.setdefault(key, []).append(ev.content["decision_id"])
+    for found in groups.values():
+        if len(found) > 1:
+            ids_ = ", ".join(sorted(found))
+            yield LintIssue(
+                "decision_conflict", ids_, "decided on the same day: one must supersede the other"
             )
 
 

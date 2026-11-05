@@ -18,6 +18,7 @@ CONTENT = load_content(REAL)
 TENANT = "kestrel"
 ORG = "org:kestrel"
 COMMON = {"tenant": TENANT, "source": Source.SYNTHETIC}
+AS_OF = datetime(2026, 11, 10, tzinfo=UTC)
 
 PROVIDER_REQS = [
     "art9",
@@ -49,27 +50,53 @@ def system(slug: str, **facts) -> AISystem:
     )
 
 
-def decision(system_id: str, tier: str, decided_on: date, name: str = "d") -> Evidence:
+def decision(
+    system_id: str, tier: str, decided_on: date, name: str = "d", supersedes=()
+) -> Evidence:
     """A `risk_tier` decision as `content/decisions.py` builds it."""
+    extra = {"supersedes": list(supersedes)} if supersedes else {}
     return Evidence.build(
         subject=system_id,
         collector="person:l-ivanova",
         collected_at=datetime(decided_on.year, decided_on.month, decided_on.day, tzinfo=UTC),
         valid_until=datetime(2030, 1, 1, tzinfo=UTC),
         kind=EvidenceKind.ATTESTATION,
-        content={"decision_id": name, "decision_kind": "risk_tier", "tier": tier},
+        content={"decision_id": name, "decision_kind": "risk_tier", "tier": tier, **extra},
         **COMMON,
     )
 
 
-def run(*systems: AISystem, decisions: tuple[Evidence, ...] = (), organisation=True):
+def revocation(system_id: str, decided_on: date, supersedes, name: str = "r") -> Evidence:
+    """A `revocation` decision as `content/decisions.py` builds it."""
+    return Evidence.build(
+        subject=system_id,
+        collector="person:l-ivanova",
+        collected_at=datetime(decided_on.year, decided_on.month, decided_on.day, tzinfo=UTC),
+        valid_until=datetime(2030, 1, 1, tzinfo=UTC),
+        kind=EvidenceKind.ATTESTATION,
+        content={
+            "decision_id": name,
+            "decision_kind": "revocation",
+            "subject": system_id,
+            "supersedes": list(supersedes),
+        },
+        **COMMON,
+    )
+
+
+def run(
+    *systems: AISystem,
+    decisions: tuple[Evidence, ...] = (),
+    organisation=True,
+    as_of: datetime = AS_OF,
+):
     nodes = [*CONTENT.frameworks, *CONTENT.requirements, *systems, *decisions]
     if organisation:
         nodes.append(Organisation(id=ORG, name="Kestrel Cloud Ltd", **COMMON))
     edges = [e for e in CONTENT.edges if e.type is EdgeType.PART_OF]
     edges += [PlainEdge(src=d.id, dst=d.subject, type=EdgeType.ABOUT, **COMMON) for d in decisions]
     graph = build_graph(nodes, edges)
-    return applicable_edges(graph, CONTENT.rules, CONTENT.dates)
+    return applicable_edges(graph, CONTENT.rules, CONTENT.dates, as_of)
 
 
 def edges_to(edges, target: str) -> dict[tuple[str, Role], object]:
