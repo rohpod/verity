@@ -26,6 +26,8 @@ AWS_READ_ONLY_COMMANDS = {
 AWS_ALWAYS_ASK_SERVICES = {"login", "sso", "configure"}  # configure set/import changes local config
 AWS_CHARGED_PER_CALL_SERVICES = {"ce"}  # Cost Explorer: $0.01 a request, even for reads
 LIVE_TEST_SWITCH = "VERITY_LIVE_AWS="  # live tests write through boto3, not the aws command
+SEED_COMMANDS = {"verity", "verity_core.cli"}  # the script, or `python -m verity_core.cli`
+SEED_TARGET_AWS = "dynamodb"  # `verity seed --target dynamodb` writes to the real table
 SEPARATORS = {"&&", "||", ";", "|", "&", "\n"}
 
 
@@ -111,6 +113,22 @@ def aws_reason(args: list[str]) -> str | None:
     return f"aws {service} {verb} is not a known read-only call"
 
 
+def seed_reason(tokens: list[str]) -> str | None:
+    """`verity seed --target dynamodb`, also behind `uv run`. It writes through boto3, not the
+    aws command, so the checks above would miss it."""
+    names = [t.rsplit("/", 1)[-1] for t in tokens]
+    start = next((i for i, n in enumerate(names) if n in SEED_COMMANDS), None)
+    if start is None or "seed" not in names[start:]:
+        return None
+    rest = tokens[start:]
+    for i, tok in enumerate(rest):
+        if tok == f"--target={SEED_TARGET_AWS}" or (
+            tok == "--target" and rest[i + 1 : i + 2] == [SEED_TARGET_AWS]
+        ):
+            return "verity seed --target dynamodb writes to the real table"
+    return None
+
+
 def reason_for(command: str) -> str | None:
     try:
         parts = split_commands(command)
@@ -119,6 +137,8 @@ def reason_for(command: str) -> str | None:
     for tokens in parts:
         if any(tok.startswith(LIVE_TEST_SWITCH) for tok in tokens):
             return "VERITY_LIVE_AWS runs tests against the real AWS account"
+        if r := seed_reason(tokens):
+            return r
         tokens = strip_prefix(tokens)
         if not tokens:
             continue
