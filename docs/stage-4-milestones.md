@@ -10,7 +10,7 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/). Decisions by the owner:
 | Plan expires **4 May 2027**; $100 credits left; no Lambda functions or DynamoDB tables in eu-west-1 | Take the last live snapshot by **1 Apr 2027** |
 | Lambda account concurrency is **10**; AWS requires 100 to stay unreserved | Reserved concurrency can't be set; dropped ([ADR 0009](adr/0009-mock-openai-iam-auth.md)) |
 | `ListFunctions` returns env var values | IAM can't enforce "names only"; the crawler discards values on receipt (D1) |
-| CLI session is **root**; default region is **ap-south-1** | **Updated:** the CLI now uses IAM user `rohpod` in **eu-north-1** ([ADR 0011](adr/0011-region-eu-north-1.md)). The user has **no permissions yet**, so M3 must grant them |
+| CLI session is **root**; default region is **ap-south-1** | **Updated:** the CLI now uses IAM user `rohpod` in **eu-north-1** ([ADR 0011](adr/0011-region-eu-north-1.md)). M3 granted its permissions ([ADR 0015](adr/0015-account-baseline.md)) |
 | `python3.12` supports arm64; deprecation forecast 31 Oct 2028 | Closes the architecture §B ❓ |
 | `aws login` flow works | Closes the architecture §J ❓ |
 | `tofu` 1.13.5 installed, `terraform` not; repo is public; `gh` logged out | Use `tofu`; owner runs `! gh auth login` |
@@ -80,8 +80,7 @@ Found while building and reviewing M1. Each is open until the named milestone cl
 
 | Milestone | Note |
 |---|---|
-| M3 | The real round trip must check what moto cannot: the table class (moto ignores it), GSI delay, and transaction capacity |
-| M3 | Check how a throttled `TransactWriteItems` is reported on the real table: as `ProvisionedThroughputExceededException` (boto3 retries it) or as a cancellation with reason `ProvisionedThroughputExceeded` (the repository retries it). AWS's pages do not say which |
+| M3 | Last open criterion: the owner re-reads credits in the Billing console at least 24 hours after the last live write (2026-11-05). M3 stays 🔄 until they match. The checks moto could not do are done ([ADR 0016](adr/0016-m3-live-results.md)) |
 | M4 | A first seed of about 300 nodes and 1,000 edges needs about 5,200 write units, roughly 6 minutes at the table's 15 per second ([ADR 0014](adr/0014-m2-measurements-and-evidence-cap.md)). `verity seed` should expect throttling waits and report progress. Re-seeding writes almost nothing |
 | M6 | `load_graph` reads every `U#` usage record in the table and discards it. If usage grows large, load without a scan: list nodes through the type index and read each node's partition |
 | M6 | Estimated in M2: 150 daily crawls of 15 to 30 resources reach 19,000 to 35,000 items and a 2.5 to 4.5 minute scan, mostly from Evidence rather than `OBSERVED` ([ADR 0014](adr/0014-m2-measurements-and-evidence-cap.md)). It stays free, but decide how to limit it, for example writing evidence only on a change |
