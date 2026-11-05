@@ -41,6 +41,7 @@ verity/
                       discovery/  collectors · enrichers · signals/scoring · correlation · diff
                       rules/      applicability engine (system attributes × role × date → requirements)
                       assess/     control status, assurance level, requirement satisfaction, rollups
+                      content/    YAML schema · loader · linter · seed (M4)
                       export/     snapshot builder + redaction
                       cli.py      `verity` command
   crawler/            handler.py — thin Lambda entrypoint
@@ -185,7 +186,8 @@ Every node and edge carries `tenant`, `source` (discovered · declared · seeded
 - **Hub:** the *Verity Control Library*, about 25–35 controls (`VC-001…`) written in our own words. Each has `kind ∈ {technical, organisational, legal_documentary}`, `automatable: bool` and `scope_level`. Only technical controls may be automatable.
 - **Spokes:** each framework requirement maps to hub controls with:
   - an STRM type: `equal` · `subset_of` · `superset_of` · `intersects_with` · `no_relationship`
-  - a strength from 1 to 10 (empty for `no_relationship`)
+  - a strength from 1 to 10 (empty for `no_relationship`). This is a Verity convention taken from the Secure Controls Framework; NIST IR 8477 does not define one ([ADR 0017](adr/0017-m4-content-semantics.md))
+  - a direction: the requirement is concept A and the control is concept B, so `subset_of` means the control covers the whole requirement and more
   - a rationale type: syntactic · semantic · functional
   - a written rationale
   - a `sufficiency` flag (empty for `no_relationship`)
@@ -318,6 +320,7 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
 | [0014](adr/0014-m2-measurements-and-evidence-cap.md) | M2 results: throttling retries, measured costs, 16 KB inline evidence cap |
 | [0015](adr/0015-account-baseline.md) | Account baseline: identity outside OpenTofu, deny policy, `credential_process`, budget excludes credits |
 | [0016](adr/0016-m3-live-results.md) | M3 live results: capacity, GSI delay, how throttling is reported |
+| [0017](adr/0017-m4-content-semantics.md) | M4 content semantics: mapping direction, strength convention, `full` sufficiency, obligation dates, ISO provenance |
 
 ## L. Schema validation walkthrough
 
