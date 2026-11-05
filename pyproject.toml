@@ -19,6 +19,7 @@ verity-core = { workspace = true }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["tests"]
 
 [tool.ruff]
 line-length = 100

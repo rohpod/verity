@@ -106,3 +106,19 @@ def test_assessor_must_be_a_person_id():
 
 def test_assurance_levels_are_ordered():
     assert AssuranceLevel.L2_EVIDENCED < AssuranceLevel.L3_TESTED < AssuranceLevel.L4_VERIFIED
+
+
+def test_no_model_shadows_an_envelope_field():
+    # Requirement once declared `version: str`, silently replacing the revision counter.
+    from verity_core.model.base import Envelope
+    from verity_core.model.edges import AppliesToEdge, MapsToEdge, PlainEdge, ProcessesEdge
+
+    classes = {type(n) for n in NODES.values()} | {
+        MapsToEdge,
+        AppliesToEdge,
+        ProcessesEdge,
+        PlainEdge,
+    }
+    for cls in classes:
+        for name, field in Envelope.model_fields.items():
+            assert cls.model_fields[name].annotation == field.annotation, (cls.__name__, name)

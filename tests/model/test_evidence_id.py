@@ -58,3 +58,13 @@ def test_field_boundaries_are_unambiguous():
 def test_naive_timestamps_are_rejected():
     with pytest.raises(ValueError, match="timezone-aware"):
         evidence_id(SUBJECT, COLLECTOR, datetime(2026, 11, 5), content_sha256({}))
+
+
+def test_content_hash_ignores_stamped_fields_only():
+    from factories import evidence
+    from verity_core.model.hashing import content_hash
+
+    e = evidence()
+    stamped = e.model_copy(update={"version": 3, "created_at": T0, "updated_at": T0})
+    assert content_hash(stamped) == content_hash(e)
+    assert content_hash(e.model_copy(update={"confidence": 0.5})) != content_hash(e)

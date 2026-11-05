@@ -146,3 +146,17 @@ def test_closed_intervals():
 def test_valid_to_cannot_precede_valid_from():
     with pytest.raises(ValidationError, match="valid_to"):
         make_edge(EdgeType.OWNS, A, B, valid_from=T1, valid_to=T0)
+
+
+def test_is_active_uses_half_open_intervals():
+    edge = make_edge(
+        EdgeType.OWNS, A, B, valid_from=T0, valid_to=T1, closed_intervals=((T0 - (T1 - T0), T0),)
+    )
+    assert not edge.is_active()  # closed, so not currently open
+    assert edge.is_active(T0) and not edge.is_active(T1)
+    assert edge.is_active(T0 - (T1 - T0))  # the start of an earlier interval
+    assert not edge.is_active(T0 - 2 * (T1 - T0))
+    assert make_edge(EdgeType.OWNS, A, B, valid_from=T0).is_active()
+    assert make_edge(EdgeType.OWNS, A, B, valid_from=T0).is_active(T1)
+    with pytest.raises(ValueError, match="timezone-aware"):
+        edge.is_active(datetime(2026, 11, 5))

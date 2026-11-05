@@ -142,14 +142,16 @@ class Requirement(NodeBase):
     ref: NonEmpty
     summary: NonEmpty
     source_url: NonEmpty
-    version: NonEmpty  # for example "2024/1689 as amended by 2026/1744"
+    # The legal text's version, for example "2024/1689 as amended by 2026/1744". Not `version`,
+    # which is the record revision counter on every node.
+    source_version: NonEmpty
     last_verified: date
 
 
 class Framework(NodeBase):
     type: Literal[NodeType.FRAMEWORK] = NodeType.FRAMEWORK
     name: NonEmpty
-    version: NonEmpty
+    source_version: NonEmpty
     source_url: NonEmpty
     last_verified: date
 
