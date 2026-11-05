@@ -246,7 +246,7 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
 | Node | `T#{tenant}#N#{id}` | `META` |
 | Outgoing edge | `T#{tenant}#N#{src}` | `E#{type}#{dst}[#{qualifier}]` |
 | Reverse edge (mirror) | `T#{tenant}#N#{dst}` | `R#{type}#{src}[#{qualifier}]` |
-| Node history | `T#{tenant}#N#{id}` | `H#{iso_ts}#{version}` |
+| Node history | `T#{tenant}#N#{id}` | `H#{iso_ts}#{version}` (version zero-padded to 10 digits, so keys sort numerically) |
 | Usage record | `T#{tenant}#N#{system}` | `U#{iso_ts}#{usage_id}` |
 
 - The qualifier is `role` on `APPLIES_TO` and `purpose` on `PROCESSES`; other edge types have none ([ADR 0012](adr/0012-graph-schema-refinements.md)).
