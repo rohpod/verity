@@ -1,24 +1,20 @@
 """What `DynamoDBRepository` does to the table for nodes (ADR 0013). The shared contract tests
 cover behaviour; these cover items, atomicity, conflicts and the number of calls."""
 
-from collections import Counter
 from datetime import timedelta
-from types import SimpleNamespace
 
-import boto3
 import pytest
 from botocore.exceptions import ClientError
-from conftest import START, FakeClock
+from conftest import START
+from dynamo_support import SpyClient, kinds_of, put_edge, repo_for
 from factories import COMMON, TENANT, evidence, make_edge, one_of_each
-from moto import mock_aws
 from verity_core.graph.dynamodb import items, keys
 from verity_core.graph.dynamodb.repository import (
     REGION,
-    DynamoDBRepository,
     _is_conflict,
     default_client,
 )
-from verity_core.graph.dynamodb.table import TABLE_NAME, table_definition
+from verity_core.graph.dynamodb.table import TABLE_NAME
 from verity_core.graph.errors import ConcurrentWriteError, InvalidEdgeError, RepositoryError
 from verity_core.model import ids
 from verity_core.model.enums import Direction, EdgeType, ModelOrigin, NodeType
@@ -29,57 +25,6 @@ SYSTEM = NODES[NodeType.AI_SYSTEM]
 PERSON = NODES[NodeType.PERSON]
 MODEL = NODES[NodeType.MODEL]
 PROVIDER = NODES[NodeType.PROVIDER]
-
-
-class SpyClient:
-    """Wraps a client to count calls, and to run a hook just before one."""
-
-    def __init__(self, inner):
-        self._inner = inner
-        self.calls = Counter()
-        self.before = {}
-
-    def __getattr__(self, name):
-        attribute = getattr(self._inner, name)
-        if not callable(attribute):
-            return attribute
-
-        def call(*args, **kwargs):
-            self.calls[name] += 1
-            hook = self.before.pop(name, None)
-            if hook:
-                hook()
-            return attribute(*args, **kwargs)
-
-        return call
-
-
-@pytest.fixture
-def table():
-    with mock_aws():
-        client = boto3.client("dynamodb", region_name=REGION)
-        client.create_table(**table_definition())
-        yield SimpleNamespace(client=client, clock=FakeClock())
-
-
-def repo_for(table, tenant=TENANT, client=None, **kwargs):
-    return DynamoDBRepository(tenant, table.clock, client=client or table.client, **kwargs)
-
-
-def rows(table):
-    """Every (PK, SK) in the table."""
-    found, start = [], {}
-    while True:
-        page = table.client.scan(TableName=TABLE_NAME, **start)
-        found += [(i["PK"]["S"], i["SK"]["S"]) for i in page["Items"]]
-        if "LastEvaluatedKey" not in page:
-            return sorted(found)
-        start = {"ExclusiveStartKey": page["LastEvaluatedKey"]}
-
-
-def kinds_of(table, node_id):
-    pk = keys.node_pk(TENANT, node_id)
-    return sorted(keys.kind_of(sk) for p, sk in rows(table) if p == pk)
 
 
 # --- what a write puts in the table --------------------------------------------------------
@@ -418,11 +363,6 @@ def test_each_tenant_can_have_its_own_organisation(table):
 
 
 # --- reading edges (writes arrive in the next PR) ------------------------------------------
-
-
-def put_edge(table, edge):
-    for item in items.edge_items(edge):
-        table.client.put_item(TableName=TABLE_NAME, Item=item)
 
 
 def test_neighbors_read_outgoing_and_incoming_items_in_key_order(table):

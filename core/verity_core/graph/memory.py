@@ -15,6 +15,7 @@ from verity_core.graph.planning import (
     check_usage_bounds,
     edges_to_close,
     ensure_tenant,
+    neighbor_sort_key,
     plan_close_edge,
     plan_edge_write,
     plan_node_write,
@@ -27,10 +28,6 @@ from verity_core.model.enums import Direction, EdgeType, NodeType
 from verity_core.model.nodes import Node
 from verity_core.model.usage import UsageRecord
 from verity_core.model.validation import validate_edge, validate_node_change
-
-
-def _sort_key(key: EdgeKey) -> tuple[str, str, str, str]:
-    return (key.src, key.type.value, key.dst, key.qualifier or "")
 
 
 def _copy[R: BaseModel](record: R) -> R:
@@ -130,7 +127,7 @@ class InMemoryRepository:
         as_of: datetime | None = None,
     ) -> list[Edge]:
         index = self._out if direction is Direction.OUT else self._in
-        keys = sorted(index.get(node_id, ()), key=_sort_key)
+        keys = sorted(index.get(node_id, ()), key=lambda k: neighbor_sort_key(k, direction))
         edges = (self._edges[k] for k in keys)
         return [
             _copy(e)

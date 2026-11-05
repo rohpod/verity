@@ -20,23 +20,28 @@ from botocore.exceptions import ClientError
 
 from verity_core.graph.dynamodb import items, keys
 from verity_core.graph.dynamodb.table import TABLE_NAME
-from verity_core.graph.errors import ConcurrentWriteError, RepositoryError
+from verity_core.graph.errors import ConcurrentWriteError, EdgeNotFoundError, RepositoryError
 from verity_core.graph.planning import (
     WriteAction,
     edges_to_close,
     ensure_tenant,
+    plan_close_edge,
+    plan_edge_write,
     plan_node_write,
     read_clock,
+    require_aware,
 )
-from verity_core.model.edges import Edge
+from verity_core.model.edges import Edge, EdgeKey
 from verity_core.model.enums import Direction, EdgeType, NodeType
 from verity_core.model.evidence import Evidence
 from verity_core.model.nodes import Node
 from verity_core.model.usage import UsageRecord
-from verity_core.model.validation import validate_node_change
+from verity_core.model.validation import EDGE_RULES, validate_edge, validate_node_change
 
 REGION = "eu-north-1"  # the only region Verity uses (ADR 0011)
 _BATCH_GET_LIMIT = 100
+# A transaction holds 100 actions and an edge is two (`E#` and `R#`), so 50 edges at most.
+_EDGES_PER_TRANSACTION = 50
 _BATCH_GET_ATTEMPTS = 6
 _KEY = "ConsistentRead"
 
@@ -219,7 +224,7 @@ class DynamoDBRepository:
         node = self.get_node(node_id)
         return [node] if isinstance(node, Evidence) else []
 
-    # --- edges (reads only until PR 5) ---------------------------------------------------
+    # --- edges ---------------------------------------------------------------------------
 
     def neighbors(
         self,
@@ -243,13 +248,50 @@ class DynamoDBRepository:
         return self.neighbors(node.id, Direction.OUT) + self.neighbors(node.id, Direction.IN)
 
     def _close_edges_of(self, node: Node) -> None:
+        """Close every open edge of an ended node, 50 edges to a transaction. Each chunk is
+        atomic, the whole is not, but closing a closed edge changes nothing, so a failed run
+        is repeated by sending the node again (ADR 0013)."""
+        now = read_clock(self._clock)
+        pending = []
         for edge, valid_to in edges_to_close(node, self._open_edges_touching(node)):
-            self.close_edge(
-                edge.src, edge.type, edge.dst, valid_to=valid_to, qualifier=edge.qualifier
-            )
+            plan = plan_close_edge(edge, valid_to, now)
+            if plan.action is not WriteAction.NOOP:
+                pending.append((plan.edge, edge.version))
+        self._write_edges(pending)
 
     def upsert_edge(self, edge: Edge) -> Edge:
-        raise NotImplementedError("edge writes arrive in the next PR")
+        ensure_tenant(self.tenant, edge.tenant, f"{edge.type} edge")
+        forward_key = (keys.node_pk(self.tenant, edge.src), keys.edge_sk(edge.key))
+        # The two nodes and the stored edge, in one call.
+        found = self._read(
+            (keys.node_pk(self.tenant, edge.src), keys.META),
+            (keys.node_pk(self.tenant, edge.dst), keys.META),
+            forward_key,
+        )
+        src, dst, stored = (
+            found.get(k)
+            for k in (
+                (keys.node_pk(self.tenant, edge.src), keys.META),
+                (keys.node_pk(self.tenant, edge.dst), keys.META),
+                forward_key,
+            )
+        )
+        validate_edge(
+            edge,
+            items.node_from_item(src) if src else None,
+            items.node_from_item(dst) if dst else None,
+            # Only the types that limit an edge per source look at the source's other edges.
+            open_out_edges=(
+                self.neighbors(edge.src, Direction.OUT)
+                if EDGE_RULES[edge.type].max_out is not None
+                else []
+            ),
+        )
+        existing = items.edge_from_item(stored) if stored else None
+        plan = plan_edge_write(existing, edge, read_clock(self._clock))
+        if plan.action is not WriteAction.NOOP:
+            self._write_edges([(plan.edge, existing.version if existing else None)])
+        return plan.edge
 
     def close_edge(
         self,
@@ -260,7 +302,49 @@ class DynamoDBRepository:
         valid_to: datetime,
         qualifier: str | None = None,
     ) -> Edge:
-        raise NotImplementedError("edge writes arrive in the next PR")
+        require_aware(valid_to, "valid_to must be timezone-aware")
+        key = EdgeKey(src, edge_type, dst, qualifier)
+        item = self._get_item(keys.node_pk(self.tenant, src), keys.edge_sk(key))
+        if item is None:
+            raise EdgeNotFoundError(f"no {edge_type} edge from {src!r} to {dst!r} ({qualifier})")
+        existing = items.edge_from_item(item)
+        plan = plan_close_edge(existing, valid_to, read_clock(self._clock))
+        if plan.action is not WriteAction.NOOP:
+            self._write_edges([(plan.edge, existing.version)])
+        return plan.edge
+
+    def _read(self, *wanted: tuple[str, str]) -> dict[tuple[str, str], items.Item]:
+        """Several items in one call, by (PK, SK). Missing ones are simply absent."""
+        found = self._batch_get([{"PK": {"S": pk}, "SK": {"S": sk}} for pk, sk in wanted])
+        return {(i["PK"]["S"], i["SK"]["S"]): i for i in found}
+
+    def _write_edges(self, edges: list[tuple[Edge, int | None]]) -> None:
+        """Write each edge as its `E#` item and `R#` mirror in one transaction, so the forward
+        and reverse lookups cannot disagree. Each edge is checked against the version it was
+        read at (`None` means it must not exist yet). Edges go 50 to a transaction."""
+        for start in range(0, len(edges), _EDGES_PER_TRANSACTION):
+            actions = []
+            for edge, expected_version in edges[start : start + _EDGES_PER_TRANSACTION]:
+                condition = (
+                    {"ConditionExpression": "attribute_not_exists(PK)"}
+                    if expected_version is None
+                    else {
+                        "ConditionExpression": "ver = :expected",
+                        "ExpressionAttributeValues": {":expected": {"N": str(expected_version)}},
+                    }
+                )
+                actions += [
+                    {"Put": {"TableName": self._table, "Item": item, **condition}}
+                    for item in items.edge_items(edge)
+                ]
+            try:
+                self._client.transact_write_items(TransactItems=actions)
+            except ClientError as error:
+                if _is_conflict(error):
+                    raise ConcurrentWriteError(
+                        "an edge changed after it was read; read it again and retry"
+                    ) from error
+                raise
 
     # --- load and usage (later PRs) ------------------------------------------------------
 

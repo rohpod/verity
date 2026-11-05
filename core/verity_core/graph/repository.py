@@ -78,8 +78,9 @@ class GraphRepository(UsageSink, Protocol):
         *,
         as_of: datetime | None = None,
     ) -> list[Edge]:
-        """Edges leaving (`OUT`) or arriving at (`IN`) a node, ordered by edge key. By default
-        only open edges; with `as_of`, edges that existed at that time."""
+        """Edges leaving (`OUT`) or arriving at (`IN`) a node, ordered by type, then the node at
+        the other end, then the qualifier (`planning.neighbor_sort_key`). By default only open
+        edges; with `as_of`, edges that existed at that time."""
         ...
 
     def nodes_by_type(self, node_type: NodeType) -> list[Node]:
