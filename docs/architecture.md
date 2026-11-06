@@ -445,6 +445,7 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
 | [0024](adr/0024-m7-review-fixes.md) | M7 review fixes: bounded telemetry, quiet AWS logs, a usage partition, reproducible zips, input ranges, a permissions boundary in M8 |
 | [0025](adr/0025-m8-deploy-and-crawl.md) | M8 deploy: the crawler function, refused CloudTrail events prove nothing, simulator proof of the boundary, a real refused write, a fixture-shaped estate |
 | [0026](adr/0026-m8-cold-start.md) | M8 cold start: bytecode in the zips that vendor packages, 512 MB for the apps that load pydantic and for the probe |
+| [0028](adr/0028-m8-review.md) | M8 review: seed and assess time came from credential refreshes, the schedule and credit steps reworded, boundary claims matched to the evidence |
 
 ## L. Schema validation walkthrough
 

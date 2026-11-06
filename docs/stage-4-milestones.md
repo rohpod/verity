@@ -46,6 +46,7 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/). Decisions by the owner:
 | D28 | M7 review fixes: bounded telemetry, quiet AWS logs, a usage partition, reproducible zips, input ranges, a permissions boundary in M8. See [ADR 0024](adr/0024-m7-review-fixes.md) |
 | D29 | M8 deploy: the crawler function, refused CloudTrail events prove nothing, simulator proof of the boundary, a real refused write, a fixture-shaped estate. See [ADR 0025](adr/0025-m8-deploy-and-crawl.md) |
 | D30 | M8 cold start: bytecode in the zips that vendor packages, 512 MB for the apps that load pydantic and for the probe. See [ADR 0026](adr/0026-m8-cold-start.md) |
+| D31 | M8 review: seed and assess time came from credential refreshes, the schedule and credit steps reworded, boundary claims matched to the evidence. See [ADR 0028](adr/0028-m8-review.md) |
 
 ## Milestones
 
@@ -163,7 +164,7 @@ Open for M8: nothing here has run on AWS. The arm64 `pydantic_core` has never be
 
 ## M8 live results (2026-11-06)
 
-PR C ran the runbook against the real account. Full values are in [ADR 0027](adr/0027-m8-live-results.md). M8 stays ⬜ until Opus reviews it.
+PR C ran the runbook against the real account. Full values are in [ADR 0027](adr/0027-m8-live-results.md). Opus reviewed it ([ADR 0028](adr/0028-m8-review.md)). M8 stays ⬜ until the scheduled run and the credit read pass.
 
 | Criterion | Result |
 |---|---|
@@ -172,8 +173,8 @@ PR C ran the runbook against the real account. Full values are in [ADR 0027](adr
 | Unused `bedrock:InvokeModel` finding appears | Yes: VC-060 fails on `support-assistant`, 29 high |
 | CloudTrail shows no Bedrock use | 7 `List*` events by `resource-explorer-2`, no invocation |
 | Second crawl idempotent | Yes: writes only the run |
-| Destroying the estate then applying rebuilds it cleanly | Yes: same code hashes, table and budget untouched, crawl wrote only the run |
-| Credits unchanged | **Not yet read** (owner, 24 hours after the last write) |
+| Destroying the estate then applying rebuilds it cleanly | Yes: same code hashes, table and budget untouched, crawl wrote only the run. 29 high still derived from the live table, in memory ([ADR 0028](adr/0028-m8-review.md)) |
+| Credits unchanged | **Not yet read** (owner, 24 hours after the first scheduled run) |
 | Scheduled run | **Not yet checked**: the schedule is `DISABLED` after the rebuild |
 
 ## Notes for later milestones
@@ -183,7 +184,7 @@ Found while building and reviewing M1. Each is open until the named milestone cl
 | Milestone | Note |
 |---|---|
 | M3 | Last open criterion: the owner re-reads credits in the Billing console at least 24 hours after the last live write (2026-11-05). M3 stays 🔄 until they match. The checks moto could not do are done ([ADR 0016](adr/0016-m3-live-results.md)) |
-| M8 | `load_graph` reads every `U#` usage record in the table and discards it. Demo usage volume is small, so measure the scan on the real table. If usage grows large, load without a scan: list nodes through the type index and read each node's partition **Closed by [ADR 0027](adr/0027-m8-live-results.md).** |
+| M8 | `load_graph` reads every `U#` usage record in the table and discards it. Demo usage volume is small, so measure the scan on the real table. If usage grows large, load without a scan: list nodes through the type index and read each node's partition **Closed by [ADR 0028](adr/0028-m8-review.md).** |
 | M8 | Read `DiscoveryRun.summary.largest_evidence_bytes` from the first live crawl. Evidence over the 16 KB cap is summarised, never refused ([ADR 0021](adr/0021-m6-discovery.md)); decide whether the cap should rise **Closed by [ADR 0027](adr/0027-m8-live-results.md).** |
 | M8 | Build `crawler/handler.py` and the live path of `verity crawl`. The CLI refuses it until then **Closed by [ADR 0027](adr/0027-m8-live-results.md).** |
 | M8 | Grant both Function URL actions, `lambda:InvokeFunctionUrl` and `lambda:InvokeFunction`, to every caller of `mock-openai` ([ADR 0023](adr/0023-m7-demo-estate.md)) **Closed by [ADR 0027](adr/0027-m8-live-results.md).** |
@@ -201,13 +202,16 @@ Found while building and reviewing M1. Each is open until the named milestone cl
 | M8 | Tag the mocks and the crawler `verity:component`, or `mock-openai` becomes a shadow-AI candidate **Closed by [ADR 0027](adr/0027-m8-live-results.md).** |
 | M8 | Publish the manifests to SSM under `/verity/manifests/` **Closed by [ADR 0027](adr/0027-m8-live-results.md).** |
 | After M8 | Decide whether to add Bedrock's 8 other `Invoke*` actions, such as `InvokeDataAutomation`, to `ai_signals.yaml` ([ADR 0025](adr/0025-m8-deploy-and-crawl.md)) |
+| After M8 | Make `trail_shows_ai` check the event's name as `_proves` does, so a `List*` call from a function's role is not `confirmed_usage` ([ADR 0028](adr/0028-m8-review.md)) |
+| After M8 | Stop `credential_process` running on every call for the operator's commands, and correct the CLI's "while it throttles" message ([ADR 0028](adr/0028-m8-review.md)) |
+| M10 | Word the boundary note as what IAM's simulator shows, with no live call tried. Never say the grant "is ineffective" as a fact ([ADR 0028](adr/0028-m8-review.md)) |
 | M8 | Confirm the real crawler's function name matches `platform_functions`, and that the demo role grants `bedrock:InvokeModel` **Closed by [ADR 0027](adr/0027-m8-live-results.md).** |
-| M8 | `verity seed` now reads every Evidence node to check decisions ([ADR 0020](adr/0020-m5-review-fixes.md)). Measure how long that takes once M6 evidence is in the table |
-| M8 | Re-seeding removes nothing, so a mapping deleted from YAML stays open in the graph. Decide on pruning before the first live re-seed |
+| Before a re-seed | `verity seed` now reads every Evidence node to check decisions ([ADR 0020](adr/0020-m5-review-fixes.md)). Measure how long that takes once M6 evidence is in the table |
+| Before a re-seed | Re-seeding removes nothing, so a mapping deleted from YAML stays open in the graph. Decide on pruning before the first live re-seed |
 | M8 | The first `verity assess --target dynamodb` on the real content writes 1,368 records (65 `APPLIES_TO` edges, 433 ControlAssessments, 870 assessment edges): about 5,900 write units, roughly 6.6 minutes at 15 table units a second, and a second run writes 0. Measured on the in-memory copy that `estimate_apply` uses. It is not yet run on the real table. Decisions that change only add or close a few records **Closed by [ADR 0027](adr/0027-m8-live-results.md).** |
 | M9 | Replace the `acct_` account digests with ordinals on export. A digest is not anonymous ([ADR 0022](adr/0022-m6-review-fixes.md)) |
 | M9 | A decision's commit SHA is looked up at export, not at seed, because a SHA inside hashed content would make a new Evidence node on every commit ([ADR 0019](adr/0019-m5-rules-and-assessment.md), D10). Build the lookup from the decision's file path and `file_sha256` |
-| M8 | Edge writes do not re-check the nodes they connect, which is safe with one writer at a time ([ADR 0014](adr/0014-m2-measurements-and-evidence-cap.md)). Do not run a seed and a crawl together |
+| Standing | Edge writes do not re-check the nodes they connect, which is safe with one writer at a time ([ADR 0014](adr/0014-m2-measurements-and-evidence-cap.md)). Do not run a seed and a crawl together |
 | M11 | Risk treatment decisions, named in [ADR 0008](adr/0008-governance-as-code.md), are deferred because nothing reads them ([ADR 0019](adr/0019-m5-rules-and-assessment.md)). Build them or drop them from ADR 0008 |
 | M11 | Three obligation dates are read by no rule, because nothing in the content or the estate falls under them: `euaia-omnibus-in-force`, `euaia-art5-new` and `euaia-high-risk-annex-i`. Revisit if a system or requirement needs one |
 | M11 | Art. 10(5) moved to the new Art. 4a, which allows special-category data for bias testing under strict conditions. The bias-test control does not cover it, because Kestrel records no special-category processing ([ADR 0019](adr/0019-m5-rules-and-assessment.md)). Revisit if that changes |
