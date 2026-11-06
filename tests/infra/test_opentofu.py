@@ -4,13 +4,22 @@ a change that would cost money fails before anyone can apply it (CLAUDE.md, ADR 
 import re
 from pathlib import Path
 
-import hcl2
 import pytest
+from hcl_support import resources
 from verity_core.graph.dynamodb.table import FREE_ALLOWANCE_UNITS, table_definition
 
 INFRA = Path(__file__).parents[2] / "infra"
 # M8 adds to this, with verified prices. Anything else needs its own approval first.
-APPROVED_RESOURCES = {"aws_budgets_budget", "aws_dynamodb_table"}
+APPROVED_RESOURCES = {
+    "aws_budgets_budget",
+    "aws_dynamodb_table",
+    # M8, ADR 0025. IAM has no charge. Log groups stay inside the 5 GB Always Free allowance
+    # with 3-day retention.
+    "aws_cloudwatch_log_group",
+    "aws_iam_policy",
+    "aws_iam_role",
+    "aws_iam_role_policy",
+}
 PAID_TABLE_SETTINGS = {
     "point_in_time_recovery",
     "replica",
@@ -18,33 +27,6 @@ PAID_TABLE_SETTINGS = {
     "ttl",
     "global_table_witness",
 }
-
-
-def clean(value):
-    """python-hcl2 keeps the quotes of string literals in some versions."""
-    if isinstance(value, str):
-        return value.strip('"')
-    if isinstance(value, dict):
-        return {clean(k): clean(v) for k, v in value.items()}
-    if isinstance(value, list):
-        return [clean(v) for v in value]
-    return value
-
-
-def parse(path: Path) -> dict:
-    with path.open() as file:
-        return clean(hcl2.load(file))
-
-
-def resources() -> dict[str, dict]:
-    found = {}
-    for path in sorted(INFRA.rglob("*.tf")):
-        if ".terraform" in path.parts:
-            continue
-        for block in parse(path).get("resource", []):
-            for kind, named in block.items():
-                found.setdefault(kind, {}).update(named)
-    return found
 
 
 def only(kind: str) -> dict:
