@@ -29,6 +29,8 @@ LIVE_TEST_SWITCH = "VERITY_LIVE_AWS="  # live tests write through boto3, not the
 SEED_COMMANDS = {"verity", "verity_core.cli"}  # the script, or `python -m verity_core.cli`
 WRITING_COMMANDS = {"seed", "assess"}  # with `--target dynamodb` they write to the real table
 SEED_TARGET_AWS = "dynamodb"
+LIVE_CRAWL = "crawl"  # without `--local` it invokes the deployed crawler (ADR 0025)
+CRAWL_SAFE_FLAGS = {"--local", "--help", "-h"}
 SEPARATORS = {"&&", "||", ";", "|", "&", "\n"}
 
 
@@ -115,16 +117,19 @@ def aws_reason(args: list[str]) -> str | None:
 
 
 def seed_reason(tokens: list[str]) -> str | None:
-    """`verity seed|assess --target dynamodb`, also behind `uv run`. They write through boto3,
-    not the aws command, so the checks above would miss them."""
+    """`verity seed|assess --target dynamodb` and `verity crawl` without `--local`, also behind
+    `uv run`. They reach AWS through boto3, not the aws command, so the checks above would miss
+    them."""
     names = [t.rsplit("/", 1)[-1] for t in tokens]
     start = next((i for i, n in enumerate(names) if n in SEED_COMMANDS), None)
     if start is None:
         return None
+    rest = tokens[start:]
+    if LIVE_CRAWL in names[start:] and not CRAWL_SAFE_FLAGS & set(rest):
+        return "verity crawl without --local runs the deployed crawler on the real account"
     command = next((n for n in names[start:] if n in WRITING_COMMANDS), None)
     if command is None:
         return None
-    rest = tokens[start:]
     for i, tok in enumerate(rest):
         if tok == f"--target={SEED_TARGET_AWS}" or (
             tok == "--target" and rest[i + 1 : i + 2] == [SEED_TARGET_AWS]

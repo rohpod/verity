@@ -10,8 +10,12 @@ code download (architecture section D):
     dynamodb:ListTables  ssm:GetParametersByPath  cloudtrail:LookupEvents
 
 Every item is cleaned inside the page loop, so a raw function never leaves it.
+
+`invoke_crawler` is the one call the operator's machine makes: it runs the deployed
+`verity-crawler` (ADR 0025, decision 2), whose role makes the calls above.
 """
 
+import json
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -34,6 +38,8 @@ from verity_core.discovery.boundary import (
 from verity_core.discovery.collectors import REGION, Collected
 from verity_core.model.enums import Source
 
+CRAWLER_FUNCTION = "verity-crawler"
+CRAWLER_TIMEOUT_SECONDS = 300  # the function's own limit; the client waits a little longer
 MANIFEST_PATH = "/verity/manifests"
 SERVICE_ROLE_PATH = "/aws-service-role/"  # roles AWS owns: not part of the estate
 QUIET_LOGGERS = ("botocore", "boto3", "urllib3")
@@ -181,3 +187,29 @@ class AwsCollector:
             ):
                 events.extend(clean_trail_event(raw) for raw in page["Events"])
         return tuple(events)
+
+
+class CrawlerFailed(RuntimeError):
+    """The deployed crawler ran and failed. It carries no payload: an error body can name
+    resources, so only the fact is kept."""
+
+
+def invoke_crawler(client: Any = None, *, region: str = REGION) -> dict[str, Any]:
+    """Runs the deployed crawler once and returns its summary (counts only). One attempt and a
+    read timeout above the function's 300 s: a retry would start a second writer, and ADR 0014
+    allows one at a time."""
+    if client is None:
+        import boto3
+        from botocore.config import Config
+
+        config = Config(
+            retries={"mode": "standard", "total_max_attempts": 1},
+            read_timeout=CRAWLER_TIMEOUT_SECONDS + 30,
+            connect_timeout=10,
+        )
+        client = boto3.client("lambda", region_name=region, config=config)
+    response = client.invoke(FunctionName=CRAWLER_FUNCTION, InvocationType="RequestResponse")
+    payload = response["Payload"].read()
+    if response.get("FunctionError"):
+        raise CrawlerFailed("the crawler function returned an error")
+    return json.loads(payload)

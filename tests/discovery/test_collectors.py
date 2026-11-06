@@ -193,11 +193,22 @@ def test_a_raw_function_that_fails_validation_leaks_nothing(capsys, caplog):
 
 
 def test_discovery_never_names_an_operation_that_reads_code_or_runs_it():
+    """Only `invoke_crawler` may invoke, and only the crawler (ADR 0025, decision 2). The
+    collector, which runs with the crawler's own role, never does."""
     forbidden = {"get_function", "get_function_configuration", "invoke", "Invoke"}
     package = Path(__file__).parents[2] / "core" / "verity_core" / "discovery"
     found = []
     for path in package.glob("*.py"):
-        for node in ast.walk(ast.parse(path.read_text())):
+        tree = ast.parse(path.read_text())
+        allowed = {
+            id(inner)
+            for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef) and node.name == "invoke_crawler"
+            for inner in ast.walk(node)
+        }
+        for node in ast.walk(tree):
+            if id(node) in allowed:
+                continue
             names = []
             if isinstance(node, ast.Attribute):
                 names.append(node.attr)

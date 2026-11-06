@@ -59,6 +59,12 @@ class Content:
         return [*self.frameworks, *self.requirements, *self.controls, *self.estate, *self.decisions]
 
 
+def load_signals(path: Path | str) -> AiSignalsFile:
+    """The crawler's AI signals alone, so a deployed crawler needs no other content (ADR 0025).
+    `load_content` reads this file through here."""
+    return parse(Path(path), AiSignalsFile)
+
+
 def load_content(root: Path | str, *, tenant: str = DEFAULT_TENANT) -> Content:
     root = Path(root)
     common: dict[str, Any] = {"tenant": tenant, "source": Source.SEEDED}
@@ -193,7 +199,7 @@ def load_content(root: Path | str, *, tenant: str = DEFAULT_TENANT) -> Content:
             raise ContentError(rules_path, f"rule {repeated!r} is defined twice")
 
     signals_path = root / "rules" / "ai_signals.yaml"
-    signals = parse(signals_path, AiSignalsFile) if signals_path.exists() else None
+    signals = load_signals(signals_path) if signals_path.exists() else None
 
     estate, estate_edges = load_estate(root, tenant, control_ids)
     decisions, decision_edges = load_decisions(root, tenant)
