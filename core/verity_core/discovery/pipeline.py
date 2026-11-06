@@ -12,6 +12,7 @@ from typing import Any
 
 import networkx as nx
 
+from verity_core.assess.freshness import stale_evidence_ids
 from verity_core.content.loader import Content
 from verity_core.content.schema import AiSignalsFile
 from verity_core.discovery import CRAWLER_VERSION
@@ -262,6 +263,9 @@ def build_plan(
         "candidates": len(specs),
         "evidence_written": len(plan.evidence),
         "manifests_invalid": collected.manifests_invalid,
+        "manifest_functions_missing": len(
+            {n for m in collected.manifests for n in m.functions} - {f.name for f in functions}
+        ),
         "trail_events": len(collected.trail_events),
         "largest_evidence_bytes": largest,
     }
@@ -373,6 +377,7 @@ def _plan_evidence(
     valid_until = started + timedelta(days=rules.evidence_valid_days)
     common = {"tenant": plan.run.tenant, "source": plan.run.source}
     latest = _latest_crawler_evidence(graph)
+    stale = stale_evidence_ids(graph, started)  # a crash after a ChangeEvent must be repaired
     roles = {r.name: r for r in collected.roles}
     largest = 0
 
@@ -403,6 +408,7 @@ def _plan_evidence(
             or last is None
             or (last.content or {}).get("config_hash") != hashes[rid]
             or expiring(last, started, refresh)
+            or last.id in stale
         ):
             add(rid, EvidenceKind.CONFIG_SNAPSHOT, content, [rid])
 
@@ -434,6 +440,7 @@ def _plan_evidence(
             last is None
             or last.sha256 != content_sha256(content)
             or expiring(last, started, refresh)
+            or last.id in stale
             or sources & set(fresh)
             or {e.dst for e in out_edges(graph, last.id, EdgeType.COLLECTED_FROM)} != sources
         ):

@@ -158,3 +158,14 @@ def test_camel_case_tokens():
     assert tokens("OpenAiProxy") == tokens("OpenAIProxy") == ["open", "ai", "proxy"]
     assert tokens("ContractSummariserFn") == ["contract", "summariser", "fn"]
     assert tokens("gpt4-worker") == ["gpt4", "worker"]
+
+
+def test_the_platform_tag_alone_does_not_hide_a_function():
+    shadow = make_function("shadow-summariser", env=["OPENAI_BASE_URL"])
+    result = scored(shadow, {"verity:component": "mock"})
+    assert result.likelihood is L.PROBABLE and "platform_component" not in result.signals
+
+
+def test_a_listed_name_without_the_tag_is_scored_normally():
+    result = scored(make_function("mock-openai", env=["OPENAI_BASE_URL"]))
+    assert result.likelihood is L.PROBABLE

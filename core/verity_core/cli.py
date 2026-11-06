@@ -247,6 +247,9 @@ def _print_crawl(report: CrawlReport, fixture: Path, *, verbose: bool) -> None:
         print(f"{len(report.changes)} change(s): {', '.join(report.changes)}")
     if report.manifests_invalid:
         print(f"{report.manifests_invalid} manifest(s) were invalid and were skipped")
+    missing = report.summary.get("manifest_functions_missing", 0)
+    if missing:
+        print(f"{missing} function(s) listed in a manifest were not found")
     written = ", ".join(f"{n} {kind}" for kind, n in sorted(report.written.items())) or "nothing"
     print(f"crawl wrote: {written}")
     if verbose:

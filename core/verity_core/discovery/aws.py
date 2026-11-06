@@ -12,6 +12,7 @@ code download (architecture section D):
 Every item is cleaned inside the page loop, so a raw function never leaves it.
 """
 
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -35,6 +36,7 @@ from verity_core.model.enums import Source
 
 MANIFEST_PATH = "/verity/manifests"
 SERVICE_ROLE_PATH = "/aws-service-role/"  # roles AWS owns: not part of the estate
+QUIET_LOGGERS = ("botocore", "boto3", "urllib3")
 TAGGED_TYPES = ["lambda:function", "dynamodb:table"]
 
 
@@ -85,6 +87,9 @@ class AwsCollector:
         self._region = region
 
     def collect(self) -> Collected:
+        # botocore logs whole responses at DEBUG, and ListFunctions holds env var values (D1).
+        for library in QUIET_LOGGERS:
+            logging.getLogger(library).setLevel(logging.WARNING)
         manifests = self._manifests()
         roles = self._roles()  # before the tables: their ARNs take the account from a role
         return Collected(

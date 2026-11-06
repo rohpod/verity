@@ -53,8 +53,9 @@ def score(
 ) -> Score:
     """The last four arguments are facts found elsewhere: a manifest lists the function, its
     role grants an AI action, its system has usage records, CloudTrail shows its role calling AI.
-    A function tagged as a platform component scores none whatever else fires."""
-    if rules.platform_tag in tags:
+    A platform component, which has the platform tag and a name in `platform_functions`, scores
+    none whatever else fires. The tag alone does nothing (ADR 0022)."""
+    if rules.platform_tag in tags and function.name in rules.platform_functions:
         return Score(AiLikelihood.NONE, (PLATFORM_COMPONENT,))
 
     fired: dict[str, AiLikelihood] = {}

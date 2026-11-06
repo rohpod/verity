@@ -9,6 +9,9 @@ evidence_refresh_days: 8 # write it again when this many days or fewer are left
 trail_lookback_days: 90 # CloudTrail event history keeps 90 days
 trail_event_sources: [bedrock.amazonaws.com]
 platform_tag: "verity:component" # the mocks and the crawler itself: never AI candidates
+# The tag alone does nothing: a function is exempt only if it also has one of these names, so
+# tagging a shadow function cannot hide it (ADR 0022).
+platform_functions: [mock-bedrock, mock-openai, verity-crawler]
 
 # The IAM actions that invoke a model, by their real names (ADR 0022). A policy grants one if an
 # `Allow` statement's `Action` pattern matches it, or a `NotAction` statement's patterns do not.

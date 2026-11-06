@@ -205,6 +205,7 @@ class AiSignalsFile(_Strict):
     trail_lookback_days: int = Field(gt=0)
     trail_event_sources: list[NonEmpty]
     platform_tag: NonEmpty
+    platform_functions: list[NonEmpty]
     ai_actions: list[AiAction]
     signals: list[SignalRule]
 

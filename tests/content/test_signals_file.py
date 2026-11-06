@@ -18,6 +18,7 @@ def signals(**changes) -> dict:
         "trail_lookback_days": 90,
         "trail_event_sources": ["bedrock.amazonaws.com"],
         "platform_tag": "verity:component",
+        "platform_functions": ["mock-openai"],
         "ai_actions": [{"action": "bedrock:InvokeModel", "trail_events": ["Converse"]}],
         "signals": [
             {"id": "tag_system_id", "kind": "tag", "key": "ai:system-id", "likelihood": "declared"},
