@@ -52,5 +52,6 @@ override.tf.json
 
 # The dashboard's recorded fixture and test output. A fixture must never be committed or published.
 web/.fixture/
+web/.prod/
 web/test-results/
 web/playwright-report/

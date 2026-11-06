@@ -262,3 +262,23 @@ describe("No single compliance score (decision 6)", () => {
     expect(screen.getByRole("table", { name: "Findings by code" })).toHaveTextContent("no evidence");
   });
 });
+
+describe("Boundary note in the Controls detail", () => {
+  it("shows the note, unchanged, on the VC-060 result for support-assistant", () => {
+    renderRoute(fixture(), "/controls?focus=ctl:VC-060");
+    expect(screen.getAllByText(BOUNDARY_NOTE)).toHaveLength(1);
+    expect(text()).not.toMatch(/ineffective/i);
+  });
+
+  it("does not show it on other VC-060 results or other controls", () => {
+    renderRoute(fixture(), "/controls?focus=ctl:VC-001");
+    expect(screen.queryByText(BOUNDARY_NOTE)).toBeNull();
+  });
+
+  it("puts it in the row of support-assistant, not another system's", () => {
+    renderRoute(fixture(), "/controls?focus=ctl:VC-060");
+    const row = screen.getByText(BOUNDARY_NOTE).closest("tr") as HTMLElement;
+    expect(row).toHaveTextContent("Support Assistant");
+    expect(row).toHaveTextContent("not implemented");
+  });
+});

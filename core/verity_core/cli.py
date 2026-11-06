@@ -383,6 +383,7 @@ def cmd_export(args: argparse.Namespace) -> int:
         return loaded
     data_source: Literal["live", "fixture"] = "fixture" if args.local else "live"
     commits = None
+    aws_errors: tuple[type[Exception], ...] = ()  # set on the live path; empty catches nothing
     try:
         if args.local:
             from verity_core.export.local import local_graph
@@ -392,7 +393,10 @@ def cmd_export(args: argparse.Namespace) -> int:
             graph = local_graph(loaded, fixture, as_of)
         else:
             # Imported here so a local export needs no AWS libraries.
+            from verity_core.graph.dynamodb.client import AWS_ERRORS
             from verity_core.graph.dynamodb.repository import DynamoDBRepository
+
+            aws_errors = AWS_ERRORS
 
             # Now, not the start of the day: the stored assessments are stamped during the day,
             # and an earlier `as_of` would make the stale check refuse a good graph (ADR 0030).
@@ -414,7 +418,9 @@ def cmd_export(args: argparse.Namespace) -> int:
     except CommitLookupError as exc:  # names decisions and counts, never a record
         print(f"refused: {exc}", file=sys.stderr)
         return REFUSED
-    except (OSError, ValueError, BoundaryError) as exc:  # no raw record is ever in these
+    except (OSError, ValueError, BoundaryError, *aws_errors) as exc:
+        # Only the type is shown: no raw record is in these, and an AWS error message can quote
+        # an ARN, an account ID or a request ID.
         print(f"cannot build the snapshot: {type(exc).__name__}", file=sys.stderr)
         return UNREADABLE
     try:

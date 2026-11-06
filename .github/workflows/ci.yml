@@ -45,6 +45,8 @@ jobs:
       - run: npx playwright install --with-deps chromium
         working-directory: web
       - run: npm run e2e --prefix web
+      - name: The production build, under a /verity/ subpath
+        run: npm run e2e:prod --prefix web
       - name: A committed snapshot passes the scan and is the live one
         run: |
           shopt -s nullglob

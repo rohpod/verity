@@ -84,10 +84,10 @@ Built in one PR ([ADR 0031](adr/0031-m10-dashboard.md)): the six screens, the Sy
 
 | Criterion | State |
 |---|---|
-| Typecheck and build pass | Passed locally and in CI |
-| `snapshot.json` is the only data source | Passed: a test fails on any other `fetch` or snapshot import, and the page's Content-Security-Policy allows only its own origin |
-| Every view shows provenance and the timestamp | Passed on the fixture and the mini snapshot |
-| Works at phone width | Passed: Playwright at 390 px and at desktop width |
+| Typecheck and build pass | Passed. **Gap found in review:** `vite build` copied `web/public/` into `dist/`, so `check:dist` would have failed in CI and in the Pages workflow once a snapshot was committed. Fixed with `build.copyPublicDir: false`, and a test that builds with a sample file in `web/public/data/` and fails without the fix |
+| `snapshot.json` is the only data source | Passed: a test fails on any other `fetch` or snapshot import, and the page's Content-Security-Policy allows only its own origin. A Playwright run against the production build under `/verity/` fails on any console error, CSP violation or off-origin request |
+| Every view shows provenance and the timestamp | **Gap found in review, now fixed:** the timestamp was on every route, but the Graph explorer's lists (neighbourhood, Impact, Stale) showed no provenance badge, so synthetic records there were unlabelled, and `routes.test.tsx` exempted `/graph` from the badge check. They now show a badge for each record, at phone width too, and only `/about` (which shows no records) is exempt. The boundary note for VC-060 on `support-assistant` was also missing from the Controls detail and is now shown there. Checked on the fixture and the mini snapshot only |
+| Works at phone width | Passed: Playwright at 390 px and at desktop width, on the dev server and on the production build |
 | Pages URL works | **Open:** the workflow skips while `web/public/data/snapshot.json` is missing. The deploy path is untested until the reviewed live snapshot PR (M9) merges |
 
 **To close:** after the M9 snapshot PR merges, open the Pages URL at desktop and phone width, check every route and the live timestamp, and confirm no fixture banner shows. Then mark M10 ✅.

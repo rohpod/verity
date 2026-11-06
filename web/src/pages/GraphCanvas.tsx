@@ -1,10 +1,11 @@
 import cytoscape from "cytoscape";
 import fcose from "cytoscape-fcose";
 import { useEffect, useRef } from "react";
+import type { Source } from "@/data/types";
 
 cytoscape.use(fcose as unknown as cytoscape.Ext);
 
-export interface GraphNode { id: string; label: string; type: string }
+export interface GraphNode { id: string; label: string; type: string; source?: Source }
 export interface GraphEdge { id: string; source: string; target: string; label: string }
 
 const COLOURS: Record<string, string> = {

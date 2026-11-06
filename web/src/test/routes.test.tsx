@@ -15,7 +15,8 @@ describe.each([
     expect(screen.getByTestId("snapshot-time")).toHaveTextContent("Snapshot as of 2026-11-06");
     // The mini snapshot has no risk or crosswalk rows, so those pages show an empty state.
     const empty = load === mini && (route === "/risks" || route === "/crosswalk");
-    if (route !== "/about" && route !== "/graph" && !empty) {
+    // `/about` shows no records, so it is the only route without a badge.
+    if (route !== "/about" && !empty) {
       expect(screen.getAllByTestId("provenance-badge").length).toBeGreaterThan(0);
     }
     const panel = screen.getByTestId("simulated-panel");

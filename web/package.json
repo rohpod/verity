@@ -13,7 +13,9 @@
     "lint": "eslint .",
     "test": "vitest run",
     "e2e": "playwright test",
-    "check:dist": "node scripts/check-dist.mjs dist"
+    "check:dist": "node scripts/check-dist.mjs dist",
+    "smoke:build": "vite build --outDir .prod/verity --emptyOutDir && node scripts/stage-smoke.mjs",
+    "e2e:prod": "npm run smoke:build && playwright test -c playwright.prod.config.ts"
   },
   "dependencies": {
     "@radix-ui/react-slot": "1.5.0",

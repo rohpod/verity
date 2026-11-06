@@ -48,3 +48,8 @@ export const ASSURANCE_LEVELS = [
   { level: 3, name: "L3 Tested", meaning: "An automated test ran." },
   { level: 4, name: "L4 Verified", meaning: "A person verified it. Organisational and legal controls need this." },
 ] as const;
+
+/** The one result the boundary note belongs to: VC-060 failing on support-assistant (ADR 0028). */
+export function showsBoundaryNote(controlId: string, scopeId: string, status: string | undefined): boolean {
+  return controlId === "ctl:VC-060" && scopeId === "sys:support-assistant" && status === "not_implemented";
+}
