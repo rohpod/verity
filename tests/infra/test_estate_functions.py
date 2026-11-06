@@ -47,9 +47,22 @@ def test_every_function_is_python_3_12_on_arm64_with_the_app_handler_from_the_bu
 
 
 def test_memory_and_timeout_are_the_fixtures_for_the_estate_and_the_adrs_for_the_crawler():
-    for kind in ("mock", "app", "probe"):
-        assert (function(kind)["memory_size"], function(kind)["timeout"]) == (128, 10), kind
+    assert (function("mock")["memory_size"], function("mock")["timeout"]) == (128, 10)
+    assert function("app")["memory_size"] == "${each.value.memory_size}"
+    assert function("app")["timeout"] == 10
+    assert (function("probe")["memory_size"], function("probe")["timeout"]) == (512, 10)
     assert (function("crawler")["memory_size"], function("crawler")["timeout"]) == (256, 300)
+
+
+def test_only_the_apps_that_load_pydantic_get_more_memory():
+    memory = {name: app["memory_size"] for name, app in LOCALS["apps"].items()}
+    assert memory == {
+        "support-assistant": 512,
+        "contract-insights": 512,
+        "talent-screening": 128,
+        "shadow-summariser": 128,
+        "invoice-renderer": 128,
+    }
 
 
 def test_no_function_uses_a_setting_the_estate_does_not_need():

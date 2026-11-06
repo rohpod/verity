@@ -4,8 +4,10 @@ Run with: uv run python scripts/build_lambdas.py [--out .build]
 
 The zips are deterministic: `CodeSha256` feeds `config_hash`, so a zip that changed on every build
 would raise a false ChangeEvent. Entries are sorted, with a fixed timestamp and mode, and no
-`__pycache__` or `*.dist-info`. Source files come from `git ls-files`, so an untracked file cannot
-ship (an uncommitted edit to a tracked file still does: build from a clean tree before deploying).
+`*.dist-info`. The zips that vendor packages also carry their bytecode, because `/var/task` is
+read-only and a cold start would otherwise recompile them every time (ADR 0026). Source files
+come from `git ls-files`, so an untracked file cannot ship (an uncommitted edit to a tracked file
+still does: build from a clean tree before deploying).
 `pydantic` and everything it depends on are vendored, each at its `uv.lock` version, for arm64.
 Only the part of `verity_core` each function imports is included (ADR 0024), and the list is per
 function. The seven estate zips never carry `networkx` or `yaml`. `verity-crawler` carries both,
@@ -14,6 +16,8 @@ with the 44 modules it imports and `rules/ai_signals.yaml` only (ADR 0025, decis
 """
 
 import argparse
+import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -26,6 +30,17 @@ ROOT = Path(__file__).resolve().parents[1]
 FIXED_TIME = (1980, 1, 1, 0, 0, 0)
 FILE_MODE = 0o644 << 16
 SKIP_DIRS = {"__pycache__", "training"}
+BYTECODE_TAG = "cpython-312"  # the Lambda runtime's: bytecode for any other version is ignored
+# Unchecked hash pycs hold no timestamp and are never compared with the source, so the zips' fixed
+# timestamps do not invalidate them. `dfile` keeps the build's paths out of them.
+COMPILE = """
+import json, py_compile, sys
+for source, target, name in json.load(sys.stdin):
+    py_compile.compile(
+        source, cfile=target, dfile=name, doraise=True,
+        invalidation_mode=py_compile.PycInvalidationMode.UNCHECKED_HASH,
+    )
+"""
 
 
 @dataclass(frozen=True)
@@ -219,13 +234,14 @@ def collect(root: Path, prefix: str = "", pathspecs: tuple[str, ...] = (".",)) -
 
 
 def vendored_files(vendored: Path) -> dict[str, Path]:
-    """The installed wheels, without caches, console scripts, uv's `.lock` or `*.dist-info`."""
+    """The installed wheels, without caches, console scripts, uv's `.lock`, `*.dist-info` or the
+    packages' own `tests`, which nothing imports."""
     found = {}
     for path in sorted(vendored.rglob("*")):
         parts = path.relative_to(vendored).parts
         if path.is_dir() or parts[0] == "bin" or "__pycache__" in parts or path.name == ".lock":
             continue
-        if any(p.endswith(".dist-info") for p in parts):
+        if "tests" in parts or any(p.endswith(".dist-info") for p in parts):
             continue
         found["/".join(parts)] = path
     return found
@@ -239,6 +255,29 @@ def write_zip(target: Path, entries: dict[str, Path]) -> None:
             info.external_attr = FILE_MODE
             info.create_system = 3
             archive.writestr(info, entries[name].read_bytes(), compresslevel=9)
+
+
+def bytecode_for(entries: dict[str, Path], target: Path) -> dict[str, Path]:
+    """The `.pyc` of every `.py` in `entries`, keyed by archive name. One fresh process with a fixed
+    seed and order, because marshal's output depends on the state of the process compiling."""
+    if sys.implementation.cache_tag != BYTECODE_TAG:
+        raise SystemExit(f"build with {BYTECODE_TAG}, not {sys.implementation.cache_tag}")
+    found = {}
+    jobs = []
+    for name in sorted(n for n in entries if n.endswith(".py")):
+        source = Path(name)
+        archive_name = f"{source.parent / '__pycache__' / source.stem}.{BYTECODE_TAG}.pyc"
+        found[archive_name] = target / archive_name
+        jobs.append((str(entries[name]), str(found[archive_name]), name))
+    subprocess.run(
+        [sys.executable, "-c", COMPILE],
+        input=json.dumps(jobs),
+        env={**os.environ, "PYTHONHASHSEED": "0"},
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return found
 
 
 def entries_for(spec: Spec, vendored: dict[tuple[str, ...], Path]) -> dict[str, Path]:
@@ -266,7 +305,10 @@ def build(out: Path) -> dict[str, Path]:
                 vendor(vendored[packages], packages)
         for name, spec in FUNCTIONS.items():
             zips[name] = out / f"{name}.zip"
-            write_zip(zips[name], entries_for(spec, vendored))
+            entries = entries_for(spec, vendored)
+            if spec.vendor:
+                entries |= bytecode_for(entries, Path(scratch) / f"bytecode-{name}")
+            write_zip(zips[name], entries)
     return zips
 
 

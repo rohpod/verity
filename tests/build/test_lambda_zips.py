@@ -5,10 +5,12 @@ One session fixture builds twice. Needs network access to PyPI for the pydantic 
 not AWS."""
 
 import hashlib
+import importlib.util
 import re
 import subprocess
 import sys
 import textwrap
+import tomllib
 import zipfile
 
 from estate_support import ROOT
@@ -75,12 +77,63 @@ def test_no_estate_zip_carries_what_a_function_must_not(builds):
         assert not {n.split("/")[0] for n in listed} & FORBIDDEN_TOP, function
 
 
-def test_no_zip_carries_caches_or_metadata(builds):
+def test_no_zip_carries_metadata_or_what_the_runtime_provides(builds):
     _, first, _ = builds
     for function, path in first.items():
         listed = names(path)
-        assert not [n for n in listed if "__pycache__" in n or ".dist-info" in n], function
+        assert not [n for n in listed if ".dist-info" in n], function
         assert not {n.split("/")[0] for n in listed} & {"boto3", "botocore", "training"}, function
+
+
+def test_no_zip_carries_the_vendored_packages_own_tests(builds):
+    _, first, _ = builds
+    for function, path in first.items():
+        assert not [n for n in names(path) if "tests" in n.split("/")], function
+
+
+def test_the_build_tests_are_collected_by_a_plain_pytest_run():
+    config = tomllib.loads((ROOT / "pyproject.toml").read_text())
+    assert "build" not in config["tool"]["pytest"]["ini_options"]["norecursedirs"]
+
+
+def test_only_the_zips_that_vendor_carry_bytecode_and_they_carry_all_of_it(builds):
+    script, first, _ = builds
+    for function, path in first.items():
+        listed = names(path)
+        cached = {n for n in listed if "__pycache__" in n}
+        expected = {
+            f"{n.rpartition('/')[0]}/__pycache__/{n.rpartition('/')[2][:-3]}.cpython-312.pyc"
+            if "/" in n
+            else f"__pycache__/{n[:-3]}.cpython-312.pyc"
+            for n in listed
+            if n.endswith(".py")
+        }
+        assert cached == (expected if script.FUNCTIONS[function].vendor else set()), function
+
+
+def test_the_bytecode_is_unchecked_for_this_python_and_holds_no_build_path(builds):
+    _, first, _ = builds
+    with zipfile.ZipFile(first["support-assistant"]) as archive:
+        cached = [archive.read(n) for n in archive.namelist() if n.endswith(".pyc")]
+    assert cached
+    for data in cached:
+        assert data[:4] == importlib.util.MAGIC_NUMBER
+        assert data[4:8] == (1).to_bytes(4, "little")  # hash based, and the hash is not checked
+        assert b"/tmp" not in data and b"/private/" not in data and str(ROOT).encode() not in data
+
+
+def test_python_loads_the_shipped_bytecode_and_never_reads_the_source(builds, tmp_path):
+    _, first, _ = builds
+    with zipfile.ZipFile(first["support-assistant"]) as archive:
+        archive.extractall(tmp_path)
+    (tmp_path / "annotated_types/__init__.py").write_text("raise SystemExit('read the source')\n")
+    done = subprocess.run(
+        [sys.executable, "-I", "-c", f"import sys; sys.path.insert(0, {str(tmp_path)!r})\n"
+         "import annotated_types; print(annotated_types.Gt)"],
+        capture_output=True,
+        text=True,
+    )  # fmt: skip
+    assert done.returncode == 0, done.stderr
 
 
 def test_compiled_files_are_for_linux_arm64_and_python_3_12(builds):
@@ -149,9 +202,11 @@ def test_a_tracked_file_deleted_from_disk_is_not_collected(builds, tmp_path):
 def test_the_real_sources_hold_no_stray_file_in_any_zip(builds):
     _, first, _ = builds
     stray = re.compile(r"(^|/)(\.DS_Store|\.lock|\.env.*|.*\.pyc|.*\.swp)$")
-    assert {f: [n for n in names(p) if stray.search(n)] for f, p in first.items()} == {
-        f: [] for f in first
+    found = {
+        f: [n for n in names(p) if stray.search(n) and "__pycache__" not in n]
+        for f, p in first.items()
     }
+    assert found == {f: [] for f in first}
 
 
 def test_the_vendored_closure_is_every_locked_dependency_of_pydantic(builds):
@@ -182,7 +237,8 @@ CORE_NOT_SHIPPED = ("cli.py", "assess", "discovery", "content", "rules")
 
 
 def core_of(first, function):
-    return sorted(n for n in names(first[function]) if n.startswith("verity_core/"))
+    listed = names(first[function])
+    return sorted(n for n in listed if n.startswith("verity_core/") and "__pycache__" not in n)
 
 
 def import_closure(relative: str) -> list[str]:

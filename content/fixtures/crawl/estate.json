@@ -8,7 +8,7 @@
       "Role": "arn:aws:iam::000000000000:role/support-assistant-role",
       "Handler": "app.handler",
       "CodeSha256": "sha-of-support-assistant-v1",
-      "MemorySize": 128,
+      "MemorySize": 512,
       "Timeout": 10,
       "Architectures": [
         "arm64"
@@ -54,7 +54,7 @@
       "Role": "arn:aws:iam::000000000000:role/contract-insights-role",
       "Handler": "app.handler",
       "CodeSha256": "sha-of-contract-insights-v1",
-      "MemorySize": 128,
+      "MemorySize": 512,
       "Timeout": 10,
       "Architectures": [
         "arm64"
