@@ -47,6 +47,7 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/). Decisions by the owner:
 | D29 | M8 deploy: the crawler function, refused CloudTrail events prove nothing, simulator proof of the boundary, a real refused write, a fixture-shaped estate. See [ADR 0025](adr/0025-m8-deploy-and-crawl.md) |
 | D30 | M8 cold start: bytecode in the zips that vendor packages, 512 MB for the apps that load pydantic and for the probe. See [ADR 0026](adr/0026-m8-cold-start.md) |
 | D31 | M8 review: seed and assess time came from credential refreshes, the schedule and credit steps reworded, boundary claims matched to the evidence. See [ADR 0028](adr/0028-m8-review.md) |
+| D32 | M9 export: listed public fields, rebuilt hashes for redacted Evidence, an independent fail-closed scanner, a generated contract. See [ADR 0029](adr/0029-m9-snapshot-export.md) |
 
 ## Milestones
 
@@ -209,7 +210,7 @@ Found while building and reviewing M1. Each is open until the named milestone cl
 | Before a re-seed | `verity seed` now reads every Evidence node to check decisions ([ADR 0020](adr/0020-m5-review-fixes.md)). Measure how long that takes once M6 evidence is in the table |
 | Before a re-seed | Re-seeding removes nothing, so a mapping deleted from YAML stays open in the graph. Decide on pruning before the first live re-seed |
 | M8 | The first `verity assess --target dynamodb` on the real content writes 1,368 records (65 `APPLIES_TO` edges, 433 ControlAssessments, 870 assessment edges): about 5,900 write units, roughly 6.6 minutes at 15 table units a second, and a second run writes 0. Measured on the in-memory copy that `estimate_apply` uses. It is not yet run on the real table. Decisions that change only add or close a few records **Closed by [ADR 0027](adr/0027-m8-live-results.md).** |
-| M9 | Replace the `acct_` account digests with ordinals on export. A digest is not anonymous ([ADR 0022](adr/0022-m6-review-fixes.md)) |
+| M9 | Replace the `acct_` account digests with ordinals on export. A digest is not anonymous ([ADR 0022](adr/0022-m6-review-fixes.md)). Ordinals alone are not enough: the hashes must go too ([ADR 0029](adr/0029-m9-snapshot-export.md)) |
 | M9 | A decision's commit SHA is looked up at export, not at seed, because a SHA inside hashed content would make a new Evidence node on every commit ([ADR 0019](adr/0019-m5-rules-and-assessment.md), D10). Build the lookup from the decision's file path and `file_sha256` |
 | Standing | Edge writes do not re-check the nodes they connect, which is safe with one writer at a time ([ADR 0014](adr/0014-m2-measurements-and-evidence-cap.md)). Do not run a seed and a crawl together |
 | M11 | Risk treatment decisions, named in [ADR 0008](adr/0008-governance-as-code.md), are deferred because nothing reads them ([ADR 0019](adr/0019-m5-rules-and-assessment.md)). Build them or drop them from ADR 0008 |

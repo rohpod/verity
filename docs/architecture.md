@@ -411,7 +411,7 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
 | Workloads | One least-privilege role per Lambda. The crawler is read-only except for its own table. |
 | Abuse limits | mock-openai's Function URL uses `AWS_IAM` auth ([ADR 0009](adr/0009-mock-openai-iam-auth.md)). Reserved concurrency is not available: the account limit is 10 and AWS requires 100 unreserved. mock-bedrock can only be invoked via IAM. The Free plan cannot bill, which caps the worst case. |
 | Data | Synthetic data only. Env var values are discarded on receipt and never stored or logged. |
-| Public snapshot | The export redacts the account ID (`000000000000`) and strips function URLs. |
+| Public snapshot | The export redacts the account ID (`000000000000`), withholds config hashes, rebuilds the hashes of redacted Evidence, and refuses to write if an independent scan finds anything ([ADR 0029](adr/0029-m9-snapshot-export.md)). |
 | Repository | Secret scanning, Dependabot, branch protection on `main`. CI holds no AWS credentials. |
 | Developer guardrail | A Claude Code project hook asks for confirmation before `terraform/tofu apply` and mutating `aws` commands. |
 
@@ -446,6 +446,7 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
 | [0025](adr/0025-m8-deploy-and-crawl.md) | M8 deploy: the crawler function, refused CloudTrail events prove nothing, simulator proof of the boundary, a real refused write, a fixture-shaped estate |
 | [0026](adr/0026-m8-cold-start.md) | M8 cold start: bytecode in the zips that vendor packages, 512 MB for the apps that load pydantic and for the probe |
 | [0028](adr/0028-m8-review.md) | M8 review: seed and assess time came from credential refreshes, the schedule and credit steps reworded, boundary claims matched to the evidence |
+| [0029](adr/0029-m9-snapshot-export.md) | M9 export: listed public fields, rebuilt hashes for redacted Evidence, an independent fail-closed scanner, a generated contract |
 
 ## L. Schema validation walkthrough
 
