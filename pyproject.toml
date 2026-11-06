@@ -28,6 +28,8 @@ verity-ai = { workspace = true }
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["tests"]
+# pytest's defaults without `build`, which would silently skip tests/build (ADR 0026).
+norecursedirs = ["*.egg", ".*", "_darcs", "CVS", "dist", "node_modules", "venv", "{arch}"]
 
 [tool.ruff]
 line-length = 100
