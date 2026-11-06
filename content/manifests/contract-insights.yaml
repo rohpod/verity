@@ -1,0 +1,3 @@
+system: sys:contract-insights
+resources:
+  - {type: lambda, name: contract-insights}
