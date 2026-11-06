@@ -61,3 +61,40 @@ def test_check_id_rejects_other_node_types():
     assert ids.check_id("sys:x", NodeType.AI_SYSTEM) == "sys:x"
     with pytest.raises(ValueError, match="expected"):
         ids.check_id("prov:x", NodeType.AI_SYSTEM)
+
+
+def test_discovery_run_id_is_the_start_time_in_utc():
+    from datetime import UTC, datetime, timedelta, timezone
+
+    started = datetime(2026, 11, 6, 9, 0, tzinfo=UTC)
+    assert ids.discovery_run_id(started) == "run:20261106T090000.000000Z"
+    plus_two = started.astimezone(timezone(timedelta(hours=2)))
+    assert ids.discovery_run_id(plus_two) == ids.discovery_run_id(started)
+    with pytest.raises(ValueError, match="timezone-aware"):
+        ids.discovery_run_id(datetime(2026, 11, 6, 9, 0))
+
+
+def test_change_event_id_is_one_per_resource_per_run():
+    from datetime import UTC, datetime
+
+    run = ids.discovery_run_id(datetime(2026, 11, 6, 9, 0, tzinfo=UTC))
+    one = ids.change_event_id(run, ids.resource_id("lambda", "eu-north-1", "a"))
+    two = ids.change_event_id(run, ids.resource_id("lambda", "eu-north-1", "b"))
+    assert one.startswith("chg:20261106T090000.000000Z:")
+    assert len(one.rpartition(":")[2]) == 16
+    assert one != two
+    assert one == ids.change_event_id(run, ids.resource_id("lambda", "eu-north-1", "a"))
+    assert ids.node_type_of(one) is NodeType.CHANGE_EVENT
+
+
+def test_a_plain_role_name_is_its_own_part():
+    assert ids.iam_role_part("verity-crawler_1.x") == "verity-crawler_1.x"
+
+
+def test_role_names_with_iam_only_characters_give_valid_distinct_parts():
+    first, second = ids.iam_role_part("a+b@c"), ids.iam_role_part("a,b=c")
+    assert first != second
+    assert first.startswith("a-b-c-") and second.startswith("a-b-c-")
+    for part in (first, second):
+        assert ids.resource_id("iam-role", "global", part)
+    assert ids.iam_role_part("a+b@c") == first
