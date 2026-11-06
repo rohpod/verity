@@ -75,6 +75,31 @@ class Raising:
         raise self.error
 
 
+class Payload:
+    def __init__(self, error):
+        self.error = error
+
+    def read(self):
+        raise self.error
+
+
+def test_a_payload_that_stalls_or_breaks_after_the_headers_is_an_adapter_error():
+    error = ReadTimeoutError(endpoint_url="https://lambda.eu-north-1.amazonaws.com")
+    client = FakeLambda({"StatusCode": 200, "Payload": Payload(error)})
+    with pytest.raises(AdapterError) as caught:
+        lambda_invoker("mock-bedrock", client=client)({})
+    assert caught.value.status is None
+
+
+@pytest.mark.parametrize("payload", [b"<html>VERITY-CANARY-7f3a", b"\xff\xfe", b""])
+def test_a_payload_that_is_not_json_is_an_adapter_error_holding_no_body(payload):
+    client = FakeLambda({"StatusCode": 200, "Payload": io.BytesIO(payload)})
+    with pytest.raises(AdapterError) as caught:
+        lambda_invoker("mock-bedrock", client=client)({})
+    assert caught.value.status is None and caught.value.__suppress_context__
+    assert "CANARY" not in repr(vars(caught.value)) + str(caught.value)
+
+
 @pytest.mark.parametrize(
     "error",
     [
