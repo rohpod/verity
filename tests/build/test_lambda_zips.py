@@ -5,6 +5,7 @@ not AWS."""
 
 import hashlib
 import importlib.util
+import re
 import subprocess
 import sys
 import textwrap
@@ -82,11 +83,11 @@ def test_no_zip_carries_what_a_function_must_not(builds):
         assert not [n for n in listed if "__pycache__" in n or ".dist-info" in n], function
 
 
-def test_compiled_files_are_for_linux_arm64(builds):
+def test_compiled_files_are_for_linux_arm64_and_python_3_12(builds):
     _, first, _ = builds
     compiled = [n for n in names(first["support-assistant"]) if n.endswith(".so")]
     assert compiled
-    assert all("aarch64-linux-gnu" in n for n in compiled)
+    assert all("aarch64-linux-gnu" in n and "cpython-312" in n for n in compiled)
 
 
 def test_the_data_files_ship_and_the_training_code_does_not(builds):
@@ -113,6 +114,83 @@ def test_the_vendored_pydantic_is_the_locked_version(builds):
     with zipfile.ZipFile(first["support-assistant"]) as archive:
         init = archive.read("pydantic/version.py").decode()
     assert f"VERSION = '{script.locked_version('pydantic')}'" in init
+
+
+def git(repo, *args):
+    subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True)
+
+
+def test_an_untracked_file_is_not_collected(builds, tmp_path):
+    script, _, _ = builds
+    git(tmp_path, "init", "-q")
+    (tmp_path / "app.py").write_text("handler = None\n")
+    (tmp_path / "data.json").write_text("{}")
+    git(tmp_path, "add", "app.py", "data.json")
+    for stray in (".DS_Store", ".env"):
+        (tmp_path / stray).write_text("secret")
+    (tmp_path / "notes.txt").write_text("not added")
+    assert sorted(script.collect(tmp_path)) == ["app.py", "data.json"]
+
+
+def test_a_tracked_file_deleted_from_disk_is_not_collected(builds, tmp_path):
+    script, _, _ = builds
+    git(tmp_path, "init", "-q")
+    (tmp_path / "app.py").write_text("x")
+    (tmp_path / "gone.py").write_text("x")
+    git(tmp_path, "add", ".")
+    (tmp_path / "gone.py").unlink()
+    assert sorted(script.collect(tmp_path)) == ["app.py"]
+
+
+def test_the_real_sources_hold_no_stray_file_in_any_zip(builds):
+    _, first, _ = builds
+    stray = re.compile(r"(^|/)(\.DS_Store|\.env.*|.*\.pyc|.*\.swp)$")
+    assert {f: [n for n in names(p) if stray.search(n)] for f, p in first.items()} == {
+        f: [] for f in first
+    }
+
+
+def test_the_vendored_closure_is_every_locked_dependency_of_pydantic(builds):
+    script, _, _ = builds
+    closure = script.locked_closure("pydantic")
+    assert {"pydantic", "pydantic-core", "typing-extensions", "annotated-types"} <= set(closure)
+    assert all(closure[name] == script.locked_version(name) for name in closure)
+
+
+def test_every_vendored_package_is_at_its_locked_version(builds, tmp_path):
+    script, first, _ = builds
+    script.vendor_pydantic(tmp_path)
+    installed = {}
+    for metadata in tmp_path.glob("*.dist-info/METADATA"):
+        fields = dict(
+            line.split(": ", 1) for line in metadata.read_text().splitlines()[:10] if ": " in line
+        )
+        installed[fields["Name"].lower().replace("_", "-")] = fields["Version"]
+    assert installed == script.locked_closure("pydantic")
+    for name in script.locked_closure("pydantic"):
+        module = name.replace("-", "_")
+        assert any(
+            n.split("/")[0] in (module, f"{module}.py") for n in names(first["support-assistant"])
+        ), name
+
+
+CORE_NOT_SHIPPED = ("cli.py", "assess", "discovery", "content", "rules")
+
+
+def test_the_zips_carry_only_the_verity_core_the_functions_import(builds):
+    script, first, _ = builds
+    for function in ("support-assistant", "contract-insights"):
+        core = sorted(n for n in names(first[function]) if n.startswith("verity_core/"))
+        assert core == sorted(
+            f"verity_core/{p.relative_to(ROOT / 'core/verity_core')}"
+            for p in script.collect(
+                ROOT / "core/verity_core", "", script.CORE_FILES["verity_core"]
+            ).values()
+        )
+        for unwanted in CORE_NOT_SHIPPED:
+            assert not [n for n in core if n.split("/")[1] == unwanted], (function, unwanted)
+        assert "verity_core/graph/dynamodb/usage.py" in core
+        assert not [n for n in core if "repository" in n or "loader" in n or "memory" in n]
 
 
 def run_blocked(code: str, blocked: tuple[str, ...] = ()) -> subprocess.CompletedProcess:
