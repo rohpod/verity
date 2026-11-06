@@ -14,6 +14,7 @@ FIXTURE = CONTENT / "fixtures" / "crawl" / "estate.json"
 CANARY = "VERITY-CANARY-7f3a"
 REGION = "eu-north-1"
 MOTO_ACCOUNT = "123456789012"
+ACCT = "acct_0123abcd"  # what a 12-digit account ID becomes at the boundary
 
 MANIFEST = "system: sys:talent-screening\nresources:\n  - {type: lambda, name: talent-screening}\n"
 
@@ -176,10 +177,10 @@ SIGNALS = load_content(CONTENT).signals
 def make_function(name, env=(), description="", role=None) -> CollectedFunction:
     return CollectedFunction(
         name=name,
-        arn=f"arn:aws:lambda:{REGION}:<account>:function:{name}",
+        arn=f"arn:aws:lambda:{REGION}:{ACCT}:function:{name}",
         runtime="python3.12",
         handler="app.handler",
-        role_arn=f"arn:aws:iam::<account>:role/{role or name + '-role'}",
+        role_arn=f"arn:aws:iam::{ACCT}:role/{role or name + '-role'}",
         architectures=("arm64",),
         memory_mb=128,
         timeout_s=10,
@@ -200,7 +201,7 @@ def allow(
 def make_role(name, *statements) -> CollectedRole:
     return CollectedRole(
         name=name,
-        arn=f"arn:aws:iam::<account>:role/{name}",
+        arn=f"arn:aws:iam::{ACCT}:role/{name}",
         trust=(),
         policies=(Policy("p", "inline", tuple(statements)),),
     )

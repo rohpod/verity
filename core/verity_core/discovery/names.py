@@ -22,6 +22,6 @@ def role_id(name: str) -> str:
 
 
 def role_name_of(arn: str) -> str | None:
-    """`arn:aws:iam::<account>:role/service-role/name` gives `name`."""
+    """`arn:aws:iam::acct_0123abcd:role/service-role/name` gives `name`."""
     _, sep, path = arn.partition(":role/")
     return path.rpartition("/")[2] if sep and path else None

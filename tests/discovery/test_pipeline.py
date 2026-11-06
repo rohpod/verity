@@ -241,7 +241,7 @@ def test_the_canary_is_nowhere_after_a_crawl(repo, clock, capsys, caplog):
     )
     assert CANARY not in everything
     assert "000000000000" not in everything
-    assert "<account>" in everything  # ARNs in evidence are kept, cleaned
+    assert "acct_" in everything  # ARNs in evidence are kept, cleaned
 
 
 def test_the_crawler_never_touches_the_seeded_systems(repo, clock):

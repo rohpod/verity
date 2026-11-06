@@ -31,14 +31,15 @@ signals:
   - {id: usage_records, kind: usage_record, likelihood: confirmed_usage}
   - {id: trail_ai_event, kind: trail_event, likelihood: confirmed_usage}
   - {id: iam_ai_action, kind: iam_action, likelihood: probable}
-  # Matched anywhere in an env var name, ignoring case.
+  # Matched against an env var name, ignoring case: a vendor word as a whole `_`-separated part
+  # in any position (`AWS_BEDROCK_REGION`), or `MODEL_ID` and `MODEL_ADAPTER` at the end.
   - id: env_ai_name
     kind: env_name
     likelihood: probable
-    pattern: '^(OPENAI|ANTHROPIC|BEDROCK|AZURE_OPENAI|GEMINI|COHERE|MISTRAL|HUGGINGFACE|HF)_|(^|_)(LLM|GPT)(_|$)|^MODEL_(ID|ADAPTER)$'
+    pattern: '(^|_)(OPENAI|ANTHROPIC|BEDROCK|SAGEMAKER|GEMINI|COHERE|MISTRAL|HUGGINGFACE|HF|LLM|GPT|CHATGPT)(_|$)|(^|_)MODEL_(ID|ADAPTER)$'
   # Matched against each whole token of the name and the description, split on anything that is
-  # not a letter or digit, so `mail`, `email` and `maintenance` never match `ai`.
+  # not a letter or digit and at CamelCase boundaries, so `mail`, `email` and `maintenance` never match `ai`.
   - id: name_ai_token
     kind: name
     likelihood: possible
-    pattern: 'ai|ml|llm|gpt|genai|chatbot|copilot|assistant|summariser|summarizer|classifier|embedding|embeddings|inference|openai|bedrock|sagemaker'
+    pattern: 'ai|ml|llm|gpt\d*|genai|chatbot|copilot|assistant|summariser|summarizer|classifier|embedding|embeddings|inference|openai|bedrock|sagemaker'

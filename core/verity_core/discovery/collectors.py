@@ -19,6 +19,7 @@ from verity_core.discovery.boundary import (
     clean_table,
     clean_tags,
     clean_trail_event,
+    own_account,
 )
 from verity_core.model.enums import Source
 
@@ -46,13 +47,15 @@ class Collector(Protocol):
 def clean_estate(raw: Mapping[str, Any], region: str = REGION) -> Collected:
     """A whole recorded estate in the shape of the AWS responses (`estate.json`)."""
     manifests = [clean_manifest(m) for m in raw.get("manifests", ())]
+    roles = tuple(
+        clean_role(r["role"], r.get("inline_policies", ()), r.get("attached_policies", ()))
+        for r in raw.get("roles", ())
+    )
+    account = own_account(roles)
     return Collected(
         functions=tuple(clean_function(f) for f in raw.get("functions", ())),
-        roles=tuple(
-            clean_role(r["role"], r.get("inline_policies", ()), r.get("attached_policies", ()))
-            for r in raw.get("roles", ())
-        ),
-        tables=tuple(clean_table(name, region) for name in raw.get("tables", ())),
+        roles=roles,
+        tables=tuple(clean_table(name, region, account) for name in raw.get("tables", ())),
         manifests=tuple(m for m in manifests if m is not None),
         trail_events=tuple(clean_trail_event(e) for e in raw.get("trail_events", ())),
         tags_by_arn=clean_tags(raw.get("tag_mappings", ())),

@@ -6,14 +6,19 @@ raw dict goes no further. What is dropped here can never be stored, logged or pu
 - the Lambda description's place in storage: it is kept for scoring in memory, never written;
 - anything in a CloudTrail event beyond its source, name, time and the role that made the call.
 
-Twelve-digit account IDs in every kept string become `<account>`, so an ARN in evidence is safe
-to publish (M9). A malformed item raises `BoundaryError` with a fixed message and `from None`,
-so neither the message nor the exception chain can carry a raw dict.
+Twelve-digit account IDs in every kept string become `acct_` and 8 hex digits of their hash
+(ADR 0022). That is valid in an ID part, an env var name and an ARN, and two accounts stay
+different, so a trust policy that moves to another account is still a change. A digest is not
+anonymous: M9 replaces it on export.
+
+A malformed item raises `BoundaryError` with a fixed message and `from None`, so neither the
+message nor the exception chain can carry a raw dict.
 
 The raw shapes are the AWS response shapes, so one boundary serves both the recorded fixture and
 the live collector.
 """
 
+import hashlib
 import json
 import re
 from collections.abc import Callable, Iterable, Mapping
@@ -29,8 +34,9 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 from verity_core.model.enums import NodeType
 from verity_core.model.ids import check_id
 
-ACCOUNT_PLACEHOLDER = "<account>"
 _ACCOUNT_ID = re.compile(r"(?<!\d)\d{12}(?!\d)")
+_OWN_ACCOUNT = re.compile(r"^arn:aws:iam::(acct_[0-9a-f]{8}):")
+UNKNOWN_ACCOUNT = "unknown"
 
 
 class BoundaryError(ValueError):
@@ -38,8 +44,22 @@ class BoundaryError(ValueError):
 
 
 def scrub(text: str) -> str:
-    """Replace every 12-digit number, which may be an account ID, with `<account>`."""
-    return _ACCOUNT_ID.sub(ACCOUNT_PLACEHOLDER, text)
+    """Replace every 12-digit number, which may be an account ID, with a short digest of it."""
+    return _ACCOUNT_ID.sub(lambda m: f"acct_{_digest(m.group())}", text)
+
+
+def _digest(number: str) -> str:
+    return hashlib.sha256(number.encode()).hexdigest()[:8]
+
+
+def own_account(roles: Iterable["CollectedRole"]) -> str:
+    """The account digest the roles belong to, for building a table ARN. `ListTables` gives
+    names only. With no role the account is unknown, and no policy can name the table."""
+    for role in roles:
+        found = _OWN_ACCOUNT.match(role.arn)
+        if found:
+            return found.group(1)
+    return UNKNOWN_ACCOUNT
 
 
 # --- clean records -------------------------------------------------------------------------
@@ -264,11 +284,9 @@ def clean_role(
     )
 
 
-def clean_table(name: str, region: str) -> CollectedTable:
-    """`ListTables` gives names only, so the ARN is built with the account left out."""
-    return CollectedTable(
-        name=name, arn=f"arn:aws:dynamodb:{region}:{ACCOUNT_PLACEHOLDER}:table/{name}"
-    )
+def clean_table(name: str, region: str, account: str) -> CollectedTable:
+    """`ListTables` gives names only, so the ARN takes the account digest from `own_account`."""
+    return CollectedTable(name=name, arn=f"arn:aws:dynamodb:{region}:{account}:table/{name}")
 
 
 class _ManifestResource(BaseModel):

@@ -1,4 +1,6 @@
+import hashlib
 import json
+import re
 from datetime import UTC, datetime
 from urllib.parse import quote
 
@@ -12,6 +14,7 @@ from verity_core.discovery.boundary import (
     clean_table,
     clean_tags,
     clean_trail_event,
+    own_account,
     scrub,
 )
 
@@ -45,11 +48,32 @@ def test_a_function_without_env_vars_has_no_names():
     assert clean_function(raw).env_names == ()
 
 
-def test_account_ids_become_a_placeholder_in_every_kept_string():
+def digest(number: str) -> str:
+    return "acct_" + hashlib.sha256(number.encode()).hexdigest()[:8]
+
+
+def test_account_ids_become_a_digest_in_every_kept_string():
     function = clean_function(raw_function())
-    assert function.arn == "arn:aws:lambda:eu-north-1:<account>:function:f"
-    assert function.role_arn == "arn:aws:iam::<account>:role/f-role"
-    assert scrub("a 123456789012 b 1234567890123") == "a <account> b 1234567890123"
+    assert function.arn == f"arn:aws:lambda:eu-north-1:{digest('123456789012')}:function:f"
+    assert function.role_arn == f"arn:aws:iam::{digest('123456789012')}:role/f-role"
+    assert scrub("a 123456789012 b 1234567890123") == f"a {digest('123456789012')} b 1234567890123"
+
+
+def test_different_accounts_stay_different_and_the_same_one_stays_the_same():
+    assert scrub("111111111111") != scrub("222222222222")
+    assert (
+        scrub("x 111111111111 y 111111111111")
+        == f"x {scrub('111111111111')} y {scrub('111111111111')}"
+    )
+
+
+def test_a_number_in_a_name_leaves_a_valid_name():
+    function = clean_function(raw_function(FunctionName="report-123456789012"))
+    assert function.name == f"report-{digest('123456789012')}"
+    assert re.fullmatch(r"[A-Za-z0-9._-]+", function.name)
+    assert clean_function(
+        raw_function(Environment={"Variables": {"KEY_123456789012": "v"}})
+    ).env_names == (f"KEY_{digest('123456789012')}",)
 
 
 def test_the_description_is_scored_but_hidden_from_the_repr():
@@ -83,7 +107,9 @@ def test_tags_are_keyed_by_the_cleaned_arn():
             }
         ]
     )
-    assert tags == {"arn:aws:lambda:eu-north-1:<account>:function:f": {"ai:system-id": "sys:x"}}
+    assert tags == {
+        f"arn:aws:lambda:eu-north-1:{digest('123456789012')}:function:f": {"ai:system-id": "sys:x"}
+    }
 
 
 def policy(*statements) -> dict:
@@ -133,9 +159,13 @@ def test_an_unknown_effect_is_refused():
         role(inline=[{"PolicyName": "p", "PolicyDocument": policy(statement)}])
 
 
-def test_a_table_arn_is_built_without_the_account():
-    table = clean_table("verity-graph", "eu-north-1")
-    assert table.arn == "arn:aws:dynamodb:eu-north-1:<account>:table/verity-graph"
+def test_a_table_arn_takes_the_account_digest_from_a_role():
+    found = role()
+    account = digest("123456789012")
+    assert own_account([found]) == account
+    table = clean_table("verity-graph", "eu-north-1", own_account([found]))
+    assert table.arn == f"arn:aws:dynamodb:eu-north-1:{account}:table/verity-graph"
+    assert own_account([]) == "unknown"
 
 
 def manifest(value: str, name="/verity/manifests/x.yaml") -> dict:
