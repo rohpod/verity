@@ -16,3 +16,4 @@ class Finding:
     severity: Severity
     subject: str  # the node ID the finding is about
     message: str
+    control_id: str | None = None  # set when the finding is about one control result

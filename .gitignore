@@ -10,6 +10,9 @@ dist/
 build/
 !tests/build/
 
+# A temporary file left by a crashed `verity export`. It is scanned, but it is not the snapshot.
+.snapshot-*.tmp
+
 # Node / web
 node_modules/
 web/dist/

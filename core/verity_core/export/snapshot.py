@@ -3,13 +3,16 @@
 Each node and edge model is a copy of its source model restricted to the fields `fields.py`
 publishes, so a field that is not listed cannot appear in the file. Evidence gains `redacted`,
 which says the hash covers the published content and not the stored original (decision 6).
+
+The schema is generated in serialisation mode, because every field is always written: a reader
+must not have to guess what a missing `redacted` means.
 """
 
 import operator
 from functools import reduce
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field, create_model
+from pydantic import BaseModel, ConfigDict, Field, create_model
 
 from verity_core.assess.freshness import Freshness
 from verity_core.assess.requirements import RequirementState
@@ -37,7 +40,11 @@ SCHEMA_VERSION = 1
 DataSource = Literal["live", "fixture"]
 
 
-def _restricted(model: type[BaseModel]) -> type[VerityRecord]:
+class SnapshotRecord(VerityRecord):
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
+
+def _restricted(model: type[BaseModel]) -> type[SnapshotRecord]:
     """A frozen, strict copy of `model` with only its public fields. Validators are not carried
     over: the values were validated when the graph was built, and the snapshot only carries them.
     A model with a field that is neither public nor withheld is refused."""
@@ -50,13 +57,13 @@ def _restricted(model: type[BaseModel]) -> type[VerityRecord]:
     }
     if model is Evidence:
         declared["redacted"] = (bool, Field(default=False))
-    return create_model(f"Snapshot{model.__name__}", __base__=VerityRecord, **declared)
+    return create_model(f"Snapshot{model.__name__}", __base__=SnapshotRecord, **declared)
 
 
-NODE_MODELS: dict[type[BaseModel], type[VerityRecord]] = {
+NODE_MODELS: dict[type[BaseModel], type[SnapshotRecord]] = {
     model: _restricted(model) for model in PUBLIC_NODE_FIELDS
 }
-EDGE_MODELS: dict[type[BaseModel], type[VerityRecord]] = {
+EDGE_MODELS: dict[type[BaseModel], type[SnapshotRecord]] = {
     model: _restricted(model) for model in PUBLIC_EDGE_FIELDS
 }
 
@@ -71,7 +78,7 @@ SnapshotEdge = Annotated[reduce(operator.or_, EDGE_MODELS.values()), Field(discr
 # a separate flag, so a demo result never looks like a real one.
 
 
-class DerivedRow(VerityRecord):
+class DerivedRow(SnapshotRecord):
     source: Literal[Source.DERIVED] = Source.DERIVED
 
 
@@ -80,9 +87,11 @@ class SnapshotFinding(DerivedRow):
     severity: Severity
     subject: str
     message: str
+    control_id: str | None  # set when the finding is about one control result
+    simulated: bool  # that result rests on a simulated sign-off
 
 
-class SnapshotTarget(VerityRecord):
+class SnapshotTarget(SnapshotRecord):
     control_id: str
     scope_id: str | None
     resolution: Resolution
@@ -127,7 +136,7 @@ class SnapshotObligation(DerivedRow):
     evidence_ids: list[str]
 
 
-class SnapshotSystemImpact(VerityRecord):
+class SnapshotSystemImpact(SnapshotRecord):
     system_id: str
     model_ids: list[str]
     owner_ids: list[str]
@@ -141,7 +150,7 @@ class SnapshotProviderImpact(DerivedRow):
     systems: list[SnapshotSystemImpact]
 
 
-class SnapshotCrosswalkLink(VerityRecord):
+class SnapshotCrosswalkLink(SnapshotRecord):
     via_control_id: str
     target_requirement_id: str
     strength: int  # the weaker of the two mappings
@@ -159,26 +168,27 @@ class SnapshotCrosswalk(DerivedRow):
     links: list[SnapshotCrosswalkLink]
 
 
-class SnapshotRedaction(VerityRecord):
+class SnapshotRedaction(SnapshotRecord):
     """What redaction did, as counts. Never a value."""
 
     steps: list[str]
     own_account_replaced: bool
     external_accounts: int
     content_keys_withheld: int
+    tags_withheld: int
     evidence_rebuilt: int
     evidence_unchanged: int
 
 
-class SnapshotHeader(VerityRecord):
+class SnapshotHeader(SnapshotRecord):
     schema_version: Literal[1] = SCHEMA_VERSION
     as_of: UtcDatetime
     data_source: DataSource  # `live` is the account; `fixture` is the recorded, simulated one
     redaction: SnapshotRedaction
-    simulated_components: list[str]
+    simulated_components: list[str]  # everything in the file that is not real
 
 
-class Snapshot(VerityRecord):
+class Snapshot(SnapshotRecord):
     """What `verity export` writes. Everything in it is a public field of the graph, or derived
     from the graph by the one assessment run named by `header.as_of`."""
 

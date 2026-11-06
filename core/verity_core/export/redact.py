@@ -1,11 +1,11 @@
 """Turns the graph into publishable records (ADR 0029, decisions 3 to 6).
 
-1. Keep only the public fields of each record.
+1. Keep only the public fields of each record, the listed tags and the listed content keys.
 2. Replace account digests: the owner's becomes `000000000000`, any other an ordinal.
 3. Withhold the config hash keys inside Evidence content.
 4. Rebuild each Evidence whose subject or content changed, through `Evidence.build`, because its
    `sha256` and ID are computed from them. Every old ID is carried through one map.
-5. Check nothing that resolved before is left dangling.
+5. Check nothing that resolved before is left dangling, and every published hash still verifies.
 
 Nothing here decides what is safe to publish: `scan.py` does, from scratch.
 """
@@ -18,10 +18,20 @@ from typing import Any
 import networkx as nx
 
 from verity_core.discovery.boundary import UNKNOWN_ACCOUNT, own_account
-from verity_core.export.fields import WITHHELD_CONTENT_KEYS, public_fields
+from verity_core.export.fields import (
+    PUBLIC_CONFIG_KEYS,
+    PUBLIC_CONTENT_KEYS,
+    PUBLIC_POLICY_KEYS,
+    PUBLIC_STATEMENT_KEYS,
+    PUBLIC_TAG_KEYS,
+    PUBLIC_TRUST_KEYS,
+    WITHHELD_CONTENT_KEYS,
+    public_fields,
+)
 from verity_core.model.edges import Edge
 from verity_core.model.enums import NodeType
-from verity_core.model.nodes import Evidence, Node
+from verity_core.model.evidence import content_sha256
+from verity_core.model.nodes import AWSResource, ChangeEvent, Evidence, Node
 
 OWN_ACCOUNT = "000000000000"
 _DIGEST = re.compile(r"acct_[0-9a-f]{8}")
@@ -44,6 +54,7 @@ class RedactionReport:
     own_account_found: bool
     external_accounts: int
     content_keys_withheld: int
+    tags_withheld: int
     evidence_rebuilt: int
     evidence_unchanged: int
 
@@ -54,7 +65,8 @@ class Redacted:
     edges: list[dict[str, Any]]
     extras: dict[str, list[dict[str, Any]]]  # the derived rows, redacted the same way
     report: RedactionReport
-    # Every sha256 and ID that redaction replaced. The scanner refuses these anywhere in the file.
+    # Every sha256 and ID that redaction replaced, and every config hash it withheld. The scanner
+    # refuses these anywhere in the file.
     replaced_hashes: frozenset[str] = field(default_factory=frozenset)
     evidence_ids: dict[str, str] = field(default_factory=dict)  # old ID -> new ID
 
@@ -96,15 +108,19 @@ def _count_keys(value: Any, keys: frozenset[str]) -> int:
 
 
 def _own_digest(evidence: list[Evidence]) -> str | None:
-    """The digest in a function's role ARN, which is always in the owner's account."""
+    """The digest in the functions' role ARNs. A function's role is always in its own account, so
+    two digests mean the graph is not what it seems: a guess could label another account as the
+    owner's, so it is refused."""
+    found = set()
     for item in evidence:
         config = (item.content or {}).get("config")
         role = config.get("role") if isinstance(config, dict) else None
         if isinstance(role, str):
-            found = own_account([_Role(role)])
-            if found != UNKNOWN_ACCOUNT:
-                return found
-    return None
+            found.add(own_account([_Role(role)]))
+    found.discard(UNKNOWN_ACCOUNT)
+    if len(found) > 1:
+        raise RedactionError("function roles name more than one account")
+    return found.pop() if found else None
 
 
 def _account_map(records: list[dict[str, Any]], own: str | None) -> dict[str, str]:
@@ -121,11 +137,59 @@ def _account_map(records: list[dict[str, Any]], own: str | None) -> dict[str, st
     return mapping
 
 
+# --- listed content and tags -------------------------------------------------------------
+
+
+def _unlisted(value: Any, listed: frozenset[str]) -> int:
+    return len(set(value) - listed - WITHHELD_CONTENT_KEYS) if isinstance(value, dict) else 0
+
+
+def _unlisted_content_keys(item: Evidence) -> int:
+    """Keys of Evidence content that are neither public nor withheld (ADR 0030)."""
+    content = item.content or {}
+    count = _unlisted(content, PUBLIC_CONTENT_KEYS[item.kind])
+    config = content.get("config")
+    if not isinstance(config, dict):
+        return count
+    count += _unlisted(config, PUBLIC_CONFIG_KEYS)
+    for policy in config.get("policies") or []:
+        count += _unlisted(policy, PUBLIC_POLICY_KEYS)
+        count += sum(_unlisted(s, PUBLIC_STATEMENT_KEYS) for s in policy.get("statements") or [])
+    return count + sum(_unlisted(t, PUBLIC_TRUST_KEYS) for t in config.get("trust") or [])
+
+
+def _listed_tags(tags: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in tags.items() if key in PUBLIC_TAG_KEYS}
+
+
+def _without_unlisted_tags(content: dict[str, Any]) -> dict[str, Any]:
+    config = content.get("config")
+    if not isinstance(config, dict) or not isinstance(config.get("tags"), dict):
+        return content
+    return {**content, "config": {**config, "tags": _listed_tags(config["tags"])}}
+
+
+def _withheld_hashes(record: Node) -> set[str]:
+    """The config hashes a record holds. None is published, and the scanner is told so."""
+    if isinstance(record, AWSResource):
+        found = {record.config_hash}
+    elif isinstance(record, ChangeEvent):
+        found = {record.previous_config_hash, record.new_config_hash}
+    elif isinstance(record, Evidence):
+        found = {(record.content or {}).get("config_hash")}
+    else:
+        return set()
+    return {value for value in found if isinstance(value, str)}
+
+
 # --- the pass ----------------------------------------------------------------------------
 
 
 def _public(record: Node | Edge) -> dict[str, Any]:
-    return record.model_dump(mode="json", include=set(public_fields(type(record))))
+    dumped = record.model_dump(mode="json", include=set(public_fields(type(record))))
+    if isinstance(record, AWSResource):
+        dumped["tags"] = _listed_tags(dumped["tags"])
+    return dumped
 
 
 def _references(nodes: list[dict[str, Any]]) -> dict[str, bool]:
@@ -153,6 +217,9 @@ def redact(
         key=lambda e: (e.src, e.type.value, e.dst, e.qualifier or ""),
     )
     evidence = [n for n in originals if isinstance(n, Evidence)]
+    unlisted = sum(_unlisted_content_keys(item) for item in evidence)
+    if unlisted:
+        raise RedactionError(f"{unlisted} Evidence content key(s) are not listed as public")
 
     nodes = [_public(n) for n in originals]
     edges = [_public(e) for e in edge_records]
@@ -167,15 +234,22 @@ def redact(
 
     # Evidence whose subject or content changes is rebuilt, and gets a new sha256 and ID.
     id_map: dict[str, str] = {}
-    replaced: set[str] = set()
+    replaced: set[str] = {value for record in originals for value in _withheld_hashes(record)}
     withheld = rebuilt = 0
+    tags_withheld = sum(
+        len(n.tags) - len(_listed_tags(n.tags)) for n in originals if isinstance(n, AWSResource)
+    )
     redacted_nodes: list[dict[str, Any]] = []
     for original, node in zip(originals, nodes, strict=True):
         if not isinstance(original, Evidence):
             redacted_nodes.append(_transform(node, text))
             continue
         content = original.content
-        new_content = None if content is None else _transform(content, text, WITHHELD_CONTENT_KEYS)
+        new_content = (
+            None
+            if content is None
+            else _transform(_without_unlisted_tags(content), text, WITHHELD_CONTENT_KEYS)
+        )
         withheld += 0 if content is None else _count_keys(content, WITHHELD_CONTENT_KEYS)
         subject = text(original.subject)
         if new_content == content and subject == original.subject:
@@ -198,7 +272,9 @@ def redact(
             valid_to=original.valid_to,
         )
         id_map[original.id] = fresh.id
-        replaced |= {original.id, original.sha256}
+        replaced.add(original.id)
+        if content is not None:  # the hash of a `content_ref` file holds no account, and stays
+            replaced.add(original.sha256)
         redacted_nodes.append({**_transform(_public(fresh), text), "redacted": True})
 
     if len(set(id_map.values())) != len(id_map):
@@ -231,12 +307,18 @@ def redact(
         if any(old in text_ for old in id_map):
             raise RedactionError("a replaced Evidence ID is still in the output")
 
+    for node in final_nodes:
+        is_inline = node["type"] == NodeType.EVIDENCE.value and node.get("content") is not None
+        if is_inline and content_sha256(node["content"]) != node["sha256"]:
+            raise RedactionError("a published Evidence hash does not match its content")
+
     final_nodes.sort(key=lambda n: n["id"])
     final_edges.sort(key=lambda e: (e["src"], e["type"], e["dst"], _qualifier(e)))
     report = RedactionReport(
         own_account_found=own is not None,
         external_accounts=len(accounts) - (own is not None),
         content_keys_withheld=withheld,
+        tags_withheld=tags_withheld,
         evidence_rebuilt=rebuilt,
         evidence_unchanged=len(evidence) - rebuilt,
     )

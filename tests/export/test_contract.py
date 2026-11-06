@@ -118,7 +118,8 @@ def test_ci_regenerates_the_contract_and_fails_on_a_difference():
 
 def test_ci_scans_a_committed_snapshot():
     runs = " ".join(s["run"] for s in steps() if "run" in s)
-    assert "verity export --check web/public/data/snapshot.json" in runs
+    assert 'verity export --check "$file" --require-live' in runs
+    assert "web/public/data/*.json" in runs
 
 
 def test_ci_holds_no_aws_credentials():

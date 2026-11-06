@@ -111,8 +111,10 @@ export type ValidFrom3 = string | null;
 export type ValidTo3 = string | null;
 export type Edges = (SnapshotMapsToEdge | SnapshotAppliesToEdge | SnapshotProcessesEdge | SnapshotPlainEdge)[];
 export type Code = string;
+export type ControlId1 = string | null;
 export type Message = string;
 export type Severity = "high" | "medium" | "low";
+export type Simulated1 = boolean;
 export type Source3 = "derived";
 export type Subject = string;
 export type Findings = SnapshotFinding[];
@@ -124,6 +126,7 @@ export type EvidenceUnchanged = number;
 export type ExternalAccounts = number;
 export type OwnAccountReplaced = boolean;
 export type Steps = string[];
+export type TagsWithheld = number;
 export type SchemaVersion = 1;
 export type SimulatedComponents = string[];
 export type Confidence4 = number;
@@ -190,7 +193,7 @@ export type ValidTo10 = string | null;
 export type Confidence11 = number;
 export type Id7 = string;
 export type Name7 = string;
-export type Simulated1 = boolean;
+export type Simulated2 = boolean;
 export type Type11 = "Provider";
 export type ValidFrom11 = string | null;
 export type ValidTo11 = string | null;
@@ -312,7 +315,7 @@ export type Nodes = (
 )[];
 export type AppliesTo = string;
 export type AssessmentId = string | null;
-export type ControlId1 = string | null;
+export type ControlId2 = string | null;
 export type EvidenceIds = string[];
 export type ProviderId = string | null;
 export type RequirementId1 = string;
@@ -338,11 +341,11 @@ export type ProviderImpact = SnapshotProviderImpact[];
 export type ApplicabilityStatus = "in_force" | "upcoming" | "conditional";
 export type Reason1 = string | null;
 export type RequirementId2 = string;
-export type Simulated2 = boolean;
+export type Simulated3 = boolean;
 export type Source6 = "derived";
 export type RequirementState = "satisfied" | "partially_addressed" | "not_met" | "not_addressed" | "not_applicable";
 export type SystemId2 = string;
-export type ControlId2 = string;
+export type ControlId3 = string;
 export type ScopeId1 = string | null;
 export type Targets = SnapshotTarget[];
 export type RequirementStatuses = SnapshotRequirementStatus[];
@@ -371,7 +374,7 @@ export interface SnapshotControlResult {
   method: Method;
   scope_id: ScopeId;
   simulated: Simulated;
-  source?: Source;
+  source: Source;
   status: ImplementationStatus;
 }
 /**
@@ -382,7 +385,7 @@ export interface SnapshotCrosswalk {
   from_framework: FromFramework;
   links: Links;
   requirement_id: RequirementId;
-  source?: Source1;
+  source: Source1;
   to_framework: ToFramework;
 }
 export interface SnapshotCrosswalkLink {
@@ -393,68 +396,70 @@ export interface SnapshotCrosswalkLink {
   via_control_id: ViaControlId;
 }
 export interface SnapshotMapsToEdge {
-  closed_intervals?: ClosedIntervals;
-  confidence?: Confidence;
+  closed_intervals: ClosedIntervals;
+  confidence: Confidence;
   dst: Dst;
   rationale: Rationale;
   rationale_type: RationaleType;
   source: Source2;
   src: Src;
-  strength?: Strength1;
+  strength: Strength1;
   strm: StrmType;
-  sufficiency?: Sufficiency | null;
-  type?: Type;
-  valid_from?: ValidFrom;
-  valid_to?: ValidTo;
+  sufficiency: Sufficiency | null;
+  type: Type;
+  valid_from: ValidFrom;
+  valid_to: ValidTo;
 }
 export interface SnapshotAppliesToEdge {
-  closed_intervals?: ClosedIntervals1;
-  condition?: AppliesCondition | null;
-  confidence?: Confidence1;
+  closed_intervals: ClosedIntervals1;
+  condition: AppliesCondition | null;
+  confidence: Confidence1;
   dst: Dst1;
-  in_force_from?: InForceFrom;
+  in_force_from: InForceFrom;
   reason: Reason;
   role: Role;
   rule_id: RuleId;
   source: Source2;
   src: Src1;
-  type?: Type1;
-  valid_from?: ValidFrom1;
-  valid_to?: ValidTo1;
+  type: Type1;
+  valid_from: ValidFrom1;
+  valid_to: ValidTo1;
 }
 export interface SnapshotProcessesEdge {
-  closed_intervals?: ClosedIntervals2;
-  confidence?: Confidence2;
+  closed_intervals: ClosedIntervals2;
+  confidence: Confidence2;
   dst: Dst2;
   purpose: Purpose;
   source: Source2;
   src: Src2;
-  type?: Type2;
-  valid_from?: ValidFrom2;
-  valid_to?: ValidTo2;
+  type: Type2;
+  valid_from: ValidFrom2;
+  valid_to: ValidTo2;
 }
 export interface SnapshotPlainEdge {
-  closed_intervals?: ClosedIntervals3;
-  confidence?: Confidence3;
+  closed_intervals: ClosedIntervals3;
+  confidence: Confidence3;
   dst: Dst3;
   source: Source2;
   src: Src3;
   type: Type3;
-  valid_from?: ValidFrom3;
-  valid_to?: ValidTo3;
+  valid_from: ValidFrom3;
+  valid_to: ValidTo3;
 }
 export interface SnapshotFinding {
   code: Code;
+  control_id: ControlId1;
   message: Message;
   severity: Severity;
-  source?: Source3;
+  simulated: Simulated1;
+  source: Source3;
   subject: Subject;
 }
 export interface SnapshotHeader {
   as_of: AsOf;
   data_source: DataSource;
   redaction: SnapshotRedaction;
-  schema_version?: SchemaVersion;
+  schema_version: SchemaVersion;
   simulated_components: SimulatedComponents;
 }
 /**
@@ -467,150 +472,151 @@ export interface SnapshotRedaction {
   external_accounts: ExternalAccounts;
   own_account_replaced: OwnAccountReplaced;
   steps: Steps;
+  tags_withheld: TagsWithheld;
 }
 export interface SnapshotOrganisation {
-  confidence?: Confidence4;
+  confidence: Confidence4;
   id: Id;
   name: Name;
   source: Source2;
-  type?: Type4;
-  valid_from?: ValidFrom4;
-  valid_to?: ValidTo4;
+  type: Type4;
+  valid_from: ValidFrom4;
+  valid_to: ValidTo4;
 }
 export interface SnapshotDepartment {
-  confidence?: Confidence5;
+  confidence: Confidence5;
   id: Id1;
   name: Name1;
   source: Source2;
-  type?: Type5;
-  valid_from?: ValidFrom5;
-  valid_to?: ValidTo5;
+  type: Type5;
+  valid_from: ValidFrom5;
+  valid_to: ValidTo5;
 }
 export interface SnapshotPerson {
-  confidence?: Confidence6;
+  confidence: Confidence6;
   id: Id2;
-  job_title?: JobTitle;
+  job_title: JobTitle;
   name: Name2;
   source: Source2;
-  type?: Type6;
-  valid_from?: ValidFrom6;
-  valid_to?: ValidTo6;
+  type: Type6;
+  valid_from: ValidFrom6;
+  valid_to: ValidTo6;
 }
 export interface SnapshotAISystem {
-  confidence?: Confidence7;
-  first_placed_on_market?: FirstPlacedOnMarket;
-  generates_synthetic_content?: GeneratesSyntheticContent;
+  confidence: Confidence7;
+  first_placed_on_market: FirstPlacedOnMarket;
+  generates_synthetic_content: GeneratesSyntheticContent;
   id: Id3;
-  interacts_with_people?: InteractsWithPeople;
+  interacts_with_people: InteractsWithPeople;
   kind: SystemKind;
   name: Name3;
   purpose: Purpose1;
-  roles?: Roles;
-  significant_change_on?: SignificantChangeOn;
+  roles: Roles;
+  significant_change_on: SignificantChangeOn;
   source: Source2;
-  type?: Type7;
-  use_domains?: UseDomains;
-  valid_from?: ValidFrom7;
-  valid_to?: ValidTo7;
+  type: Type7;
+  use_domains: UseDomains;
+  valid_from: ValidFrom7;
+  valid_to: ValidTo7;
 }
 export interface SnapshotCandidate {
   ai_likelihood: AiLikelihood;
-  confidence?: Confidence8;
+  confidence: Confidence8;
   id: Id4;
   name: Name4;
-  signals?: Signals;
+  signals: Signals;
   source: Source2;
-  type?: Type8;
-  valid_from?: ValidFrom8;
-  valid_to?: ValidTo8;
+  type: Type8;
+  valid_from: ValidFrom8;
+  valid_to: ValidTo8;
 }
 export interface SnapshotAWSResource {
-  ai_likelihood?: AiLikelihood | null;
-  confidence?: Confidence9;
-  env_var_names?: EnvVarNames;
+  ai_likelihood: AiLikelihood | null;
+  confidence: Confidence9;
+  env_var_names: EnvVarNames;
   id: Id5;
   name: Name5;
   region: Region;
   resource_type: ResourceType;
-  signals?: Signals1;
+  signals: Signals1;
   source: Source2;
-  tags?: Tags;
-  type?: Type9;
-  valid_from?: ValidFrom9;
-  valid_to?: ValidTo9;
+  tags: Tags;
+  type: Type9;
+  valid_from: ValidFrom9;
+  valid_to: ValidTo9;
 }
 export interface Tags {
   [k: string]: string;
 }
 export interface SnapshotModel {
-  confidence?: Confidence10;
+  confidence: Confidence10;
   id: Id6;
   name: Name6;
   origin: ModelOrigin;
   source: Source2;
-  type?: Type10;
-  valid_from?: ValidFrom10;
-  valid_to?: ValidTo10;
+  type: Type10;
+  valid_from: ValidFrom10;
+  valid_to: ValidTo10;
 }
 export interface SnapshotProvider {
-  confidence?: Confidence11;
+  confidence: Confidence11;
   id: Id7;
   name: Name7;
-  simulated: Simulated1;
+  simulated: Simulated2;
   source: Source2;
-  type?: Type11;
-  valid_from?: ValidFrom11;
-  valid_to?: ValidTo11;
+  type: Type11;
+  valid_from: ValidFrom11;
+  valid_to: ValidTo11;
 }
 export interface SnapshotDataset {
   classification: DataClassification;
-  confidence?: Confidence12;
+  confidence: Confidence12;
   id: Id8;
   name: Name8;
   personal_data: PersonalData;
   source: Source2;
-  type?: Type12;
-  valid_from?: ValidFrom12;
-  valid_to?: ValidTo12;
+  type: Type12;
+  valid_from: ValidFrom12;
+  valid_to: ValidTo12;
 }
 export interface SnapshotRisk {
-  confidence?: Confidence13;
+  confidence: Confidence13;
   description: Description;
   id: Id9;
   source: Source2;
   title: Title;
-  type?: Type13;
-  valid_from?: ValidFrom13;
-  valid_to?: ValidTo13;
+  type: Type13;
+  valid_from: ValidFrom13;
+  valid_to: ValidTo13;
 }
 export interface SnapshotControl {
   automatable: Automatable;
-  confidence?: Confidence14;
+  confidence: Confidence14;
   id: Id10;
   kind: ControlKind;
   scope_level: ScopeLevel;
   source: Source2;
   summary: Summary;
   title: Title1;
-  type?: Type14;
-  valid_from?: ValidFrom14;
-  valid_to?: ValidTo14;
+  type: Type14;
+  valid_from: ValidFrom14;
+  valid_to: ValidTo14;
 }
 export interface SnapshotControlAssessment {
-  assessed_at?: AssessedAt;
-  assessor?: Assessor1;
+  assessed_at: AssessedAt;
+  assessor: Assessor1;
   assurance_level: AssuranceLevel;
-  confidence?: Confidence15;
+  confidence: Confidence15;
   id: Id11;
-  method?: Method1;
+  method: Method1;
   source: Source2;
   status: ImplementationStatus;
-  type?: Type15;
-  valid_from?: ValidFrom15;
-  valid_to?: ValidTo15;
+  type: Type15;
+  valid_from: ValidFrom15;
+  valid_to: ValidTo15;
 }
 export interface SnapshotRequirement {
-  confidence?: Confidence16;
+  confidence: Confidence16;
   id: Id12;
   last_verified: LastVerified;
   ref: Ref;
@@ -618,75 +624,75 @@ export interface SnapshotRequirement {
   source_url: SourceUrl;
   source_version: SourceVersion;
   summary: Summary1;
-  type?: Type16;
-  valid_from?: ValidFrom16;
-  valid_to?: ValidTo16;
+  type: Type16;
+  valid_from: ValidFrom16;
+  valid_to: ValidTo16;
   verified_against: VerifiedAgainst;
 }
 export interface SnapshotFramework {
   binding: Binding;
-  confidence?: Confidence17;
+  confidence: Confidence17;
   id: Id13;
   last_verified: LastVerified1;
   name: Name9;
   source: Source2;
   source_url: SourceUrl1;
   source_version: SourceVersion1;
-  type?: Type17;
-  valid_from?: ValidFrom17;
-  valid_to?: ValidTo17;
+  type: Type17;
+  valid_from: ValidFrom17;
+  valid_to: ValidTo17;
 }
 export interface SnapshotEvidence {
   collected_at: CollectedAt;
   collector: Collector;
-  confidence?: Confidence18;
-  content?: Content;
-  content_ref?: ContentRef;
+  confidence: Confidence18;
+  content: Content;
+  content_ref: ContentRef;
   id: Id14;
   kind: EvidenceKind;
-  redacted?: Redacted;
+  redacted: Redacted;
   sha256: Sha256;
   source: Source2;
   subject: Subject1;
-  type?: Type18;
-  valid_from?: ValidFrom18;
-  valid_to?: ValidTo18;
+  type: Type18;
+  valid_from: ValidFrom18;
+  valid_to: ValidTo18;
   valid_until: ValidUntil;
 }
 export interface SnapshotPolicy {
-  confidence?: Confidence19;
+  confidence: Confidence19;
   id: Id15;
   source: Source2;
   summary: Summary2;
   title: Title2;
-  type?: Type19;
-  valid_from?: ValidFrom19;
-  valid_to?: ValidTo19;
+  type: Type19;
+  valid_from: ValidFrom19;
+  valid_to: ValidTo19;
 }
 export interface SnapshotDiscoveryRun {
-  confidence?: Confidence20;
+  confidence: Confidence20;
   crawler_version: CrawlerVersion;
-  finished_at?: FinishedAt;
+  finished_at: FinishedAt;
   id: Id16;
   mode: RunMode;
   source: Source2;
   started_at: StartedAt;
-  summary?: Summary3;
-  type?: Type20;
-  valid_from?: ValidFrom20;
-  valid_to?: ValidTo20;
+  summary: Summary3;
+  type: Type20;
+  valid_from: ValidFrom20;
+  valid_to: ValidTo20;
 }
 export interface Summary3 {
   [k: string]: number;
 }
 export interface SnapshotChangeEvent {
-  confidence?: Confidence21;
+  confidence: Confidence21;
   detected_at: DetectedAt;
   id: Id17;
   source: Source2;
-  type?: Type21;
-  valid_from?: ValidFrom21;
-  valid_to?: ValidTo21;
+  type: Type21;
+  valid_from: ValidFrom21;
+  valid_to: ValidTo21;
 }
 /**
  * One row of `obligations_for(system)`. The mapping itself is the MAPS_TO edge.
@@ -694,13 +700,13 @@ export interface SnapshotChangeEvent {
 export interface SnapshotObligation {
   applies_to: AppliesTo;
   assessment_id: AssessmentId;
-  control_id: ControlId1;
+  control_id: ControlId2;
   evidence_ids: EvidenceIds;
   provider_id: ProviderId;
   requirement_id: RequirementId1;
   resolution: Resolution;
   role: Role;
-  source?: Source4;
+  source: Source4;
   strength: Strength2;
   strm: StrmType | null;
   sufficiency: Sufficiency | null;
@@ -709,7 +715,7 @@ export interface SnapshotObligation {
 export interface SnapshotProviderImpact {
   assessment_ids: AssessmentIds;
   provider_id: ProviderId1;
-  source?: Source5;
+  source: Source5;
   systems: Systems;
 }
 export interface SnapshotSystemImpact {
@@ -723,14 +729,14 @@ export interface SnapshotRequirementStatus {
   applicability: ApplicabilityStatus | null;
   reason: Reason1;
   requirement_id: RequirementId2;
-  simulated: Simulated2;
-  source?: Source6;
+  simulated: Simulated3;
+  source: Source6;
   state: RequirementState;
   system_id: SystemId2;
   targets: Targets;
 }
 export interface SnapshotTarget {
-  control_id: ControlId2;
+  control_id: ControlId3;
   resolution: Resolution;
   scope_id: ScopeId1;
 }

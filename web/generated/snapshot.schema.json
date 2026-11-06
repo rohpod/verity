@@ -310,10 +310,20 @@
       },
       "required": [
         "id",
+        "type",
         "name",
         "purpose",
         "kind",
-        "source"
+        "roles",
+        "use_domains",
+        "interacts_with_people",
+        "generates_synthetic_content",
+        "first_placed_on_market",
+        "significant_change_on",
+        "source",
+        "confidence",
+        "valid_from",
+        "valid_to"
       ],
       "title": "SnapshotAISystem",
       "type": "object"
@@ -418,10 +428,18 @@
       },
       "required": [
         "id",
+        "type",
         "resource_type",
         "region",
         "name",
-        "source"
+        "tags",
+        "env_var_names",
+        "ai_likelihood",
+        "signals",
+        "source",
+        "confidence",
+        "valid_from",
+        "valid_to"
       ],
       "title": "SnapshotAWSResource",
       "type": "object"
@@ -540,10 +558,17 @@
       "required": [
         "src",
         "dst",
+        "type",
+        "closed_intervals",
         "role",
         "rule_id",
         "reason",
-        "source"
+        "in_force_from",
+        "condition",
+        "source",
+        "confidence",
+        "valid_from",
+        "valid_to"
       ],
       "title": "SnapshotAppliesToEdge",
       "type": "object"
@@ -615,9 +640,14 @@
       },
       "required": [
         "id",
+        "type",
         "name",
         "ai_likelihood",
-        "source"
+        "signals",
+        "source",
+        "confidence",
+        "valid_from",
+        "valid_to"
       ],
       "title": "SnapshotCandidate",
       "type": "object"
@@ -679,8 +709,12 @@
       },
       "required": [
         "id",
+        "type",
         "detected_at",
-        "source"
+        "source",
+        "confidence",
+        "valid_from",
+        "valid_to"
       ],
       "title": "SnapshotChangeEvent",
       "type": "object"
@@ -757,12 +791,16 @@
       },
       "required": [
         "id",
+        "type",
         "title",
         "summary",
         "kind",
         "automatable",
         "scope_level",
-        "source"
+        "source",
+        "confidence",
+        "valid_from",
+        "valid_to"
       ],
       "title": "SnapshotControl",
       "type": "object"
@@ -862,9 +900,16 @@
       },
       "required": [
         "id",
+        "type",
         "status",
         "assurance_level",
-        "source"
+        "method",
+        "assessed_at",
+        "assessor",
+        "source",
+        "confidence",
+        "valid_from",
+        "valid_to"
       ],
       "title": "SnapshotControlAssessment",
       "type": "object"
@@ -934,6 +979,7 @@
         }
       },
       "required": [
+        "source",
         "control_id",
         "scope_id",
         "status",
@@ -978,6 +1024,7 @@
         }
       },
       "required": [
+        "source",
         "from_framework",
         "to_framework",
         "requirement_id",
@@ -1082,10 +1129,14 @@
       },
       "required": [
         "id",
+        "type",
         "name",
         "classification",
         "personal_data",
-        "source"
+        "source",
+        "confidence",
+        "valid_from",
+        "valid_to"
       ],
       "title": "SnapshotDataset",
       "type": "object"
@@ -1147,8 +1198,12 @@
       },
       "required": [
         "id",
+        "type",
         "name",
-        "source"
+        "source",
+        "confidence",
+        "valid_from",
+        "valid_to"
       ],
       "title": "SnapshotDepartment",
       "type": "object"
@@ -1238,10 +1293,16 @@
       },
       "required": [
         "id",
+        "type",
         "mode",
         "started_at",
+        "finished_at",
         "crawler_version",
-        "source"
+        "summary",
+        "source",
+        "confidence",
+        "valid_from",
+        "valid_to"
       ],
       "title": "SnapshotDiscoveryRun",
       "type": "object"
@@ -1354,13 +1415,20 @@
       },
       "required": [
         "id",
+        "type",
         "subject",
         "kind",
         "collector",
         "collected_at",
         "valid_until",
+        "content",
+        "content_ref",
         "sha256",
-        "source"
+        "source",
+        "confidence",
+        "valid_from",
+        "valid_to",
+        "redacted"
       ],
       "title": "SnapshotEvidence",
       "type": "object"
@@ -1372,12 +1440,27 @@
           "title": "Code",
           "type": "string"
         },
+        "control_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Control Id"
+        },
         "message": {
           "title": "Message",
           "type": "string"
         },
         "severity": {
           "$ref": "#/$defs/Severity"
+        },
+        "simulated": {
+          "title": "Simulated",
+          "type": "boolean"
         },
         "source": {
           "const": "derived",
@@ -1391,10 +1474,13 @@
         }
       },
       "required": [
+        "source",
         "code",
         "severity",
         "subject",
-        "message"
+        "message",
+        "control_id",
+        "simulated"
       ],
       "title": "SnapshotFinding",
       "type": "object"
@@ -1475,12 +1561,16 @@
       },
       "required": [
         "id",
+        "type",
         "name",
         "source_version",
         "source_url",
         "last_verified",
         "binding",
-        "source"
+        "source",
+        "confidence",
+        "valid_from",
+        "valid_to"
       ],
       "title": "SnapshotFramework",
       "type": "object"
@@ -1519,6 +1609,7 @@
         }
       },
       "required": [
+        "schema_version",
         "as_of",
         "data_source",
         "redaction",
@@ -1640,10 +1731,17 @@
       "required": [
         "src",
         "dst",
+        "type",
+        "closed_intervals",
         "strm",
+        "strength",
         "rationale_type",
         "rationale",
-        "source"
+        "sufficiency",
+        "source",
+        "confidence",
+        "valid_from",
+        "valid_to"
       ],
       "title": "SnapshotMapsToEdge",
       "type": "object"
@@ -1708,9 +1806,13 @@
       },
       "required": [
         "id",
+        "type",
         "name",
         "origin",
-        "source"
+        "source",
+        "confidence",
+        "valid_from",
+        "valid_to"
       ],
       "title": "SnapshotModel",
       "type": "object"
@@ -1816,6 +1918,7 @@
         }
       },
       "required": [
+        "source",
         "system_id",
         "requirement_id",
         "role",
@@ -1889,8 +1992,12 @@
       },
       "required": [
         "id",
+        "type",
         "name",
-        "source"
+        "source",
+        "confidence",
+        "valid_from",
+        "valid_to"
       ],
       "title": "SnapshotOrganisation",
       "type": "object"
@@ -1964,8 +2071,13 @@
       },
       "required": [
         "id",
+        "type",
         "name",
-        "source"
+        "job_title",
+        "source",
+        "confidence",
+        "valid_from",
+        "valid_to"
       ],
       "title": "SnapshotPerson",
       "type": "object"
@@ -2072,7 +2184,11 @@
         "src",
         "dst",
         "type",
-        "source"
+        "closed_intervals",
+        "source",
+        "confidence",
+        "valid_from",
+        "valid_to"
       ],
       "title": "SnapshotPlainEdge",
       "type": "object"
@@ -2139,9 +2255,13 @@
       },
       "required": [
         "id",
+        "type",
         "title",
         "summary",
-        "source"
+        "source",
+        "confidence",
+        "valid_from",
+        "valid_to"
       ],
       "title": "SnapshotPolicy",
       "type": "object"
@@ -2226,8 +2346,13 @@
       "required": [
         "src",
         "dst",
+        "type",
+        "closed_intervals",
         "purpose",
-        "source"
+        "source",
+        "confidence",
+        "valid_from",
+        "valid_to"
       ],
       "title": "SnapshotProcessesEdge",
       "type": "object"
@@ -2293,9 +2418,13 @@
       },
       "required": [
         "id",
+        "type",
         "name",
         "simulated",
-        "source"
+        "source",
+        "confidence",
+        "valid_from",
+        "valid_to"
       ],
       "title": "SnapshotProvider",
       "type": "object"
@@ -2329,6 +2458,7 @@
         }
       },
       "required": [
+        "source",
         "provider_id",
         "assessment_ids",
         "systems"
@@ -2366,6 +2496,10 @@
           },
           "title": "Steps",
           "type": "array"
+        },
+        "tags_withheld": {
+          "title": "Tags Withheld",
+          "type": "integer"
         }
       },
       "required": [
@@ -2373,6 +2507,7 @@
         "own_account_replaced",
         "external_accounts",
         "content_keys_withheld",
+        "tags_withheld",
         "evidence_rebuilt",
         "evidence_unchanged"
       ],
@@ -2459,13 +2594,17 @@
       },
       "required": [
         "id",
+        "type",
         "ref",
         "summary",
         "source_url",
         "source_version",
         "last_verified",
         "verified_against",
-        "source"
+        "source",
+        "confidence",
+        "valid_from",
+        "valid_to"
       ],
       "title": "SnapshotRequirement",
       "type": "object"
@@ -2524,6 +2663,7 @@
         }
       },
       "required": [
+        "source",
         "requirement_id",
         "system_id",
         "state",
@@ -2597,9 +2737,13 @@
       },
       "required": [
         "id",
+        "type",
         "title",
         "description",
-        "source"
+        "source",
+        "confidence",
+        "valid_from",
+        "valid_to"
       ],
       "title": "SnapshotRisk",
       "type": "object"

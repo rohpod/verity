@@ -323,10 +323,14 @@ def _as_of(text: str) -> datetime:
     return value.astimezone(UTC)
 
 
-def _check_snapshot(path: Path) -> int:
-    """Runs the scanner on a snapshot file. It cannot test for replaced hashes, which need the
-    graph the file came from (ADR 0029, decision 7)."""
+def _check_snapshot(path: Path, *, require_live: bool = False) -> int:
+    """Runs the scanner on a snapshot file, and checks it against the snapshot models, so a field
+    that is not public fails. It cannot test for replaced hashes, which need the graph the file
+    came from (ADR 0029, decision 7). `require_live` refuses a fixture (ADR 0030)."""
+    from pydantic import ValidationError
+
     from verity_core.export.scan import scan_text
+    from verity_core.export.snapshot import Snapshot
 
     try:
         text = path.read_text(encoding="utf-8")
@@ -337,14 +341,24 @@ def _check_snapshot(path: Path) -> int:
     for hit in hits:
         print(f"scan hit: {hit}", file=sys.stderr)
     print(f"{path}: {len(hits)} scan hit(s), {len(text.encode()) / 1024:.0f} KB")
-    return FAILED if hits else OK
+    if hits:
+        return FAILED
+    try:
+        snapshot = Snapshot.model_validate_json(text)
+    except ValidationError as exc:  # its text can quote a value, so only the count is shown
+        print(f"{exc.error_count()} field(s) do not match the snapshot models", file=sys.stderr)
+        return FAILED
+    if require_live and snapshot.header.data_source != "live":
+        print("refused: this snapshot is not from the live graph", file=sys.stderr)
+        return FAILED
+    return OK
 
 
 def cmd_export(args: argparse.Namespace) -> int:
     """Writes the redacted snapshot, or with `--check` scans an existing one. Only `--local`
     exists so far: a live export reads the account's graph and is a later step."""
     if args.check is not None:
-        return _check_snapshot(args.check)
+        return _check_snapshot(args.check, require_live=args.require_live)
     if not args.local:
         print(
             "refused: a live export is not built yet. Use --local to export the recorded "
@@ -355,6 +369,7 @@ def cmd_export(args: argparse.Namespace) -> int:
     # Imported here so the other commands need no export code.
     from verity_core.export.build import (
         ScanRejected,
+        SnapshotTooLarge,
         StaleGraphError,
         build_snapshot,
         write_snapshot,
@@ -382,6 +397,9 @@ def cmd_export(args: argparse.Namespace) -> int:
             print(f"scan hit: {hit}", file=sys.stderr)
         print("refused: the scan found something, so nothing was written", file=sys.stderr)
         return FAILED
+    except SnapshotTooLarge as exc:
+        print(f"refused: {exc}, so nothing was written", file=sys.stderr)
+        return FAILED
     report = built.report
     print("data source: recorded fixture, simulated. Nothing was read from AWS.")
     shown = built.snapshot
@@ -393,7 +411,8 @@ def cmd_export(args: argparse.Namespace) -> int:
     print(
         f"redaction: own account {'replaced' if report.own_account_found else 'not found'}, "
         f"{report.external_accounts} other account(s), {report.content_keys_withheld} hash "
-        f"key(s) withheld, {report.evidence_rebuilt} Evidence rebuilt, "
+        f"key(s) and {report.tags_withheld} tag(s) withheld, {report.evidence_rebuilt} Evidence "
+        "rebuilt, "
         f"{report.evidence_unchanged} unchanged"
     )
     print(f"scan: clean. Wrote {args.out} ({size / 1024:.0f} KB)")
@@ -502,6 +521,11 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         metavar="FILE",
         help="scan an existing snapshot instead of writing one",
+    )
+    export_parser.add_argument(
+        "--require-live",
+        action="store_true",
+        help="with --check: fail unless the snapshot came from the live graph",
     )
     export_parser.add_argument(
         "--out",

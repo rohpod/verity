@@ -25,7 +25,7 @@ TYPES = GENERATED / "snapshot.ts"
 
 def schema_text() -> str:
     """Stable text: sorted keys, two-space indent, a final newline."""
-    schema = Snapshot.model_json_schema()
+    schema = Snapshot.model_json_schema(mode="serialization")
     schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
     schema["title"] = "Snapshot"
     return json.dumps(schema, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
