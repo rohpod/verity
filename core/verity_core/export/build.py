@@ -7,15 +7,32 @@ caller. The same graph and `as_of` give identical bytes.
 import json
 import os
 import tempfile
+from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import networkx as nx
 
-from verity_core.export.redact import Redacted, RedactionReport, redact
+from verity_core.assess.apply import estimate_apply
+from verity_core.content.loader import Content
+from verity_core.export.derive import derive
+from verity_core.export.redact import OWN_ACCOUNT, Redacted, RedactionReport, redact
 from verity_core.export.scan import Hit, scan_text
 from verity_core.export.snapshot import DataSource, Snapshot
+from verity_core.model.enums import NodeType, Source
+from verity_core.model.nodes import Provider
+
+
+class StaleGraphError(ValueError):
+    """The stored assessments are not the ones an assessment now would produce, so the file would
+    not match the graph. The message holds counts only."""
+
+    def __init__(self, written: Counter[str]):
+        kinds = ", ".join(f"{n} {kind}" for kind, n in sorted(written.items()))
+        super().__init__(f"an assessment would still write {kinds}: run verity assess first")
+        self.written = written
 
 
 class ScanRejected(Exception):
@@ -36,14 +53,82 @@ class Built:
         return self.redacted.report
 
 
-def build_snapshot(graph: nx.MultiDiGraph, *, as_of: datetime, data_source: DataSource) -> Built:
-    redacted = redact(graph)
+def _ticking_clock(graph: nx.MultiDiGraph, start: datetime) -> Callable[[], datetime]:
+    """A clock that moves forward on every call, from a time after anything in the graph. The
+    estimate counts a record as written if it was stamped after the run began, so a clock that
+    stood still would count every copied record."""
+    stamps = [graph.nodes[n]["record"].updated_at for n in graph.nodes]
+    now = max([start, *(stamp for stamp in stamps if stamp is not None)])
+
+    def clock() -> datetime:
+        nonlocal now
+        now += timedelta(microseconds=1)
+        return now
+
+    return clock
+
+
+def _simulated_components(graph: nx.MultiDiGraph) -> list[str]:
+    """What in the file is not real: simulated providers, and records marked simulated."""
+    records = [graph.nodes[n]["record"] for n in graph.nodes]
+    found = {
+        f"{r.name} (simulated provider)" for r in records if isinstance(r, Provider) and r.simulated
+    }
+    signed = [r for r in records if r.type is NodeType.EVIDENCE and r.source is Source.SIMULATED]
+    if signed:
+        found.add("simulated sign-offs")
+    return sorted(found)
+
+
+def _steps(report: RedactionReport) -> list[str]:
+    steps = ["config hash fields withheld"]
+    if report.own_account_found:
+        steps.append(f"own account replaced by {OWN_ACCOUNT}")
+    if report.external_accounts:
+        steps.append("other accounts replaced by ordinals")
+    if report.evidence_rebuilt:
+        steps.append("changed Evidence rebuilt with a new hash and ID")
+    steps.append("independent scan before writing")
+    return steps
+
+
+def build_snapshot(
+    graph: nx.MultiDiGraph, *, content: Content, as_of: datetime, data_source: DataSource
+) -> Built:
+    """Refuses a graph whose stored assessments are not the ones `as_of` would give (decision 2).
+    Findings, statuses and control results come from that same run."""
+    if content.rules is None:
+        raise ValueError("applicability.yaml is needed to check the assessments")
+    result = estimate_apply(
+        graph,
+        content.rules,
+        content.dates,
+        as_of,
+        _ticking_clock(graph, as_of),
+        content.tenant,
+    )
+    if result.total_written:
+        raise StaleGraphError(result.written)
+    redacted = redact(graph, derive(graph, result))
+    report = redacted.report
     snapshot = Snapshot.model_validate(
         {
-            "data_source": data_source,
-            "as_of": as_of,
+            "header": {
+                "as_of": as_of,
+                "data_source": data_source,
+                "redaction": {
+                    "steps": _steps(report),
+                    "own_account_replaced": report.own_account_found,
+                    "external_accounts": report.external_accounts,
+                    "content_keys_withheld": report.content_keys_withheld,
+                    "evidence_rebuilt": report.evidence_rebuilt,
+                    "evidence_unchanged": report.evidence_unchanged,
+                },
+                "simulated_components": _simulated_components(graph),
+            },
             "nodes": redacted.nodes,
             "edges": redacted.edges,
+            **redacted.extras,
         }
     )
     return Built(snapshot, redacted)

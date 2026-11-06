@@ -1,8 +1,11 @@
 """Helpers for the export tests. Everything here is invented."""
 
+from collections import Counter
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from unittest.mock import patch
 
+from verity_core.assess.apply import ApplyResult
 from verity_core.content.loader import load_content
 from verity_core.discovery.boundary import scrub
 from verity_core.export.build import build_snapshot
@@ -96,8 +99,20 @@ def small_graph(*contents: dict, extra_edges: bool = True):
     return repo.load_graph(), made
 
 
-def built_from(graph, **kw):
-    return build_snapshot(graph, as_of=AS_OF, data_source="fixture", **kw)
+LOADED = load_content(CONTENT)
+NOTHING = ApplyResult(Counter(), 0, (), (), ())
+
+
+def built_from(graph):
+    """For a hand-built graph, which holds no systems to assess: the staleness check is told
+    there is nothing to write. The real check is exercised on the fixture by `built_fixture`."""
+    with patch("verity_core.export.build.estimate_apply", return_value=NOTHING):
+        return build_snapshot(graph, content=LOADED, as_of=AS_OF, data_source="fixture")
+
+
+def built_fixture(as_of=AS_OF):
+    """The recorded estate through the whole path, including the real staleness check."""
+    return build_snapshot(fixture_graph(), content=LOADED, as_of=as_of, data_source="fixture")
 
 
 _FIXTURE_GRAPH = None
@@ -109,3 +124,15 @@ def fixture_graph():
     if _FIXTURE_GRAPH is None:
         _FIXTURE_GRAPH = local_graph(load_content(CONTENT), FIXTURE, AS_OF)
     return _FIXTURE_GRAPH
+
+
+def unassessed_graph():
+    """Seeded and crawled but never assessed, so an assessment would still write."""
+    from verity_core.content.seed import seed
+    from verity_core.discovery.collectors import FixtureCollector
+    from verity_core.discovery.pipeline import crawl
+
+    repo = InMemoryRepository(LOADED.tenant, clock)
+    seed(repo, LOADED, clock)
+    crawl(repo, LOADED, FixtureCollector(FIXTURE), clock)
+    return repo.load_graph()

@@ -3,7 +3,14 @@
 import json
 
 import pytest
-from export_support import CONTENT, FIXTURE, built_from, fixture_graph, function_config, small_graph
+from export_support import (
+    CONTENT,
+    FIXTURE,
+    built_fixture,
+    built_from,
+    function_config,
+    small_graph,
+)
 from verity_core import cli
 from verity_core.export import scan
 from verity_core.export.build import ScanRejected, serialise, write_snapshot
@@ -19,8 +26,8 @@ def run(*argv):
 
 
 def test_identical_inputs_and_as_of_give_identical_bytes():
-    first = serialise(built_from(fixture_graph()).snapshot)
-    second = serialise(built_from(fixture_graph()).snapshot)
+    first = serialise(built_fixture().snapshot)
+    second = serialise(built_fixture().snapshot)
     assert first == second and first.endswith("\n")
 
 
@@ -68,7 +75,7 @@ def test_a_clean_graph_is_written_and_nothing_else_is_left(tmp_path):
 
 def test_the_file_the_scan_read_is_the_file_that_was_renamed(tmp_path):
     target = tmp_path / "snapshot.json"
-    built = built_from(fixture_graph())
+    built = built_fixture()
     write_snapshot(target, built)
     assert target.read_text() == serialise(built.snapshot)
     assert scan.scan_text(target.read_text(), old_hashes=built.redacted.replaced_hashes) == []
@@ -99,8 +106,8 @@ def test_export_local_reports_what_it_did_and_stays_small(tmp_path, capsys):
     assert "own account replaced" in text and "Evidence rebuilt" in text
     assert out.stat().st_size < 2 * 1024 * 1024
     data = json.loads(out.read_text())
-    assert data["data_source"] == "fixture" and data["schema_version"] == 1
-    assert data["as_of"] == "2026-11-06T00:00:00Z"
+    assert data["header"]["data_source"] == "fixture" and data["header"]["schema_version"] == 1
+    assert data["header"]["as_of"] == "2026-11-06T00:00:00Z"
 
 
 def test_export_without_local_is_refused_for_now(tmp_path, capsys):
