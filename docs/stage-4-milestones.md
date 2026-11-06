@@ -41,6 +41,7 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/). Decisions by the owner:
 | D23 | M5 rules: automated-only guardrail, Art. 111(2), high-risk candidates, decisions as Evidence, *Not met*. See [ADR 0019](adr/0019-m5-rules-and-assessment.md) |
 | D24 | M5 review fixes: decision lifecycle, risk-tier expiry, unknown facts, severity from binding law, ended assessments. See [ADR 0020](adr/0020-m5-review-fixes.md) |
 | D25 | M6 discovery: evidence on change only, summarised over the cap, one cleaning boundary, VC-060 for unused permissions, Candidate lifecycle. See [ADR 0021](adr/0021-m6-discovery.md) |
+| D26 | M6 review fixes: concrete AI actions, an inconclusive VC-060 outcome, account digests, signal matching. See [ADR 0022](adr/0022-m6-review-fixes.md) |
 
 ## Milestones
 
@@ -118,6 +119,7 @@ Found while building and reviewing M1. Each is open until the named milestone cl
 |---|---|
 | M3 | Last open criterion: the owner re-reads credits in the Billing console at least 24 hours after the last live write (2026-11-05). M3 stays 🔄 until they match. The checks moto could not do are done ([ADR 0016](adr/0016-m3-live-results.md)) |
 | M8 | `load_graph` reads every `U#` usage record in the table and discards it. Demo usage volume is small, so measure the scan on the real table. If usage grows large, load without a scan: list nodes through the type index and read each node's partition |
+| M6 | The end-of-milestone review keeps M6 open until the fixes in [ADR 0022](adr/0022-m6-review-fixes.md) land and the review's experiments pass again |
 | M8 | Read `DiscoveryRun.summary.largest_evidence_bytes` from the first live crawl. Evidence over the 16 KB cap is summarised, never refused ([ADR 0021](adr/0021-m6-discovery.md)); decide whether the cap should rise |
 | M8 | Build `crawler/handler.py` and the live path of `verity crawl`. The CLI refuses it until then |
 | M8 | Grant the crawler the actions listed in architecture §D, and never `lambda:GetFunction` |
