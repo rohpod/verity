@@ -13,3 +13,15 @@ variable "budget_email" {
   type        = string
   sensitive   = true
 }
+
+variable "schedule_state" {
+  description = "ENABLED only after a manual crawl and a second one have passed (ADR 0025)."
+  type        = string
+  default     = "DISABLED"
+}
+
+variable "enable_probe" {
+  description = "Creates verity-probe while the LeadingKeys limit is proved, then false again."
+  type        = bool
+  default     = false
+}
