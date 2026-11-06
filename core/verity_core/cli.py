@@ -1,5 +1,5 @@
 """The `verity` command (architecture section I). M4 adds `lint` and `seed`, M5 `assess` and
-`attest`."""
+`attest`, M6 `crawl`."""
 
 import argparse
 import sys
@@ -28,6 +28,9 @@ from verity_core.content.seed import (
     estimate,
     seed,
 )
+from verity_core.discovery.boundary import BoundaryError
+from verity_core.discovery.collectors import FixtureCollector
+from verity_core.discovery.pipeline import CrawlReport, crawl
 from verity_core.graph.memory import InMemoryRepository
 from verity_core.model.enums import ImplementationStatus
 from verity_core.rules.status import ApplicabilityStatus
@@ -232,6 +235,59 @@ def cmd_assess(args: argparse.Namespace) -> int:
     return OK
 
 
+def _print_crawl(report: CrawlReport, fixture: Path, *, verbose: bool) -> None:
+    print(f"data source: recorded fixture {fixture}, simulated. Nothing was read from AWS.")
+    print(f"{len(report.functions)} function(s) scored:")
+    for name, likelihood, signals in report.functions:
+        print(f"  {name:<20} {likelihood.value:<16} {', '.join(signals) or '-'}")
+    print(f"{len(report.candidates)} candidate(s) for the registry:")
+    for name, likelihood, signals in report.candidates:
+        print(f"  {name:<20} {likelihood.value:<16} {', '.join(signals)}")
+    if report.changes:
+        print(f"{len(report.changes)} change(s): {', '.join(report.changes)}")
+    if report.manifests_invalid:
+        print(f"{report.manifests_invalid} manifest(s) were invalid and were skipped")
+    written = ", ".join(f"{n} {kind}" for kind, n in sorted(report.written.items())) or "nothing"
+    print(f"crawl wrote: {written}")
+    if verbose:
+        print("run summary: " + ", ".join(f"{k}={v}" for k, v in sorted(report.summary.items())))
+
+
+def cmd_crawl(args: argparse.Namespace) -> int:
+    """Crawls a recorded fixture into a fresh in-memory graph, then assesses it. Only `full`
+    crawls exist, and the live path needs the deployed crawler (M8, ADR 0021)."""
+    if not args.local:
+        print(
+            "refused: a live crawl needs the deployed crawler, which arrives in M8. Use --local "
+            "to crawl the recorded fixture; it reads nothing from AWS.",
+            file=sys.stderr,
+        )
+        return REFUSED
+    loaded = _load_and_lint(args.content, args.tenant)
+    if isinstance(loaded, int):
+        return loaded
+    if loaded.rules is None or loaded.signals is None:
+        print(
+            "cannot crawl: content/rules/applicability.yaml and ai_signals.yaml are needed",
+            file=sys.stderr,
+        )
+        return UNREADABLE
+    fixture = args.fixture or args.content / "fixtures" / "crawl" / "estate.json"
+    repo = InMemoryRepository(args.tenant, _utc_now)
+    seed(repo, loaded, _utc_now)
+    try:
+        report = crawl(repo, loaded, FixtureCollector(fixture), _utc_now)
+    except (OSError, ValueError, BoundaryError) as exc:  # no raw record is ever in these
+        print(f"cannot read the fixture {fixture}: {type(exc).__name__}", file=sys.stderr)
+        return UNREADABLE
+    _print_crawl(report, fixture, verbose=args.verbose)
+    as_of = _utc_now()
+    result = apply_assessment(repo, loaded.rules, loaded.dates, as_of, _utc_now)
+    _print_assessment(result, as_of, verb="stored in memory", verbose=args.verbose)
+    print("dry run only: nothing was written to AWS.")
+    return OK
+
+
 def cmd_attest(args: argparse.Namespace) -> int:
     """Scaffolds a decision file for review (D9). It never touches the graph."""
     today = _utc_now().date()
@@ -307,6 +363,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     assess_parser.add_argument("--yes", action="store_true", help="skip the confirmation prompt")
     assess_parser.add_argument("--verbose", action="store_true", help="list every finding")
+
+    crawl_parser = add("crawl", cmd_crawl, "discover the AI estate and assess it")
+    crawl_parser.add_argument(
+        "--local",
+        action="store_true",
+        help="crawl a recorded fixture into a fresh in-memory graph; reads nothing from AWS",
+    )
+    crawl_parser.add_argument(
+        "--fixture",
+        type=Path,
+        metavar="PATH",
+        help="the recorded estate (default: <content>/fixtures/crawl/estate.json)",
+    )
+    crawl_parser.add_argument("--verbose", action="store_true", help="list every finding")
 
     attest_parser = add("attest", cmd_attest, "scaffold an attestation decision file")
     attest_parser.add_argument("control", help="control code, such as VC-001")

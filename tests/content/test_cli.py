@@ -224,3 +224,75 @@ def test_the_module_runs_as_a_script():
         check=True,
     ).stdout
     assert "content passes lint" in out
+
+
+# --- verity crawl (M6) ---------------------------------------------------------------------
+
+REAL = Path(__file__).parents[2] / "content"
+
+
+def test_crawl_without_local_is_refused_and_names_m8(capsys):
+    assert cli.run(["crawl", "--content", str(REAL)]) == cli.REFUSED
+    err = capsys.readouterr().err
+    assert err.startswith("refused:") and "M8" in err
+
+
+def test_crawl_local_scores_the_fixture_and_assesses_it(capsys):
+    assert cli.run(["crawl", "--local", "--content", str(REAL)]) == cli.OK
+    out = capsys.readouterr().out
+    assert "recorded fixture" in out and "Nothing was read from AWS" in out
+    assert "shadow-summariser    probable" in out
+    assert "invoice-renderer     none" in out
+    assert "high   shadow_ai_candidate  cand:shadow-summariser" in out
+    assert "high   control_not_met  sys:support-assistant" in out
+    assert "dry run only" in out
+
+
+def test_crawl_local_never_prints_an_env_value_or_an_account_id(capsys):
+    assert cli.run(["crawl", "--local", "--verbose", "--content", str(REAL)]) == cli.OK
+    out = capsys.readouterr()
+    assert "VERITY-CANARY-7f3a" not in out.out + out.err
+    assert "000000000000" not in out.out + out.err
+    assert "run summary:" in out.out
+
+
+def test_crawl_local_reads_another_fixture(tmp_path, capsys):
+    import json
+
+    raw = json.loads((REAL / "fixtures" / "crawl" / "estate.json").read_text())
+    raw["functions"] = [f for f in raw["functions"] if f["FunctionName"] != "shadow-summariser"]
+    path = tmp_path / "estate.json"
+    path.write_text(json.dumps(raw))
+    assert cli.run(["crawl", "--local", "--fixture", str(path), "--content", str(REAL)]) == cli.OK
+    assert "shadow-summariser" not in capsys.readouterr().out
+
+
+def test_crawl_local_with_a_missing_or_broken_fixture_is_unreadable(tmp_path, capsys):
+    missing = tmp_path / "nope.json"
+    assert cli.run(["crawl", "--local", "--fixture", str(missing), "--content", str(REAL)]) == (
+        cli.UNREADABLE
+    )
+    broken = tmp_path / "broken.json"
+    broken.write_text('{"functions": [{"FunctionName": "f"}]}')
+    assert cli.run(["crawl", "--local", "--fixture", str(broken), "--content", str(REAL)]) == (
+        cli.UNREADABLE
+    )
+    assert "cannot read the fixture" in capsys.readouterr().err
+
+
+def test_crawl_local_needs_the_signals_file(tmp_path, capsys):
+    assert cli.run(["crawl", "--local", "--content", tree(tmp_path)]) == cli.UNREADABLE
+    assert "ai_signals.yaml" in capsys.readouterr().err
+
+
+def test_crawl_local_does_not_import_the_aws_collector():
+    import subprocess
+
+    code = (
+        "import sys; from verity_core import cli; "
+        f"assert cli.run(['crawl', '--local', '--content', {str(REAL)!r}]) == 0; "
+        "assert 'verity_core.discovery.aws' not in sys.modules; "
+        "assert 'boto3' not in sys.modules"
+    )
+    done = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+    assert done.returncode == 0, done.stderr
