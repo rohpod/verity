@@ -66,9 +66,9 @@ Stage 4 also showed ⬜ here. PRs 59 to 61 built the export and passed its redac
 | Schema validates | Passed on the fixture, not yet on live data |
 | Every record has provenance, and the file has its `as_of` | Passed on the fixture, not yet on live data |
 
-**Code still to write (PR C), which can start now:**
+**Code for PR C, written and tested with moto and a throwaway git repo, never run against the real table:**
 1. **The live export path.** Read through `GraphRepository.load_graph()`, write `data_source: live`, and use now as `as_of`, not the start of the day, or the stale check refuses a good graph ([ADR 0030](adr/0030-m9-redaction-review.md)).
-2. **The decision commit SHA lookup** (ADR 0029, decision 9). It is **not built**, and the snapshot schema has no field for it. It needs the field, the lookup, a refusal when a live export cannot find a SHA, and an exact-shape exemption from the digit rule, because a SHA is 40 hex digits.
+2. **The decision commit SHA lookup** (ADR 0029, decision 9). The snapshot gains `decision_commits` (`commit_sha` is null in a fixture export), a live export refuses if a decision has no commit, and the scanner exempts only a 40-hex value under the key `commit_sha`.
 
 **Steps that wait for M8 to close:**
 3. With approval, run `verity assess --target dynamodb`, because export refuses a stale graph. It took 41 minutes last time, slowed by credential refreshes (ADR 0028).

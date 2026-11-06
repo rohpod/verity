@@ -168,6 +168,16 @@ class SnapshotCrosswalk(DerivedRow):
     links: list[SnapshotCrosswalkLink]
 
 
+class SnapshotDecisionCommit(DerivedRow):
+    """The commit that introduced a decision file (ADR 0029, decision 9). Null in a fixture
+    export, which runs no git; a live export refuses if one is missing."""
+
+    decision_id: str
+    decision_file: str
+    file_sha256: str
+    commit_sha: str | None
+
+
 class SnapshotRedaction(SnapshotRecord):
     """What redaction did, as counts. Never a value."""
 
@@ -201,3 +211,4 @@ class Snapshot(SnapshotRecord):
     obligations: list[SnapshotObligation]
     provider_impact: list[SnapshotProviderImpact]
     crosswalk: list[SnapshotCrosswalk]
+    decision_commits: list[SnapshotDecisionCommit]

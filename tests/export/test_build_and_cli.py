@@ -110,12 +110,6 @@ def test_export_local_reports_what_it_did_and_stays_small(tmp_path, capsys):
     assert data["header"]["as_of"] == "2026-11-06T00:00:00Z"
 
 
-def test_export_without_local_is_refused_for_now(tmp_path, capsys):
-    out = tmp_path / "snapshot.json"
-    assert run("--out", out) == cli.REFUSED
-    assert "refused:" in capsys.readouterr().err and not out.exists()
-
-
 def test_export_check_passes_a_clean_file_and_fails_a_planted_one(tmp_path, capsys):
     clean = tmp_path / "clean.json"
     run("--local", "--as-of", "2026-11-06", "--out", clean)

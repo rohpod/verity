@@ -7,6 +7,7 @@ from collections import Counter
 from collections.abc import Callable, Sequence
 from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
+from typing import Literal
 
 import yaml
 from pydantic import ValidationError
@@ -355,14 +356,15 @@ def _check_snapshot(path: Path, *, require_live: bool = False) -> int:
 
 
 def cmd_export(args: argparse.Namespace) -> int:
-    """Writes the redacted snapshot, or with `--check` scans an existing one. Only `--local`
-    exists so far: a live export reads the account's graph and is a later step."""
+    """Writes the redacted snapshot, or with `--check` scans an existing one. `--local` crawls the
+    recorded fixture and reads nothing from AWS. Without it the live graph is read, read-only
+    (ADR 0029, decision 1)."""
     if args.check is not None:
         return _check_snapshot(args.check, require_live=args.require_live)
-    if not args.local:
+    if not args.local and (args.as_of is not None or args.fixture is not None):
         print(
-            "refused: a live export is not built yet. Use --local to export the recorded "
-            "fixture; it reads nothing from AWS.",
+            "refused: a live export is as of now and reads the account's graph, so --as-of and "
+            "--fixture only go with --local",
             file=sys.stderr,
         )
         return REFUSED
@@ -374,17 +376,42 @@ def cmd_export(args: argparse.Namespace) -> int:
         build_snapshot,
         write_snapshot,
     )
-    from verity_core.export.local import local_graph
+    from verity_core.export.commits import CommitLookupError, lookup
 
     loaded = _load_and_lint(args.content, args.tenant)
     if isinstance(loaded, int):
         return loaded
-    as_of = args.as_of or _utc_now().replace(microsecond=0)
-    fixture = args.fixture or args.content / "fixtures" / "crawl" / "estate.json"
+    data_source: Literal["live", "fixture"] = "fixture" if args.local else "live"
+    commits = None
     try:
-        graph = local_graph(loaded, fixture, as_of)
-        built = build_snapshot(graph, content=loaded, as_of=as_of, data_source="fixture")
+        if args.local:
+            from verity_core.export.local import local_graph
+
+            as_of = args.as_of or _utc_now().replace(microsecond=0)
+            fixture = args.fixture or args.content / "fixtures" / "crawl" / "estate.json"
+            graph = local_graph(loaded, fixture, as_of)
+        else:
+            # Imported here so a local export needs no AWS libraries.
+            from verity_core.graph.dynamodb.repository import DynamoDBRepository
+
+            # Now, not the start of the day: the stored assessments are stamped during the day,
+            # and an earlier `as_of` would make the stale check refuse a good graph (ADR 0030).
+            as_of = _utc_now()
+            graph = DynamoDBRepository(args.tenant, _utc_now).load_graph()
+            if not graph.nodes:
+                print(
+                    "the table is empty: run `verity seed --target dynamodb` first",
+                    file=sys.stderr,
+                )
+                return REFUSED
+            commits = lookup(graph, args.content.resolve().parent, require=True)
+        built = build_snapshot(
+            graph, content=loaded, as_of=as_of, data_source=data_source, decision_commits=commits
+        )
     except StaleGraphError as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return REFUSED
+    except CommitLookupError as exc:  # names decisions and counts, never a record
         print(f"refused: {exc}", file=sys.stderr)
         return REFUSED
     except (OSError, ValueError, BoundaryError) as exc:  # no raw record is ever in these
@@ -401,7 +428,10 @@ def cmd_export(args: argparse.Namespace) -> int:
         print(f"refused: {exc}, so nothing was written", file=sys.stderr)
         return FAILED
     report = built.report
-    print("data source: recorded fixture, simulated. Nothing was read from AWS.")
+    if args.local:
+        print("data source: recorded fixture, simulated. Nothing was read from AWS.")
+    else:
+        print("data source: live graph, read-only. Nothing was written to AWS.")
     shown = built.snapshot
     print(
         f"{len(shown.nodes)} nodes, {len(shown.edges)} edges, {len(shown.findings)} findings, "
@@ -514,7 +544,8 @@ def build_parser() -> argparse.ArgumentParser:
     export_parser.add_argument(
         "--local",
         action="store_true",
-        help="export the recorded fixture, crawled and assessed in memory; reads nothing from AWS",
+        help="export the recorded fixture, crawled and assessed in memory; reads nothing from AWS "
+        "(without it, the live graph is read, read-only)",
     )
     export_parser.add_argument(
         "--check",

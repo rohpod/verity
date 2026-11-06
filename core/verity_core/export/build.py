@@ -12,11 +12,13 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import networkx as nx
 
 from verity_core.assess.apply import estimate_apply
 from verity_core.content.loader import Content
+from verity_core.export.commits import without_commits
 from verity_core.export.derive import derive
 from verity_core.export.redact import OWN_ACCOUNT, Redacted, RedactionReport, redact
 from verity_core.export.scan import Hit, scan_text
@@ -108,10 +110,16 @@ def _steps(report: RedactionReport) -> list[str]:
 
 
 def build_snapshot(
-    graph: nx.MultiDiGraph, *, content: Content, as_of: datetime, data_source: DataSource
+    graph: nx.MultiDiGraph,
+    *,
+    content: Content,
+    as_of: datetime,
+    data_source: DataSource,
+    decision_commits: list[dict[str, Any]] | None = None,
 ) -> Built:
     """Refuses a graph whose stored assessments are not the ones `as_of` would give (decision 2).
-    Findings, statuses and control results come from that same run."""
+    Findings, statuses and control results come from that same run. `decision_commits` are the
+    looked-up rows (decision 9); without them every `commit_sha` is null."""
     if content.rules is None:
         raise ValueError("applicability.yaml is needed to check the assessments")
     result = estimate_apply(
@@ -124,7 +132,11 @@ def build_snapshot(
     )
     if result.total_written:
         raise StaleGraphError(result.written)
-    redacted = redact(graph, derive(graph, result))
+    derived = derive(graph, result)
+    derived["decision_commits"] = (
+        decision_commits if decision_commits is not None else without_commits(graph)
+    )
+    redacted = redact(graph, derived)
     report = redacted.report
     if data_source == "live" and not report.own_account_found:
         raise ValueError("a live graph must show the owner's account")
