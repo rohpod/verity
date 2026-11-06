@@ -28,6 +28,12 @@ def granted(*statements):
     return granted_ai_actions(AI, statements)
 
 
+def test_a_call_that_invokes_no_model_does_not_show_ai_use():
+    assert not trail_shows_ai("r", [event("r", name="ListFoundationModels")], SOURCES, AI)
+    assert not trail_shows_ai("r", [event("r", name="ListGuardrails")], SOURCES, AI)
+    assert not trail_shows_ai("r", [event("r", name="GetFoundationModel")], SOURCES, AI)
+
+
 def test_a_pattern_grant_resolves_to_the_listed_actions_it_covers():
     assert granted(allow("bedrock:InvokeModel")) == (INVOKE,)
     assert granted(allow("BEDROCK:invokemodel")) == (INVOKE,)
@@ -144,11 +150,11 @@ def test_the_content_names_the_control_and_the_scope_the_assessor_matches_on():
 
 
 def test_trail_signal():
-    assert trail_shows_ai("r", [event("r")], SOURCES)
-    assert not trail_shows_ai("other", [event("r")], SOURCES)
-    assert not trail_shows_ai(None, [event(None)], SOURCES)
-    assert not trail_shows_ai("r", [event("r", source="s3.amazonaws.com")], SOURCES)
-    assert not trail_shows_ai("r", [event("r", kind="AwsServiceEvent")], SOURCES)
+    assert trail_shows_ai("r", [event("r")], SOURCES, AI)
+    assert not trail_shows_ai("other", [event("r")], SOURCES, AI)
+    assert not trail_shows_ai(None, [event(None)], SOURCES, AI)
+    assert not trail_shows_ai("r", [event("r", source="s3.amazonaws.com")], SOURCES, AI)
+    assert not trail_shows_ai("r", [event("r", kind="AwsServiceEvent")], SOURCES, AI)
 
 
 def test_usage_records_are_a_signal_but_never_part_of_the_vc060_check():
@@ -173,11 +179,11 @@ def test_a_refused_call_does_not_count_as_use():
     result = check_vc060(AI, [role], [refused], SOURCES)
     assert result.outcome == "fail"
     assert result.unused == (INVOKE,)
-    assert not trail_shows_ai("r", [refused], SOURCES)
+    assert not trail_shows_ai("r", [refused], SOURCES, AI)
 
 
 def test_a_successful_call_still_proves_use_beside_a_failed_one():
     role = make_role("r", allow("bedrock:InvokeModel"))
     events = [event("r", name="InvokeModel", error="ThrottlingException"), event("r")]
     assert check_vc060(AI, [role], events, SOURCES).outcome == "pass"
-    assert trail_shows_ai("r", events, SOURCES)
+    assert trail_shows_ai("r", events, SOURCES, AI)

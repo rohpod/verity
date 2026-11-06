@@ -202,7 +202,7 @@ Found while building and reviewing M1. Each is open until the named milestone cl
 | M8 | Tag the mocks and the crawler `verity:component`, or `mock-openai` becomes a shadow-AI candidate **Closed by [ADR 0027](adr/0027-m8-live-results.md).** |
 | M8 | Publish the manifests to SSM under `/verity/manifests/` **Closed by [ADR 0027](adr/0027-m8-live-results.md).** |
 | After M8 | Decide whether to add Bedrock's 8 other `Invoke*` actions, such as `InvokeDataAutomation`, to `ai_signals.yaml` ([ADR 0025](adr/0025-m8-deploy-and-crawl.md)) |
-| After M8 | Make `trail_shows_ai` check the event's name as `_proves` does, so a `List*` call from a function's role is not `confirmed_usage` ([ADR 0028](adr/0028-m8-review.md)) |
+| After M8 | Make `trail_shows_ai` check the event's name as `_proves` does, so a `List*` call from a function's role is not `confirmed_usage` ([ADR 0028](adr/0028-m8-review.md)) **Closed:** it now uses `_proves`. The deployed crawler changes at the next apply |
 | After M8 | Stop `credential_process` running on every call for the operator's commands, and correct the CLI's "while it throttles" message ([ADR 0028](adr/0028-m8-review.md)) |
 | M10 | Word the boundary note as what IAM's simulator shows, with no live call tried. Never say the grant "is ineffective" as a fact ([ADR 0028](adr/0028-m8-review.md)) |
 | M8 | Confirm the real crawler's function name matches `platform_functions`, and that the demo role grants `bedrock:InvokeModel` **Closed by [ADR 0027](adr/0027-m8-live-results.md).** |

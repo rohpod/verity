@@ -204,6 +204,22 @@ def test_an_unseen_role_is_inconclusive_and_replaces_an_older_pass(repo, clock, 
     )
 
 
+def test_a_list_call_from_the_role_neither_scores_as_usage_nor_proves_the_grant(
+    repo, clock, tmp_path
+):
+    seeded(repo, clock, CONTENT_LOADED)
+
+    def listed(raw):
+        raw["trail_events"].append(
+            trail_event_json("support-assistant-role", name="ListFoundationModels")
+        )
+
+    report = crawl_fixture(repo, clock, edited_fixture(tmp_path, listed), CONTENT_LOADED)
+    scored = {name: signals for name, _, signals in report.functions}
+    assert "trail_ai_event" not in scored["support-assistant"]
+    assert result(assess(repo, clock)).status is not ImplementationStatus.IMPLEMENTED
+
+
 def test_converse_in_cloudtrail_proves_the_seeded_invoke_model_grant(repo, clock, tmp_path):
     seeded(repo, clock, CONTENT_LOADED)
 
