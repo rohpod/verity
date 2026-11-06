@@ -1,6 +1,6 @@
 """`DynamoDBUsageSink`: what the `verity_ai` adapters write through (D8, ADR 0013).
 
-It is one conditional `PutItem` in the system's own partition. It never reads, so an app role
+It is one conditional `PutItem` in the system's own usage partition. It never reads, so an app role
 needs only `dynamodb:PutItem`, limited to its partition with `dynamodb:LeadingKeys`. The graph
 repository delegates to it. One of the few modules allowed to import boto3.
 """

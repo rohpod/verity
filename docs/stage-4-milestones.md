@@ -147,7 +147,7 @@ Found while building and reviewing M1. Each is open until the named milestone cl
 | M8 | Read `DiscoveryRun.summary.largest_evidence_bytes` from the first live crawl. Evidence over the 16 KB cap is summarised, never refused ([ADR 0021](adr/0021-m6-discovery.md)); decide whether the cap should rise |
 | M8 | Build `crawler/handler.py` and the live path of `verity crawl`. The CLI refuses it until then |
 | M8 | Grant both Function URL actions, `lambda:InvokeFunctionUrl` and `lambda:InvokeFunction`, to every caller of `mock-openai` ([ADR 0023](adr/0023-m7-demo-estate.md)) |
-| M8 | Write the `dynamodb:LeadingKeys` policy for each app role, limited to `T#kestrel#N#sys:<system>`, with `dynamodb:PutItem` only. `shadow-summariser` and `talent-screening` get no table access |
+| M8 | Write the `dynamodb:LeadingKeys` policy for each app role, limited to `T#kestrel#U#sys:<system>` using `ForAllValues:StringEquals`, with `dynamodb:PutItem` only. `shadow-summariser` and `talent-screening` get no table access |
 | M8 | Prove SigV4 against the real Function URL, including the signing name `lambda`, which no page read so far has confirmed. `tests/sdk` only proves the signature's shape |
 | M8 | Tag `mock-bedrock` and `mock-openai` `verity:component`. `mock-bedrock` is now in the fixture and in `platform_functions` |
 | M8 | Add manifest files under `content/manifests/` for `talent-screening` and `contract-insights`, then publish them |

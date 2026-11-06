@@ -6,7 +6,7 @@
 | Outgoing edge         | `T#{tenant}#N#{src}`     | `E#{type}#{dst}[#{qualifier}]`      |
 | Reverse edge (mirror) | `T#{tenant}#N#{dst}`     | `R#{type}#{src}[#{qualifier}]`      |
 | Node history          | `T#{tenant}#N#{id}`      | `H#{iso_ts}#{version}`              |
-| Usage record          | `T#{tenant}#N#{system}`  | `U#{iso_ts}#{usage_id}`             |
+| Usage record          | `T#{tenant}#U#{system}`  | `U#{iso_ts}#{usage_id}`             |
 
 IDs, tenants and qualifiers contain no `#` (their patterns forbid it), so a key can always be
 read back unambiguously. Timestamps are fixed-width UTC, and versions are zero-padded, so
@@ -42,6 +42,12 @@ def tenant_prefix(tenant: str) -> str:
 
 def node_pk(tenant: str, node_id: str) -> str:
     return f"{tenant_prefix(tenant)}N#{node_id}"
+
+
+def usage_pk(tenant: str, system_id: str) -> str:
+    """Usage has its own partition, so an app role's `dynamodb:LeadingKeys` condition can name it
+    without also reaching the system's `META`, edge and history items (ADR 0024)."""
+    return f"{tenant_prefix(tenant)}U#{system_id}"
 
 
 def _with_qualifier(sk: str, qualifier: str | None) -> str:

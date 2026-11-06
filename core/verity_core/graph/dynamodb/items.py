@@ -75,7 +75,7 @@ def edge_items(edge: Edge) -> tuple[Item, Item]:
 
 def usage_item(record: UsageRecord) -> Item:
     return {
-        "PK": _s(keys.node_pk(record.tenant, record.system_id)),
+        "PK": _s(keys.usage_pk(record.tenant, record.system_id)),
         "SK": _s(keys.usage_sk(record.timestamp, record.usage_id)),
         "doc": _doc(record),
     }

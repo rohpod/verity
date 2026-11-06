@@ -444,7 +444,7 @@ class DynamoDBRepository:
         found = self._query(
             KeyConditionExpression="PK = :pk AND SK BETWEEN :low AND :high",
             ExpressionAttributeValues={
-                ":pk": {"S": keys.node_pk(self.tenant, system_id)},
+                ":pk": {"S": keys.usage_pk(self.tenant, system_id)},
                 ":low": {"S": low},
                 ":high": {"S": high},
             },

@@ -73,7 +73,7 @@ verity/
 - `shadow-summariser` has no tags and no manifest but has an `OPENAI_BASE_URL` env var. It must be classified *probable* and surface as a shadow-AI candidate. It really calls mock-openai through `OpenAICompatible` with `usage=None`, has no `verity_core` in its zip and writes no usage records, like a team that wired up a client and never registered the system ([ADR 0023](adr/0023-m7-demo-estate.md)).
 - `invoice-renderer` is an ordinary function and must be classified *none*.
 
-**Bundled data.** The help articles ship in the support assistant's zip (`HELP_ARTICLES_FILE`) and the invoice template in the invoice renderer's (`INVOICE_TEMPLATE`), because a second table is impossible at 25 of 25 capacity units and S3 is banned. App roles write usage records with `dynamodb:PutItem` only, limited by `dynamodb:LeadingKeys` to their own partition (D8). Every mock labels itself simulated: `additionalModelResponseFields: {"simulated": true}` and a `[SIMULATED]` reply for mock-bedrock, `system_fingerprint: "verity-mock"`, the `x-verity-simulated` header and a `[SIMULATED]` reply for mock-openai.
+**Bundled data.** The help articles ship in the support assistant's zip (`HELP_ARTICLES_FILE`) and the invoice template in the invoice renderer's (`INVOICE_TEMPLATE`), because a second table is impossible at 25 of 25 capacity units and S3 is banned. App roles write usage records with `dynamodb:PutItem` only, limited by `dynamodb:LeadingKeys` to their own usage partition, which holds nothing else (D8, [ADR 0024](adr/0024-m7-review-fixes.md)). Every mock labels itself simulated: `additionalModelResponseFields: {"simulated": true}` and a `[SIMULATED]` reply for mock-bedrock, `system_fingerprint: "verity-mock"`, the `x-verity-simulated` header and a `[SIMULATED]` reply for mock-openai.
 
 **Synthetic estate:** about 25 additional AI systems for the fictional **Kestrel Cloud Ltd**, with `source=synthetic` and no AWS resources, so posture charts have realistic volume. Every record in the UI carries a provenance badge: **Live-discovered · Declared · Synthetic**.
 
@@ -355,7 +355,7 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
 | Outgoing edge | `T#{tenant}#N#{src}` | `E#{type}#{dst}[#{qualifier}]` |
 | Reverse edge (mirror) | `T#{tenant}#N#{dst}` | `R#{type}#{src}[#{qualifier}]` |
 | Node history | `T#{tenant}#N#{id}` | `H#{iso_ts}#{version}` (version zero-padded to 10 digits, so keys sort numerically) |
-| Usage record | `T#{tenant}#N#{system}` | `U#{iso_ts}#{usage_id}` |
+| Usage record | `T#{tenant}#U#{system}` | `U#{iso_ts}#{usage_id}` |
 
 - The qualifier is `role` on `APPLIES_TO` and `purpose` on `PROCESSES`; other edge types have none ([ADR 0012](adr/0012-graph-schema-refinements.md)).
 - Every item holds the whole record as a JSON string in `doc`. Evidence has no `H#` items, because it never changes ([ADR 0013](adr/0013-dynamodb-write-model.md)).
