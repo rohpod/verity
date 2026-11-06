@@ -4,7 +4,7 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", ".fixture", "generated", "node_modules", "test-results", "playwright-report"] },
+  { ignores: ["dist", ".fixture", "generated", "node_modules", "test-results", "playwright-report", ".prod"] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

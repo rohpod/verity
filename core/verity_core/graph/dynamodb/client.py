@@ -4,6 +4,11 @@ from typing import Any
 
 import boto3
 from botocore.config import Config
+from botocore.exceptions import BotoCoreError, ClientError
+
+# What a failed AWS call raises. Exported so callers outside this package can catch it without
+# importing botocore, which only this package may do.
+AWS_ERRORS: tuple[type[Exception], ...] = (BotoCoreError, ClientError)
 
 REGION = "eu-north-1"  # the only region Verity uses (ADR 0011)
 

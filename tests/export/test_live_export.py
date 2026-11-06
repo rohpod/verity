@@ -305,3 +305,76 @@ def test_serialise_and_write_still_agree_for_the_new_rows(tmp_path):
     write_snapshot(out, built)
     assert out.read_text(encoding="utf-8") == serialise(built.snapshot)
     assert ScanRejected  # imported for the type of failure the live path shares
+
+
+# --- AWS errors on the live path show their type only ----------------------------------------
+
+LEAK = "111122223333"  # invented; stands for an account ID that an AWS message could quote
+
+
+def _client_error():
+    from botocore.exceptions import ClientError
+
+    message = f"User: arn:aws:iam::{LEAK}:user/someone is not authorized"
+    return ClientError({"Error": {"Code": "AccessDeniedException", "Message": message}}, "Scan")
+
+
+def _connection_error():
+    from botocore.exceptions import EndpointConnectionError
+
+    return EndpointConnectionError(endpoint_url=f"https://dynamodb.eu-north-1.{LEAK}.example/")
+
+
+def _no_credentials():
+    from botocore.exceptions import NoCredentialsError
+
+    return NoCredentialsError()
+
+
+@pytest.mark.parametrize(
+    ("make", "name"),
+    [
+        (_client_error, "ClientError"),
+        (_connection_error, "EndpointConnectionError"),
+        (_no_credentials, "NoCredentialsError"),
+    ],
+)
+@pytest.mark.parametrize("where", ["load_graph", "construct"])
+def test_an_aws_error_on_the_live_path_prints_only_its_type(
+    make, name, where, monkeypatch, repo_copy, tmp_path, capsys
+):
+    class Broken:
+        def __init__(self, tenant, clock):
+            if where == "construct":
+                raise make()
+
+        def load_graph(self):
+            raise make()
+
+    monkeypatch.setattr("verity_core.graph.dynamodb.repository.DynamoDBRepository", Broken)
+    out = tmp_path / "snapshot.json"
+    assert run_export(repo_copy, "--out", out) == cli.UNREADABLE
+    captured = capsys.readouterr()
+    assert captured.err.strip() == f"cannot build the snapshot: {name}"
+    assert LEAK not in captured.out + captured.err and "arn:" not in captured.out + captured.err
+    assert not out.exists()
+
+
+def test_a_local_export_still_needs_no_aws_error_types(monkeypatch, tmp_path):
+    """The botocore import sits on the live branch only, so --local imports no AWS library."""
+    import sys
+
+    for name in [n for n in sys.modules if n == "botocore" or n.startswith("botocore.")]:
+        monkeypatch.delitem(sys.modules, name)
+    monkeypatch.setattr(sys, "meta_path", [_Block(), *sys.meta_path])
+    out = tmp_path / "snapshot.json"
+    assert cli.run(["export", "--content", str(CONTENT), "--local", "--out", str(out)]) == cli.OK
+
+
+class _Block:
+    """Refuses `import botocore`, so the test fails if the local path imports it."""
+
+    def find_spec(self, name, path=None, target=None):
+        if name == "botocore" or name.startswith("botocore."):
+            raise ImportError("botocore must not be imported by a local export")
+        return None

@@ -9,7 +9,7 @@ import { compareTime } from "@/data/time";
 import type { NodeOf, Obligation } from "@/data/types";
 import { findingsFor, obligationsFor, ownersOf, resourcesOf, resultFor, severityRank, statusesFor } from "@/data/views";
 import { count, formatTime, words } from "@/lib/utils";
-import { BOUNDARY_NOTE, HISTORY_LIMIT, INHERITED_ORG, ISO_NOTE, SYNTHETIC_NOTE } from "@/lib/wording";
+import { BOUNDARY_NOTE, HISTORY_LIMIT, INHERITED_ORG, ISO_NOTE, SYNTHETIC_NOTE, showsBoundaryNote } from "@/lib/wording";
 
 export function SystemProfile() {
   const index = useIndex();
@@ -215,7 +215,7 @@ function ControlsTab({ index, system }: Props) {
       <tbody>
         {pairs.sort((a, b) => (a.control < b.control ? -1 : a.control > b.control ? 1 : 0)).map(({ control, scope, resolution }) => {
           const result = resultFor(index, control, scope);
-          const boundary = control === "ctl:VC-060" && system.id === "sys:support-assistant" && result?.status === "not_implemented";
+          const boundary = showsBoundaryNote(control, system.id, result?.status);
           return (
             <tr key={`${control}${scope}`}>
               <Td><Link to={`/controls?focus=${encodeURIComponent(control)}`}>{control}</Link><div className="text-xs">{index.label(control)}</div></Td>

@@ -31,6 +31,9 @@ function devFixture(): Plugin {
 export default defineConfig({
   // Relative, so the same build works on Pages and in `vite preview` (ADR 0031, decision 10).
   base: "./",
+  // `web/public/` is where the reviewed live snapshot is committed. A build must not copy it:
+  // the Pages workflow adds that file to dist/ itself, after `check:dist` and the scan.
+  build: { copyPublicDir: false },
   plugins: [react(), tailwindcss(), devFixture()],
   resolve: { alias: { "@": path.join(here, "src") } },
   test: {

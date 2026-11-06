@@ -164,3 +164,34 @@ describe("Graph explorer", () => {
     });
   });
 });
+
+describe("Provenance in the Graph explorer", () => {
+  const badges = (container: HTMLElement) => container.querySelectorAll("[data-testid=provenance-badge]");
+
+  it("labels every record in the neighbourhood list, which is also the phone-width view", () => {
+    const { container } = renderRoute(fixture(), "/graph?node=sys:call-transcriber");
+    expect(text()).toContain("At this width the graph is shown as a list.");
+    const table = screen.getByRole("table", { name: "Neighbourhood as a list" });
+    const rows = within(table).getAllByRole("row").slice(1);
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) expect(badges(row).length).toBe(2);
+    expect(within(table).getAllByText("Synthetic").length).toBeGreaterThan(0);
+    expect(badges(container).length).toBeGreaterThan(0);
+  });
+
+  it("labels the systems, models and risks in Impact mode", () => {
+    renderRoute(fixture(), "/graph?mode=impact&subject=prov:mock-bedrock");
+    const table = screen.getByRole("table", { name: "Systems reached" });
+    for (const row of within(table).getAllByRole("row").slice(1)) {
+      expect(badges(row).length).toBeGreaterThanOrEqual(3);
+    }
+    expect(within(table).getAllByText("Synthetic").length).toBeGreaterThan(0);
+  });
+
+  it("labels the evidence and resource in Stale mode", () => {
+    renderRoute(mini(), "/graph?mode=stale");
+    const row = screen.getByTestId("stale-evidence");
+    expect(badges(row).length).toBeGreaterThanOrEqual(3);
+    expect(row).toHaveTextContent("Live-discovered");
+  });
+});

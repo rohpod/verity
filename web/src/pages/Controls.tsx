@@ -9,7 +9,7 @@ import { useIndex } from "@/data/provider";
 import { auditTrail, type AuditLink } from "@/data/trail";
 import { compareText } from "@/data/time";
 import { count, formatTime, words } from "@/lib/utils";
-import { ASSURANCE_LEVELS, INHERITED_ORG, ISO_NOTE, NO_SCORE_NOTE, REDACTED_NOTE, SIMULATED_SIGNOFF, STRENGTH_NOTE } from "@/lib/wording";
+import { ASSURANCE_LEVELS, BOUNDARY_NOTE, INHERITED_ORG, ISO_NOTE, NO_SCORE_NOTE, REDACTED_NOTE, SIMULATED_SIGNOFF, STRENGTH_NOTE, showsBoundaryNote } from "@/lib/wording";
 
 export function Controls() {
   const index = useIndex();
@@ -104,7 +104,7 @@ function ControlDetail({ index, controlId }: { index: SnapshotIndex; controlId: 
           {results.map((r) => (
             <tr key={r.scope_id}>
               <Td>{index.label(r.scope_id)}{r.scope_id.startsWith("org:") ? <div className="text-xs">{INHERITED_ORG} by every system</div> : null}</Td>
-              <Td><ResultCell result={r} /></Td><Td>{words(r.method)}</Td>
+              <Td><ResultCell result={r} />{showsBoundaryNote(r.control_id, r.scope_id, r.status) ? <Note tone="warn">{BOUNDARY_NOTE}</Note> : null}</Td><Td>{words(r.method)}</Td>
               <Td>{r.evidence_id ? <Link to={`/controls?focus=${encodeURIComponent(r.evidence_id)}`}>{r.evidence_id}</Link> : "none"}</Td>
             </tr>
           ))}
