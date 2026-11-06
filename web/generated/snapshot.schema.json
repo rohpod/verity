@@ -1,0 +1,2935 @@
+{
+  "$defs": {
+    "AiLikelihood": {
+      "description": "How strongly the discovery signals suggest a resource is AI (architecture section D).",
+      "enum": [
+        "declared",
+        "confirmed_usage",
+        "probable",
+        "possible",
+        "none"
+      ],
+      "title": "AiLikelihood",
+      "type": "string"
+    },
+    "ApplicabilityStatus": {
+      "enum": [
+        "in_force",
+        "upcoming",
+        "conditional"
+      ],
+      "title": "ApplicabilityStatus",
+      "type": "string"
+    },
+    "AppliesCondition": {
+      "description": "Why an `APPLIES_TO` edge is conditional rather than in force or upcoming (ADR 0019).",
+      "enum": [
+        "legacy_significant_change"
+      ],
+      "title": "AppliesCondition",
+      "type": "string"
+    },
+    "AssuranceLevel": {
+      "description": "The assurance ladder (ADR 0005). Ordered, so `level >= L2_EVIDENCED` works.",
+      "enum": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "title": "AssuranceLevel",
+      "type": "integer"
+    },
+    "ControlKind": {
+      "enum": [
+        "technical",
+        "organisational",
+        "legal_documentary"
+      ],
+      "title": "ControlKind",
+      "type": "string"
+    },
+    "DataClassification": {
+      "enum": [
+        "public",
+        "internal",
+        "confidential",
+        "restricted"
+      ],
+      "title": "DataClassification",
+      "type": "string"
+    },
+    "EvidenceKind": {
+      "enum": [
+        "config_snapshot",
+        "automated_test",
+        "usage_record",
+        "attestation",
+        "document_ref"
+      ],
+      "title": "EvidenceKind",
+      "type": "string"
+    },
+    "Freshness": {
+      "enum": [
+        "fresh",
+        "expiring",
+        "stale"
+      ],
+      "title": "Freshness",
+      "type": "string"
+    },
+    "ImplementationStatus": {
+      "enum": [
+        "implemented",
+        "partially_implemented",
+        "not_implemented",
+        "not_assessed",
+        "not_applicable"
+      ],
+      "title": "ImplementationStatus",
+      "type": "string"
+    },
+    "ModelOrigin": {
+      "enum": [
+        "in_house",
+        "third_party"
+      ],
+      "title": "ModelOrigin",
+      "type": "string"
+    },
+    "Purpose": {
+      "description": "Why a system processes a dataset. `training` means this system itself runs training;\n`TRAINED_ON` is model lineage (ADR 0012).",
+      "enum": [
+        "inference",
+        "training",
+        "retrieval"
+      ],
+      "title": "Purpose",
+      "type": "string"
+    },
+    "RationaleType": {
+      "enum": [
+        "syntactic",
+        "semantic",
+        "functional"
+      ],
+      "title": "RationaleType",
+      "type": "string"
+    },
+    "RequirementState": {
+      "enum": [
+        "satisfied",
+        "partially_addressed",
+        "not_met",
+        "not_addressed",
+        "not_applicable"
+      ],
+      "title": "RequirementState",
+      "type": "string"
+    },
+    "Resolution": {
+      "description": "How a control's assessment was found for a scope.",
+      "enum": [
+        "direct",
+        "inherited_org",
+        "inherited_provider",
+        "not_applicable",
+        "provider_unknown",
+        "unmapped"
+      ],
+      "title": "Resolution",
+      "type": "string"
+    },
+    "Role": {
+      "description": "Role under the EU AI Act. `any` is for requirements that are not role-based.",
+      "enum": [
+        "provider",
+        "deployer",
+        "importer",
+        "distributor",
+        "any"
+      ],
+      "title": "Role",
+      "type": "string"
+    },
+    "RunMode": {
+      "enum": [
+        "full",
+        "incremental"
+      ],
+      "title": "RunMode",
+      "type": "string"
+    },
+    "ScopeLevel": {
+      "enum": [
+        "organisation",
+        "system",
+        "provider"
+      ],
+      "title": "ScopeLevel",
+      "type": "string"
+    },
+    "Severity": {
+      "enum": [
+        "high",
+        "medium",
+        "low"
+      ],
+      "title": "Severity",
+      "type": "string"
+    },
+    "SnapshotAISystem": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "first_placed_on_market": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "First Placed On Market"
+        },
+        "generates_synthetic_content": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Generates Synthetic Content"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "interacts_with_people": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Interacts With People"
+        },
+        "kind": {
+          "$ref": "#/$defs/SystemKind"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "purpose": {
+          "minLength": 1,
+          "title": "Purpose",
+          "type": "string"
+        },
+        "roles": {
+          "items": {
+            "$ref": "#/$defs/Role"
+          },
+          "title": "Roles",
+          "type": "array"
+        },
+        "significant_change_on": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Significant Change On"
+        },
+        "source": {
+          "$ref": "#/$defs/Source"
+        },
+        "type": {
+          "const": "AISystem",
+          "default": "AISystem",
+          "title": "Type",
+          "type": "string"
+        },
+        "use_domains": {
+          "items": {
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "type": "string"
+          },
+          "title": "Use Domains",
+          "type": "array"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "purpose",
+        "kind",
+        "source"
+      ],
+      "title": "SnapshotAISystem",
+      "type": "object"
+    },
+    "SnapshotAWSResource": {
+      "additionalProperties": false,
+      "properties": {
+        "ai_likelihood": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AiLikelihood"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "confidence": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "env_var_names": {
+          "items": {
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+            "type": "string"
+          },
+          "title": "Env Var Names",
+          "type": "array"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "region": {
+          "minLength": 1,
+          "title": "Region",
+          "type": "string"
+        },
+        "resource_type": {
+          "minLength": 1,
+          "title": "Resource Type",
+          "type": "string"
+        },
+        "signals": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Signals",
+          "type": "array"
+        },
+        "source": {
+          "$ref": "#/$defs/Source"
+        },
+        "tags": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "object"
+        },
+        "type": {
+          "const": "AWSResource",
+          "default": "AWSResource",
+          "title": "Type",
+          "type": "string"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        }
+      },
+      "required": [
+        "id",
+        "resource_type",
+        "region",
+        "name",
+        "source"
+      ],
+      "title": "SnapshotAWSResource",
+      "type": "object"
+    },
+    "SnapshotAppliesToEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "closed_intervals": {
+          "default": [],
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "format": "date-time",
+                "type": "string"
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Closed Intervals",
+          "type": "array"
+        },
+        "condition": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AppliesCondition"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "confidence": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "dst": {
+          "title": "Dst",
+          "type": "string"
+        },
+        "in_force_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "In Force From"
+        },
+        "reason": {
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        },
+        "role": {
+          "$ref": "#/$defs/Role"
+        },
+        "rule_id": {
+          "minLength": 1,
+          "title": "Rule Id",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/Source"
+        },
+        "src": {
+          "title": "Src",
+          "type": "string"
+        },
+        "type": {
+          "const": "APPLIES_TO",
+          "default": "APPLIES_TO",
+          "title": "Type",
+          "type": "string"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        }
+      },
+      "required": [
+        "src",
+        "dst",
+        "role",
+        "rule_id",
+        "reason",
+        "source"
+      ],
+      "title": "SnapshotAppliesToEdge",
+      "type": "object"
+    },
+    "SnapshotCandidate": {
+      "additionalProperties": false,
+      "properties": {
+        "ai_likelihood": {
+          "$ref": "#/$defs/AiLikelihood"
+        },
+        "confidence": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "signals": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Signals",
+          "type": "array"
+        },
+        "source": {
+          "$ref": "#/$defs/Source"
+        },
+        "type": {
+          "const": "Candidate",
+          "default": "Candidate",
+          "title": "Type",
+          "type": "string"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "ai_likelihood",
+        "source"
+      ],
+      "title": "SnapshotCandidate",
+      "type": "object"
+    },
+    "SnapshotChangeEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "detected_at": {
+          "format": "date-time",
+          "title": "Detected At",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/Source"
+        },
+        "type": {
+          "const": "ChangeEvent",
+          "default": "ChangeEvent",
+          "title": "Type",
+          "type": "string"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        }
+      },
+      "required": [
+        "id",
+        "detected_at",
+        "source"
+      ],
+      "title": "SnapshotChangeEvent",
+      "type": "object"
+    },
+    "SnapshotControl": {
+      "additionalProperties": false,
+      "properties": {
+        "automatable": {
+          "title": "Automatable",
+          "type": "boolean"
+        },
+        "confidence": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/ControlKind"
+        },
+        "scope_level": {
+          "$ref": "#/$defs/ScopeLevel"
+        },
+        "source": {
+          "$ref": "#/$defs/Source"
+        },
+        "summary": {
+          "minLength": 1,
+          "title": "Summary",
+          "type": "string"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "type": {
+          "const": "Control",
+          "default": "Control",
+          "title": "Type",
+          "type": "string"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "summary",
+        "kind",
+        "automatable",
+        "scope_level",
+        "source"
+      ],
+      "title": "SnapshotControl",
+      "type": "object"
+    },
+    "SnapshotControlAssessment": {
+      "additionalProperties": false,
+      "properties": {
+        "assessed_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Assessed At"
+        },
+        "assessor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Assessor"
+        },
+        "assurance_level": {
+          "$ref": "#/$defs/AssuranceLevel"
+        },
+        "confidence": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "method": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Method"
+        },
+        "source": {
+          "$ref": "#/$defs/Source"
+        },
+        "status": {
+          "$ref": "#/$defs/ImplementationStatus"
+        },
+        "type": {
+          "const": "ControlAssessment",
+          "default": "ControlAssessment",
+          "title": "Type",
+          "type": "string"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "assurance_level",
+        "source"
+      ],
+      "title": "SnapshotControlAssessment",
+      "type": "object"
+    },
+    "SnapshotControlResult": {
+      "additionalProperties": false,
+      "properties": {
+        "assessor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Assessor"
+        },
+        "control_id": {
+          "title": "Control Id",
+          "type": "string"
+        },
+        "evidence_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Evidence Id"
+        },
+        "freshness": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Freshness"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "level": {
+          "$ref": "#/$defs/AssuranceLevel"
+        },
+        "method": {
+          "title": "Method",
+          "type": "string"
+        },
+        "scope_id": {
+          "title": "Scope Id",
+          "type": "string"
+        },
+        "simulated": {
+          "title": "Simulated",
+          "type": "boolean"
+        },
+        "source": {
+          "const": "derived",
+          "default": "derived",
+          "title": "Source",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/ImplementationStatus"
+        }
+      },
+      "required": [
+        "control_id",
+        "scope_id",
+        "status",
+        "level",
+        "method",
+        "assessor",
+        "simulated",
+        "evidence_id",
+        "freshness"
+      ],
+      "title": "SnapshotControlResult",
+      "type": "object"
+    },
+    "SnapshotCrosswalk": {
+      "additionalProperties": false,
+      "description": "Requirement R of one framework related to requirements of another through a hub control.\nA pair of frameworks has a row for each requirement that reaches the other.",
+      "properties": {
+        "from_framework": {
+          "title": "From Framework",
+          "type": "string"
+        },
+        "links": {
+          "items": {
+            "$ref": "#/$defs/SnapshotCrosswalkLink"
+          },
+          "title": "Links",
+          "type": "array"
+        },
+        "requirement_id": {
+          "title": "Requirement Id",
+          "type": "string"
+        },
+        "source": {
+          "const": "derived",
+          "default": "derived",
+          "title": "Source",
+          "type": "string"
+        },
+        "to_framework": {
+          "title": "To Framework",
+          "type": "string"
+        }
+      },
+      "required": [
+        "from_framework",
+        "to_framework",
+        "requirement_id",
+        "links"
+      ],
+      "title": "SnapshotCrosswalk",
+      "type": "object"
+    },
+    "SnapshotCrosswalkLink": {
+      "additionalProperties": false,
+      "properties": {
+        "from_strm": {
+          "$ref": "#/$defs/StrmType"
+        },
+        "strength": {
+          "title": "Strength",
+          "type": "integer"
+        },
+        "target_requirement_id": {
+          "title": "Target Requirement Id",
+          "type": "string"
+        },
+        "to_strm": {
+          "$ref": "#/$defs/StrmType"
+        },
+        "via_control_id": {
+          "title": "Via Control Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "via_control_id",
+        "target_requirement_id",
+        "strength",
+        "from_strm",
+        "to_strm"
+      ],
+      "title": "SnapshotCrosswalkLink",
+      "type": "object"
+    },
+    "SnapshotDataset": {
+      "additionalProperties": false,
+      "properties": {
+        "classification": {
+          "$ref": "#/$defs/DataClassification"
+        },
+        "confidence": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "personal_data": {
+          "title": "Personal Data",
+          "type": "boolean"
+        },
+        "source": {
+          "$ref": "#/$defs/Source"
+        },
+        "type": {
+          "const": "Dataset",
+          "default": "Dataset",
+          "title": "Type",
+          "type": "string"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "classification",
+        "personal_data",
+        "source"
+      ],
+      "title": "SnapshotDataset",
+      "type": "object"
+    },
+    "SnapshotDepartment": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/Source"
+        },
+        "type": {
+          "const": "Department",
+          "default": "Department",
+          "title": "Type",
+          "type": "string"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "source"
+      ],
+      "title": "SnapshotDepartment",
+      "type": "object"
+    },
+    "SnapshotDiscoveryRun": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "crawler_version": {
+          "minLength": 1,
+          "title": "Crawler Version",
+          "type": "string"
+        },
+        "finished_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Finished At"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "mode": {
+          "$ref": "#/$defs/RunMode"
+        },
+        "source": {
+          "$ref": "#/$defs/Source"
+        },
+        "started_at": {
+          "format": "date-time",
+          "title": "Started At",
+          "type": "string"
+        },
+        "summary": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Summary",
+          "type": "object"
+        },
+        "type": {
+          "const": "DiscoveryRun",
+          "default": "DiscoveryRun",
+          "title": "Type",
+          "type": "string"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        }
+      },
+      "required": [
+        "id",
+        "mode",
+        "started_at",
+        "crawler_version",
+        "source"
+      ],
+      "title": "SnapshotDiscoveryRun",
+      "type": "object"
+    },
+    "SnapshotEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "collected_at": {
+          "format": "date-time",
+          "title": "Collected At",
+          "type": "string"
+        },
+        "collector": {
+          "title": "Collector",
+          "type": "string"
+        },
+        "confidence": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "content": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Content"
+        },
+        "content_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Content Ref"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/EvidenceKind"
+        },
+        "redacted": {
+          "default": false,
+          "title": "Redacted",
+          "type": "boolean"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/Source"
+        },
+        "subject": {
+          "title": "Subject",
+          "type": "string"
+        },
+        "type": {
+          "const": "Evidence",
+          "default": "Evidence",
+          "title": "Type",
+          "type": "string"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "valid_until": {
+          "format": "date-time",
+          "title": "Valid Until",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "subject",
+        "kind",
+        "collector",
+        "collected_at",
+        "valid_until",
+        "sha256",
+        "source"
+      ],
+      "title": "SnapshotEvidence",
+      "type": "object"
+    },
+    "SnapshotFinding": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/Severity"
+        },
+        "source": {
+          "const": "derived",
+          "default": "derived",
+          "title": "Source",
+          "type": "string"
+        },
+        "subject": {
+          "title": "Subject",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "severity",
+        "subject",
+        "message"
+      ],
+      "title": "SnapshotFinding",
+      "type": "object"
+    },
+    "SnapshotFramework": {
+      "additionalProperties": false,
+      "properties": {
+        "binding": {
+          "title": "Binding",
+          "type": "boolean"
+        },
+        "confidence": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "last_verified": {
+          "format": "date",
+          "title": "Last Verified",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/Source"
+        },
+        "source_url": {
+          "minLength": 1,
+          "title": "Source Url",
+          "type": "string"
+        },
+        "source_version": {
+          "minLength": 1,
+          "title": "Source Version",
+          "type": "string"
+        },
+        "type": {
+          "const": "Framework",
+          "default": "Framework",
+          "title": "Type",
+          "type": "string"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "source_version",
+        "source_url",
+        "last_verified",
+        "binding",
+        "source"
+      ],
+      "title": "SnapshotFramework",
+      "type": "object"
+    },
+    "SnapshotHeader": {
+      "additionalProperties": false,
+      "properties": {
+        "as_of": {
+          "format": "date-time",
+          "title": "As Of",
+          "type": "string"
+        },
+        "data_source": {
+          "enum": [
+            "live",
+            "fixture"
+          ],
+          "title": "Data Source",
+          "type": "string"
+        },
+        "redaction": {
+          "$ref": "#/$defs/SnapshotRedaction"
+        },
+        "schema_version": {
+          "const": 1,
+          "default": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "simulated_components": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Simulated Components",
+          "type": "array"
+        }
+      },
+      "required": [
+        "as_of",
+        "data_source",
+        "redaction",
+        "simulated_components"
+      ],
+      "title": "SnapshotHeader",
+      "type": "object"
+    },
+    "SnapshotMapsToEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "closed_intervals": {
+          "default": [],
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "format": "date-time",
+                "type": "string"
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Closed Intervals",
+          "type": "array"
+        },
+        "confidence": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "dst": {
+          "title": "Dst",
+          "type": "string"
+        },
+        "rationale": {
+          "minLength": 1,
+          "title": "Rationale",
+          "type": "string"
+        },
+        "rationale_type": {
+          "$ref": "#/$defs/RationaleType"
+        },
+        "source": {
+          "$ref": "#/$defs/Source"
+        },
+        "src": {
+          "title": "Src",
+          "type": "string"
+        },
+        "strength": {
+          "anyOf": [
+            {
+              "maximum": 10,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Strength"
+        },
+        "strm": {
+          "$ref": "#/$defs/StrmType"
+        },
+        "sufficiency": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Sufficiency"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "type": {
+          "const": "MAPS_TO",
+          "default": "MAPS_TO",
+          "title": "Type",
+          "type": "string"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        }
+      },
+      "required": [
+        "src",
+        "dst",
+        "strm",
+        "rationale_type",
+        "rationale",
+        "source"
+      ],
+      "title": "SnapshotMapsToEdge",
+      "type": "object"
+    },
+    "SnapshotModel": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "origin": {
+          "$ref": "#/$defs/ModelOrigin"
+        },
+        "source": {
+          "$ref": "#/$defs/Source"
+        },
+        "type": {
+          "const": "Model",
+          "default": "Model",
+          "title": "Type",
+          "type": "string"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "origin",
+        "source"
+      ],
+      "title": "SnapshotModel",
+      "type": "object"
+    },
+    "SnapshotObligation": {
+      "additionalProperties": false,
+      "description": "One row of `obligations_for(system)`. The mapping itself is the MAPS_TO edge.",
+      "properties": {
+        "applies_to": {
+          "title": "Applies To",
+          "type": "string"
+        },
+        "assessment_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Assessment Id"
+        },
+        "control_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Control Id"
+        },
+        "evidence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "provider_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Provider Id"
+        },
+        "requirement_id": {
+          "title": "Requirement Id",
+          "type": "string"
+        },
+        "resolution": {
+          "$ref": "#/$defs/Resolution"
+        },
+        "role": {
+          "$ref": "#/$defs/Role"
+        },
+        "source": {
+          "const": "derived",
+          "default": "derived",
+          "title": "Source",
+          "type": "string"
+        },
+        "strength": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Strength"
+        },
+        "strm": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StrmType"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sufficiency": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Sufficiency"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "system_id": {
+          "title": "System Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "system_id",
+        "requirement_id",
+        "role",
+        "applies_to",
+        "control_id",
+        "strm",
+        "strength",
+        "sufficiency",
+        "resolution",
+        "provider_id",
+        "assessment_id",
+        "evidence_ids"
+      ],
+      "title": "SnapshotObligation",
+      "type": "object"
+    },
+    "SnapshotOrganisation": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/Source"
+        },
+        "type": {
+          "const": "Organisation",
+          "default": "Organisation",
+          "title": "Type",
+          "type": "string"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "source"
+      ],
+      "title": "SnapshotOrganisation",
+      "type": "object"
+    },
+    "SnapshotPerson": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "job_title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Job Title"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/Source"
+        },
+        "type": {
+          "const": "Person",
+          "default": "Person",
+          "title": "Type",
+          "type": "string"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "source"
+      ],
+      "title": "SnapshotPerson",
+      "type": "object"
+    },
+    "SnapshotPlainEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "closed_intervals": {
+          "default": [],
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "format": "date-time",
+                "type": "string"
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Closed Intervals",
+          "type": "array"
+        },
+        "confidence": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "dst": {
+          "title": "Dst",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/Source"
+        },
+        "src": {
+          "title": "Src",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "MEMBER_OF",
+            "PART_OF",
+            "OWNS",
+            "DEVELOPS",
+            "APPROVES_RISK_FOR",
+            "RUNS_ON",
+            "ASSUMES",
+            "CALLS",
+            "USES_MODEL",
+            "PROVIDED_BY",
+            "TRAINED_ON",
+            "DERIVED_FROM",
+            "PROMOTED_TO",
+            "HAS_RISK",
+            "MITIGATED_BY",
+            "ASSESSES",
+            "SCOPED_TO",
+            "ASSESSED",
+            "SUPPORTS",
+            "ABOUT",
+            "COLLECTED_FROM",
+            "IMPLEMENTS",
+            "OBSERVED",
+            "AFFECTS"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        }
+      },
+      "required": [
+        "src",
+        "dst",
+        "type",
+        "source"
+      ],
+      "title": "SnapshotPlainEdge",
+      "type": "object"
+    },
+    "SnapshotPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/Source"
+        },
+        "summary": {
+          "minLength": 1,
+          "title": "Summary",
+          "type": "string"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "type": {
+          "const": "Policy",
+          "default": "Policy",
+          "title": "Type",
+          "type": "string"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "summary",
+        "source"
+      ],
+      "title": "SnapshotPolicy",
+      "type": "object"
+    },
+    "SnapshotProcessesEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "closed_intervals": {
+          "default": [],
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "format": "date-time",
+                "type": "string"
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Closed Intervals",
+          "type": "array"
+        },
+        "confidence": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "dst": {
+          "title": "Dst",
+          "type": "string"
+        },
+        "purpose": {
+          "$ref": "#/$defs/Purpose"
+        },
+        "source": {
+          "$ref": "#/$defs/Source"
+        },
+        "src": {
+          "title": "Src",
+          "type": "string"
+        },
+        "type": {
+          "const": "PROCESSES",
+          "default": "PROCESSES",
+          "title": "Type",
+          "type": "string"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        }
+      },
+      "required": [
+        "src",
+        "dst",
+        "purpose",
+        "source"
+      ],
+      "title": "SnapshotProcessesEdge",
+      "type": "object"
+    },
+    "SnapshotProvider": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "simulated": {
+          "title": "Simulated",
+          "type": "boolean"
+        },
+        "source": {
+          "$ref": "#/$defs/Source"
+        },
+        "type": {
+          "const": "Provider",
+          "default": "Provider",
+          "title": "Type",
+          "type": "string"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "simulated",
+        "source"
+      ],
+      "title": "SnapshotProvider",
+      "type": "object"
+    },
+    "SnapshotProviderImpact": {
+      "additionalProperties": false,
+      "properties": {
+        "assessment_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Assessment Ids",
+          "type": "array"
+        },
+        "provider_id": {
+          "title": "Provider Id",
+          "type": "string"
+        },
+        "source": {
+          "const": "derived",
+          "default": "derived",
+          "title": "Source",
+          "type": "string"
+        },
+        "systems": {
+          "items": {
+            "$ref": "#/$defs/SnapshotSystemImpact"
+          },
+          "title": "Systems",
+          "type": "array"
+        }
+      },
+      "required": [
+        "provider_id",
+        "assessment_ids",
+        "systems"
+      ],
+      "title": "SnapshotProviderImpact",
+      "type": "object"
+    },
+    "SnapshotRedaction": {
+      "additionalProperties": false,
+      "description": "What redaction did, as counts. Never a value.",
+      "properties": {
+        "content_keys_withheld": {
+          "title": "Content Keys Withheld",
+          "type": "integer"
+        },
+        "evidence_rebuilt": {
+          "title": "Evidence Rebuilt",
+          "type": "integer"
+        },
+        "evidence_unchanged": {
+          "title": "Evidence Unchanged",
+          "type": "integer"
+        },
+        "external_accounts": {
+          "title": "External Accounts",
+          "type": "integer"
+        },
+        "own_account_replaced": {
+          "title": "Own Account Replaced",
+          "type": "boolean"
+        },
+        "steps": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Steps",
+          "type": "array"
+        }
+      },
+      "required": [
+        "steps",
+        "own_account_replaced",
+        "external_accounts",
+        "content_keys_withheld",
+        "evidence_rebuilt",
+        "evidence_unchanged"
+      ],
+      "title": "SnapshotRedaction",
+      "type": "object"
+    },
+    "SnapshotRequirement": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "last_verified": {
+          "format": "date",
+          "title": "Last Verified",
+          "type": "string"
+        },
+        "ref": {
+          "minLength": 1,
+          "title": "Ref",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/Source"
+        },
+        "source_url": {
+          "minLength": 1,
+          "title": "Source Url",
+          "type": "string"
+        },
+        "source_version": {
+          "minLength": 1,
+          "title": "Source Version",
+          "type": "string"
+        },
+        "summary": {
+          "minLength": 1,
+          "title": "Summary",
+          "type": "string"
+        },
+        "type": {
+          "const": "Requirement",
+          "default": "Requirement",
+          "title": "Type",
+          "type": "string"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "verified_against": {
+          "$ref": "#/$defs/VerifiedAgainst"
+        }
+      },
+      "required": [
+        "id",
+        "ref",
+        "summary",
+        "source_url",
+        "source_version",
+        "last_verified",
+        "verified_against",
+        "source"
+      ],
+      "title": "SnapshotRequirement",
+      "type": "object"
+    },
+    "SnapshotRequirementStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "applicability": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ApplicabilityStatus"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reason"
+        },
+        "requirement_id": {
+          "title": "Requirement Id",
+          "type": "string"
+        },
+        "simulated": {
+          "title": "Simulated",
+          "type": "boolean"
+        },
+        "source": {
+          "const": "derived",
+          "default": "derived",
+          "title": "Source",
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/RequirementState"
+        },
+        "system_id": {
+          "title": "System Id",
+          "type": "string"
+        },
+        "targets": {
+          "items": {
+            "$ref": "#/$defs/SnapshotTarget"
+          },
+          "title": "Targets",
+          "type": "array"
+        }
+      },
+      "required": [
+        "requirement_id",
+        "system_id",
+        "state",
+        "reason",
+        "targets",
+        "applicability",
+        "simulated"
+      ],
+      "title": "SnapshotRequirementStatus",
+      "type": "object"
+    },
+    "SnapshotRisk": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/Source"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "type": {
+          "const": "Risk",
+          "default": "Risk",
+          "title": "Type",
+          "type": "string"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "description",
+        "source"
+      ],
+      "title": "SnapshotRisk",
+      "type": "object"
+    },
+    "SnapshotSystemImpact": {
+      "additionalProperties": false,
+      "properties": {
+        "model_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Model Ids",
+          "type": "array"
+        },
+        "owner_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Owner Ids",
+          "type": "array"
+        },
+        "requirement_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Requirement Ids",
+          "type": "array"
+        },
+        "risk_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Risk Ids",
+          "type": "array"
+        },
+        "system_id": {
+          "title": "System Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "system_id",
+        "model_ids",
+        "owner_ids",
+        "risk_ids",
+        "requirement_ids"
+      ],
+      "title": "SnapshotSystemImpact",
+      "type": "object"
+    },
+    "SnapshotTarget": {
+      "additionalProperties": false,
+      "properties": {
+        "control_id": {
+          "title": "Control Id",
+          "type": "string"
+        },
+        "resolution": {
+          "$ref": "#/$defs/Resolution"
+        },
+        "scope_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Scope Id"
+        }
+      },
+      "required": [
+        "control_id",
+        "scope_id",
+        "resolution"
+      ],
+      "title": "SnapshotTarget",
+      "type": "object"
+    },
+    "Source": {
+      "description": "Where a record came from. One value maps to one provenance badge (D12).",
+      "enum": [
+        "discovered",
+        "declared",
+        "seeded",
+        "synthetic",
+        "derived",
+        "simulated"
+      ],
+      "title": "Source",
+      "type": "string"
+    },
+    "StrmType": {
+      "description": "NIST IR 8477 set theory relationship types.",
+      "enum": [
+        "equal",
+        "subset_of",
+        "superset_of",
+        "intersects_with",
+        "no_relationship"
+      ],
+      "title": "StrmType",
+      "type": "string"
+    },
+    "Sufficiency": {
+      "enum": [
+        "full",
+        "partial"
+      ],
+      "title": "Sufficiency",
+      "type": "string"
+    },
+    "SystemKind": {
+      "enum": [
+        "generative_ai",
+        "classical_ml",
+        "external_ai_api"
+      ],
+      "title": "SystemKind",
+      "type": "string"
+    },
+    "VerifiedAgainst": {
+      "description": "What a requirement's wording was checked against (ADR 0017). ISO entries are always\n`public_listing`, so nothing implies a check against the standard itself.",
+      "enum": [
+        "primary_text",
+        "public_listing"
+      ],
+      "title": "VerifiedAgainst",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "What `verity export` writes. Everything in it is a public field of the graph, or derived\nfrom the graph by the one assessment run named by `header.as_of`.",
+  "properties": {
+    "control_results": {
+      "items": {
+        "$ref": "#/$defs/SnapshotControlResult"
+      },
+      "title": "Control Results",
+      "type": "array"
+    },
+    "crosswalk": {
+      "items": {
+        "$ref": "#/$defs/SnapshotCrosswalk"
+      },
+      "title": "Crosswalk",
+      "type": "array"
+    },
+    "edges": {
+      "items": {
+        "discriminator": {
+          "mapping": {
+            "ABOUT": "#/$defs/SnapshotPlainEdge",
+            "AFFECTS": "#/$defs/SnapshotPlainEdge",
+            "APPLIES_TO": "#/$defs/SnapshotAppliesToEdge",
+            "APPROVES_RISK_FOR": "#/$defs/SnapshotPlainEdge",
+            "ASSESSED": "#/$defs/SnapshotPlainEdge",
+            "ASSESSES": "#/$defs/SnapshotPlainEdge",
+            "ASSUMES": "#/$defs/SnapshotPlainEdge",
+            "CALLS": "#/$defs/SnapshotPlainEdge",
+            "COLLECTED_FROM": "#/$defs/SnapshotPlainEdge",
+            "DERIVED_FROM": "#/$defs/SnapshotPlainEdge",
+            "DEVELOPS": "#/$defs/SnapshotPlainEdge",
+            "HAS_RISK": "#/$defs/SnapshotPlainEdge",
+            "IMPLEMENTS": "#/$defs/SnapshotPlainEdge",
+            "MAPS_TO": "#/$defs/SnapshotMapsToEdge",
+            "MEMBER_OF": "#/$defs/SnapshotPlainEdge",
+            "MITIGATED_BY": "#/$defs/SnapshotPlainEdge",
+            "OBSERVED": "#/$defs/SnapshotPlainEdge",
+            "OWNS": "#/$defs/SnapshotPlainEdge",
+            "PART_OF": "#/$defs/SnapshotPlainEdge",
+            "PROCESSES": "#/$defs/SnapshotProcessesEdge",
+            "PROMOTED_TO": "#/$defs/SnapshotPlainEdge",
+            "PROVIDED_BY": "#/$defs/SnapshotPlainEdge",
+            "RUNS_ON": "#/$defs/SnapshotPlainEdge",
+            "SCOPED_TO": "#/$defs/SnapshotPlainEdge",
+            "SUPPORTS": "#/$defs/SnapshotPlainEdge",
+            "TRAINED_ON": "#/$defs/SnapshotPlainEdge",
+            "USES_MODEL": "#/$defs/SnapshotPlainEdge"
+          },
+          "propertyName": "type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/SnapshotMapsToEdge"
+          },
+          {
+            "$ref": "#/$defs/SnapshotAppliesToEdge"
+          },
+          {
+            "$ref": "#/$defs/SnapshotProcessesEdge"
+          },
+          {
+            "$ref": "#/$defs/SnapshotPlainEdge"
+          }
+        ]
+      },
+      "title": "Edges",
+      "type": "array"
+    },
+    "findings": {
+      "items": {
+        "$ref": "#/$defs/SnapshotFinding"
+      },
+      "title": "Findings",
+      "type": "array"
+    },
+    "header": {
+      "$ref": "#/$defs/SnapshotHeader"
+    },
+    "nodes": {
+      "items": {
+        "discriminator": {
+          "mapping": {
+            "AISystem": "#/$defs/SnapshotAISystem",
+            "AWSResource": "#/$defs/SnapshotAWSResource",
+            "Candidate": "#/$defs/SnapshotCandidate",
+            "ChangeEvent": "#/$defs/SnapshotChangeEvent",
+            "Control": "#/$defs/SnapshotControl",
+            "ControlAssessment": "#/$defs/SnapshotControlAssessment",
+            "Dataset": "#/$defs/SnapshotDataset",
+            "Department": "#/$defs/SnapshotDepartment",
+            "DiscoveryRun": "#/$defs/SnapshotDiscoveryRun",
+            "Evidence": "#/$defs/SnapshotEvidence",
+            "Framework": "#/$defs/SnapshotFramework",
+            "Model": "#/$defs/SnapshotModel",
+            "Organisation": "#/$defs/SnapshotOrganisation",
+            "Person": "#/$defs/SnapshotPerson",
+            "Policy": "#/$defs/SnapshotPolicy",
+            "Provider": "#/$defs/SnapshotProvider",
+            "Requirement": "#/$defs/SnapshotRequirement",
+            "Risk": "#/$defs/SnapshotRisk"
+          },
+          "propertyName": "type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/SnapshotOrganisation"
+          },
+          {
+            "$ref": "#/$defs/SnapshotDepartment"
+          },
+          {
+            "$ref": "#/$defs/SnapshotPerson"
+          },
+          {
+            "$ref": "#/$defs/SnapshotAISystem"
+          },
+          {
+            "$ref": "#/$defs/SnapshotCandidate"
+          },
+          {
+            "$ref": "#/$defs/SnapshotAWSResource"
+          },
+          {
+            "$ref": "#/$defs/SnapshotModel"
+          },
+          {
+            "$ref": "#/$defs/SnapshotProvider"
+          },
+          {
+            "$ref": "#/$defs/SnapshotDataset"
+          },
+          {
+            "$ref": "#/$defs/SnapshotRisk"
+          },
+          {
+            "$ref": "#/$defs/SnapshotControl"
+          },
+          {
+            "$ref": "#/$defs/SnapshotControlAssessment"
+          },
+          {
+            "$ref": "#/$defs/SnapshotRequirement"
+          },
+          {
+            "$ref": "#/$defs/SnapshotFramework"
+          },
+          {
+            "$ref": "#/$defs/SnapshotEvidence"
+          },
+          {
+            "$ref": "#/$defs/SnapshotPolicy"
+          },
+          {
+            "$ref": "#/$defs/SnapshotDiscoveryRun"
+          },
+          {
+            "$ref": "#/$defs/SnapshotChangeEvent"
+          }
+        ]
+      },
+      "title": "Nodes",
+      "type": "array"
+    },
+    "obligations": {
+      "items": {
+        "$ref": "#/$defs/SnapshotObligation"
+      },
+      "title": "Obligations",
+      "type": "array"
+    },
+    "provider_impact": {
+      "items": {
+        "$ref": "#/$defs/SnapshotProviderImpact"
+      },
+      "title": "Provider Impact",
+      "type": "array"
+    },
+    "requirement_statuses": {
+      "items": {
+        "$ref": "#/$defs/SnapshotRequirementStatus"
+      },
+      "title": "Requirement Statuses",
+      "type": "array"
+    }
+  },
+  "required": [
+    "header",
+    "nodes",
+    "edges",
+    "findings",
+    "requirement_statuses",
+    "control_results",
+    "obligations",
+    "provider_impact",
+    "crosswalk"
+  ],
+  "title": "Snapshot",
+  "type": "object"
+}

@@ -8,8 +8,8 @@ from export_support import (
     OTHER,
     OWN,
     THIRD,
+    built_fixture,
     built_from,
-    fixture_graph,
     function_config,
     small_graph,
 )
@@ -167,7 +167,7 @@ def test_every_edge_and_reference_resolves_after_the_id_map():
 
 
 def test_every_reference_resolves_in_the_full_fixture_snapshot():
-    data = built_from(fixture_graph()).snapshot.model_dump(mode="json")
+    data = built_fixture().snapshot.model_dump(mode="json")
     ids_ = {n["id"] for n in data["nodes"]}
     assert len(ids_) == len(data["nodes"])
     assert all(e["src"] in ids_ and e["dst"] in ids_ for e in data["edges"])
@@ -207,7 +207,7 @@ def test_a_reference_that_resolved_before_and_not_after_is_refused():
 
 
 def test_the_fixture_snapshot_passes_the_scan_and_holds_no_canary_or_hash_key():
-    built = built_from(fixture_graph())
+    built = built_fixture()
     text = text_of(built)
     assert scan.scan_text(text, old_hashes=built.redacted.replaced_hashes) == []
     assert "CANARY" not in text and "config_hash" not in text
@@ -222,7 +222,7 @@ def test_the_d1_canary_on_every_env_var_never_reaches_the_file():
         v for f in raw["functions"] for v in f.get("Environment", {}).get("Variables", {}).values()
     }
     assert values == {"VERITY-CANARY-7f3a"}
-    text = text_of(built_from(fixture_graph()))
+    text = text_of(built_fixture())
     assert "7f3a" not in text and "VERITY-CANARY" not in text
     names = {n for f in raw["functions"] for n in f.get("Environment", {}).get("Variables", {})}
     published = {
@@ -235,7 +235,7 @@ def test_the_d1_canary_on_every_env_var_never_reaches_the_file():
 
 
 def test_every_published_redacted_hash_verifies_against_the_published_content():
-    for item in evidence_nodes(built_from(fixture_graph())):
+    for item in evidence_nodes(built_fixture()):
         if item["content"] is None:
             continue
         assert item["sha256"] == content_sha256(item["content"]), item["id"]

@@ -11,7 +11,7 @@ Nothing here decides what is safe to publish: `scan.py` does, from scratch.
 """
 
 import re
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -52,6 +52,7 @@ class RedactionReport:
 class Redacted:
     nodes: list[dict[str, Any]]
     edges: list[dict[str, Any]]
+    extras: dict[str, list[dict[str, Any]]]  # the derived rows, redacted the same way
     report: RedactionReport
     # Every sha256 and ID that redaction replaced. The scanner refuses these anywhere in the file.
     replaced_hashes: frozenset[str] = field(default_factory=frozenset)
@@ -140,7 +141,12 @@ def _references(nodes: list[dict[str, Any]]) -> dict[str, bool]:
     return found
 
 
-def redact(graph: nx.MultiDiGraph) -> Redacted:
+def redact(
+    graph: nx.MultiDiGraph, extras: Mapping[str, list[dict[str, Any]]] | None = None
+) -> Redacted:
+    """`extras` are derived rows that name nodes and Evidence, such as findings and obligations.
+    They go through the same account map and the same ID map as the records."""
+    extras = extras or {}
     originals: list[Node] = [graph.nodes[n]["record"] for n in sorted(graph.nodes)]
     edge_records: list[Edge] = sorted(
         (data["record"] for _, _, data in graph.edges(data=True)),
@@ -151,7 +157,8 @@ def redact(graph: nx.MultiDiGraph) -> Redacted:
     nodes = [_public(n) for n in originals]
     edges = [_public(e) for e in edge_records]
     own = _own_digest(evidence)
-    accounts = _account_map([*nodes, *edges], own)
+    extra_rows = [row for name in sorted(extras) for row in extras[name]]
+    accounts = _account_map([*nodes, *edges, *extra_rows], own)
 
     def text(value: str) -> str:
         return _DIGEST.sub(lambda m: accounts[m.group()], value)
@@ -204,6 +211,10 @@ def redact(graph: nx.MultiDiGraph) -> Redacted:
 
     final_nodes = [_transform(n, follow) for n in redacted_nodes]
     final_edges = [_transform(_transform(e, text), follow) for e in edges]
+    final_extras = {
+        name: [_transform(_transform(row, text), follow) for row in rows]
+        for name, rows in extras.items()
+    }
 
     ids_after = {n["id"] for n in final_nodes}
     if len(ids_after) != len(final_nodes):
@@ -216,6 +227,10 @@ def redact(graph: nx.MultiDiGraph) -> Redacted:
     if lost:
         raise RedactionError(f"{len(lost)} reference(s) no longer resolve after redaction")
 
+    for text_ in _strings([final_nodes, final_edges, *final_extras.values()]):
+        if any(old in text_ for old in id_map):
+            raise RedactionError("a replaced Evidence ID is still in the output")
+
     final_nodes.sort(key=lambda n: n["id"])
     final_edges.sort(key=lambda e: (e["src"], e["type"], e["dst"], _qualifier(e)))
     report = RedactionReport(
@@ -225,7 +240,7 @@ def redact(graph: nx.MultiDiGraph) -> Redacted:
         evidence_rebuilt=rebuilt,
         evidence_unchanged=len(evidence) - rebuilt,
     )
-    return Redacted(final_nodes, final_edges, report, frozenset(replaced), id_map)
+    return Redacted(final_nodes, final_edges, final_extras, report, frozenset(replaced), id_map)
 
 
 def _qualifier(edge: dict[str, Any]) -> str:

@@ -289,6 +289,17 @@ def _in_framework(graph: nx.MultiDiGraph, requirement_id: str, framework_id: str
     return False
 
 
+def frameworks_of(graph: nx.MultiDiGraph, requirement_id: str) -> list[str]:
+    """The frameworks a requirement sits under, through any chain of PART_OF. Sorted."""
+    _require(graph, requirement_id, NodeType.REQUIREMENT)
+    return sorted(
+        node_id
+        for node_id in graph.nodes
+        if graph.nodes[node_id]["record"].type is NodeType.FRAMEWORK
+        and _in_framework(graph, requirement_id, node_id)
+    )
+
+
 def crosswalk(
     graph: nx.MultiDiGraph, requirement_id: str, target_framework_id: str
 ) -> list[DerivedLink]:

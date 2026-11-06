@@ -984,6 +984,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "jsonschema" },
     { name = "moto", extra = ["awslambda", "dynamodb", "resourcegroupstaggingapi", "ssm"] },
     { name = "pytest" },
     { name = "python-hcl2" },
@@ -1001,6 +1002,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "jsonschema", specifier = ">=4.26" },
     { name = "moto", extras = ["dynamodb", "awslambda", "iam", "ssm", "resourcegroupstaggingapi"], specifier = ">=5.2.5" },
     { name = "pytest", specifier = ">=8" },
     { name = "python-hcl2", specifier = ">=8.1.4" },

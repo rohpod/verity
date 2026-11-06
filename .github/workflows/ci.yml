@@ -21,6 +21,21 @@ jobs:
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run pytest
+      # Node is here for the snapshot type generation only (ADR 0029, decision 12).
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --ignore-scripts --prefix web
+      - run: uv run python scripts/generate_snapshot_contract.py
+      - name: The generated contract matches the models
+        run: test -z "$(git status --porcelain -- web/generated)"
+      - name: A committed snapshot passes the scan
+        run: |
+          if [ -f web/public/data/snapshot.json ]; then
+            uv run verity export --check web/public/data/snapshot.json
+          fi
       - uses: opentofu/setup-opentofu@v2.0.2
         with:
           tofu_version: 1.13.8

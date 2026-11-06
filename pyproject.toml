@@ -7,6 +7,7 @@ dependencies = ["verity-core", "verity-ai"]
 
 [dependency-groups]
 dev = [
+    "jsonschema>=4.26",  # validates the snapshot against its schema (ADR 0029, decision 12)
     "moto[dynamodb,awslambda,iam,ssm,resourcegroupstaggingapi]>=5.2.5",
     "pytest>=8",
     "python-hcl2>=8.1.4",

@@ -353,7 +353,12 @@ def cmd_export(args: argparse.Namespace) -> int:
         )
         return REFUSED
     # Imported here so the other commands need no export code.
-    from verity_core.export.build import ScanRejected, build_snapshot, write_snapshot
+    from verity_core.export.build import (
+        ScanRejected,
+        StaleGraphError,
+        build_snapshot,
+        write_snapshot,
+    )
     from verity_core.export.local import local_graph
 
     loaded = _load_and_lint(args.content, args.tenant)
@@ -363,7 +368,10 @@ def cmd_export(args: argparse.Namespace) -> int:
     fixture = args.fixture or args.content / "fixtures" / "crawl" / "estate.json"
     try:
         graph = local_graph(loaded, fixture, as_of)
-        built = build_snapshot(graph, as_of=as_of, data_source="fixture")
+        built = build_snapshot(graph, content=loaded, as_of=as_of, data_source="fixture")
+    except StaleGraphError as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return REFUSED
     except (OSError, ValueError, BoundaryError) as exc:  # no raw record is ever in these
         print(f"cannot build the snapshot: {type(exc).__name__}", file=sys.stderr)
         return UNREADABLE
@@ -376,7 +384,12 @@ def cmd_export(args: argparse.Namespace) -> int:
         return FAILED
     report = built.report
     print("data source: recorded fixture, simulated. Nothing was read from AWS.")
-    print(f"{len(built.snapshot.nodes)} nodes and {len(built.snapshot.edges)} edges")
+    shown = built.snapshot
+    print(
+        f"{len(shown.nodes)} nodes, {len(shown.edges)} edges, {len(shown.findings)} findings, "
+        f"{len(shown.requirement_statuses)} requirement statuses, {len(shown.obligations)} "
+        f"obligations, {len(shown.crosswalk)} crosswalk rows"
+    )
     print(
         f"redaction: own account {'replaced' if report.own_account_found else 'not found'}, "
         f"{report.external_accounts} other account(s), {report.content_keys_withheld} hash "
