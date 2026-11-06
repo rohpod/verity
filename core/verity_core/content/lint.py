@@ -79,6 +79,7 @@ def lint(content: Content, limits: LintLimits = LintLimits()) -> list[LintIssue]
         *_estate(content),
         *_decisions(content),
         *_rules(content),
+        *_signals(content),
         *_honesty(content),
     ]
     return sorted(issues, key=lambda i: (i.subject, i.code))
@@ -328,6 +329,33 @@ def _rules(content: Content) -> Iterator[LintIssue]:
         for date_id in (rule.date, rule.legacy_date):
             if date_id is not None and date_id not in dates:
                 yield LintIssue("rule_unknown_date", subject, f"{date_id!r} does not exist")
+
+
+# Signal IDs the crawler raises itself, so a rule file may not reuse them.
+BUILT_IN_SIGNALS = ("platform_component", "names_unknown_system")
+
+
+def _signals(content: Content) -> Iterator[LintIssue]:
+    """Signal IDs must be unique, and every pattern must compile, or the crawler would fail on
+    its first function."""
+    if content.signals is None:
+        return
+    seen = Counter(s.id for s in content.signals.signals)
+    for signal in content.signals.signals:
+        subject = f"signal:{signal.id}"
+        if seen[signal.id] > 1:
+            yield LintIssue("signal_duplicate_id", subject, "defined more than once")
+        if signal.id in BUILT_IN_SIGNALS:
+            yield LintIssue("signal_reserved_id", subject, "the crawler uses this ID itself")
+        if signal.pattern is not None:
+            try:
+                re.compile(signal.pattern)
+            except re.error as exc:
+                yield LintIssue("signal_bad_pattern", subject, f"does not compile: {exc}")
+    if len(set(content.signals.trail_event_sources)) != len(content.signals.trail_event_sources):
+        yield LintIssue(
+            "signal_duplicate_source", "signals", "a trail event source is listed twice"
+        )
 
 
 def _strings(content: Content) -> Iterator[tuple[str, str]]:

@@ -1,6 +1,6 @@
 # Verity — Architecture
 
-_Stage 3 deliverable · 2026-11-05 · Status: accepted, amended in Stage 4 (see [milestone plan](stage-4-milestones.md), [ADR 0009](adr/0009-mock-openai-iam-auth.md), [ADR 0010](adr/0010-assessment-and-crosswalk-semantics.md), [ADR 0012](adr/0012-graph-schema-refinements.md), [ADR 0013](adr/0013-dynamodb-write-model.md))._
+_Stage 3 deliverable · 2026-11-05 · Status: accepted, amended in Stage 4 (see [milestone plan](stage-4-milestones.md), [ADR 0009](adr/0009-mock-openai-iam-auth.md), [ADR 0010](adr/0010-assessment-and-crosswalk-semantics.md), [ADR 0012](adr/0012-graph-schema-refinements.md), [ADR 0013](adr/0013-dynamodb-write-model.md), [ADR 0021](adr/0021-m6-discovery.md))._
 Inputs: [Stage 1 discovery](stage-1-discovery.md) · [Stage 2 feasibility](stage-2-feasibility.md) · decisions in [`adr/`](adr/).
 
 **Locked constraints:** AWS Free plan · single region `eu-north-1` · Terraform/OpenTofu · Python 3.12 backend · React + TS frontend · DynamoDB + NetworkX graph · no S3 · Bedrock/OpenAI mock-only · public demo = static snapshot on GitHub Pages · target customer = mid-size EU SaaS company acting as both AI provider and deployer.
@@ -38,7 +38,7 @@ Inputs: [Stage 1 discovery](stage-1-discovery.md) · [Stage 2 feasibility](stage
 verity/
   core/verity_core/   model/      pydantic node & edge types, enums, ID helpers
                       graph/      GraphRepository protocol, InMemory + DynamoDB impls, NetworkX loader
-                      discovery/  collectors · enrichers · signals/scoring · correlation · diff
+                      discovery/  boundary · collectors · aws · signals · correlate · relate · usage · diff · persist · pipeline
                       rules/      applicability engine (system attributes × role × date → requirements)
                       assess/     control status, assurance level, requirement satisfaction, rollups
                       content/    YAML schema · loader · linter · seed (M4)
@@ -48,7 +48,7 @@ verity/
   sdk/verity_ai/      provider adapters (BedrockCompatible, OpenAICompatible) + usage telemetry
   apps/               support_assistant · talent_screening · contract_insights · shadow_summariser · invoice_renderer
   mocks/              mock_bedrock · mock_openai
-  content/            frameworks/ · controls.yaml · mappings/ · rules/ · org/ · manifests/ · decisions/
+  content/            frameworks/ · controls.yaml · mappings/ · rules/ · org/ · manifests/ · decisions/ · fixtures/
   infra/              Terraform root + modules (lambda_app, crawler, table, guardrails)
   web/                Vite + React + TS dashboard
   tests/  docs/  .github/workflows/
@@ -76,17 +76,17 @@ verity/
 
 ## D. Discovery crawler
 
-The pipeline is a sequence of pure functions over plain data, so it can be unit-tested with `moto` and recorded fixtures.
+The pipeline is a sequence of pure functions over plain data, so it can be unit-tested with `moto` and recorded fixtures. `crawl` reads the clock once, and `persist` is the only writer ([ADR 0021](adr/0021-m6-discovery.md)).
 
 | # | Stage | What it does |
 |---|---|---|
-| 1 | Enumerate | `tag:GetResources`, `lambda:ListFunctions`, `iam:ListRoles`, `dynamodb:ListTables`, `ssm:GetParametersByPath(/verity/manifests)`. Resource Explorer `Search` is optional and uses the local index only, never Config-backed views. |
-| 2 | Enrich | Function configuration (runtime, role, architecture). **Env var *names* only.** `ListFunctions` returns values too, so the collector discards them on receipt: never stored, never logged, and covered by a canary test. Tags. Inline and attached role policies. |
-| 3 | Signal & score | Rules in `content/rules/ai_signals.yaml` combine signals into `ai_likelihood ∈ {declared, confirmed_usage, probable, possible, none}`. Every result stores the signals that fired, so the UI can explain *why*. |
-| 4 | Correlate | The `ai:system-id` tag or a manifest links a resource to an `AISystem`. Unlinked resources scored *probable* or *possible* become `Candidate`s (the shadow-AI inbox). |
-| 5 | Relate | `ASSUMES` (function → role) and `CALLS` (function → table/function, derived from IAM resource ARNs and env var names). Also system → provider. |
-| 6 | Usage | `verity_ai` adapters write `U#` usage records (system, provider, model, timestamp, token estimate). This is evidence of **actual AI usage**, as opposed to infrastructure merely existing. CloudTrail `LookupEvents` is also queried for `bedrock:*`; the honest expected result is *none observed*. |
-| 7 | Diff | Config hashes are compared with the previous run to produce `ChangeEvent`s. Evidence collected from a changed resource becomes **stale**. |
+| 1 | Enumerate | `tag:GetResources`, `lambda:ListFunctions`, `iam:ListRoles`, `dynamodb:ListTables`, `ssm:GetParametersByPath(/verity/manifests)`. Resource Explorer `Search` is optional and uses the local index only, never Config-backed views. M6 builds this against `moto` only; the live read is M8. |
+| 2 | Enrich | Function configuration (runtime, role, architecture). **Env var *names* only.** `ListFunctions` returns values too, so `boundary.py` discards them on receipt: never stored, never logged, and covered by a canary test. Tags. Inline and attached role policies. 12-digit account IDs in any kept string become `<account>`. The Lambda description is scored but never stored. |
+| 3 | Signal & score | Rules in `content/rules/ai_signals.yaml` combine signals into `ai_likelihood ∈ {declared, confirmed_usage, probable, possible, none}`. Every result stores the signals that fired, so the UI can explain *why*. Only Lambda functions are scored. |
+| 4 | Correlate | The `ai:system-id` tag (a full ID such as `sys:talent-screening`) or a manifest links a resource to an `AISystem`. An unlinked function scored *probable* or *possible*, or one that names a system that does not exist, becomes a `Candidate` (the shadow-AI inbox). |
+| 5 | Relate | `RUNS_ON` (system → function), `ASSUMES` (function → role) and `CALLS` (function → table or function, from the resource ARNs in the role's `Allow` statements; `Resource: "*"` makes no edge). The crawler creates no system → provider link: §E's path through Model stands. |
+| 6 | Usage | `verity_ai` adapters write `U#` usage records (system, provider, model, timestamp, token estimate). This is evidence of **actual AI usage**, as opposed to infrastructure merely existing. CloudTrail `LookupEvents` is also queried for `bedrock.amazonaws.com`; the honest expected result is *none observed*. Capability without usage is the control VC-060 (below). |
+| 7 | Diff | Config hashes are compared with the stored ones to produce `ChangeEvent`s. Evidence collected from a changed resource becomes **stale**. |
 | 8 | Persist | Idempotent upserts with deterministic IDs, plus a `DiscoveryRun` node for provenance. |
 
 **Signal ladder (summary):**
@@ -98,7 +98,21 @@ The pipeline is a sequence of pure functions over plain data, so it can be unit-
 | IAM grants AI actions; AI-named env vars | probable |
 | Name or description heuristics | possible |
 
-**IAM:** a custom least-privilege policy, rather than the broader AWS-managed `SecurityAudit`. It deliberately excludes `lambda:GetFunction` (which would allow code download), and its only write access is to `verity-graph`.
+The order is declared, confirmed_usage, probable, possible, none. The strongest wins and every signal that fired is stored, sorted. A resource tagged `verity:component` (the mocks and the crawler) scores *none* with the signal `platform_component`. An IAM signal on a role counts for the function that assumes it. `ai_actions` (`bedrock:Invoke*`, `bedrock:Converse*`, `sagemaker:InvokeEndpoint*`) match a granted action in either direction, so `bedrock:*` and `*` cover them. The `name` signal matches whole tokens, so `mail` and `maintenance` never match `ai`.
+
+**Written on change only** ([ADR 0021](adr/0021-m6-discovery.md)). A resource gets a `config_snapshot` when it is new, its `config_hash` differs from its latest snapshot's, or that snapshot has 8 days or less to run (`EXPIRING_WITHIN` plus one). `OBSERVED` is written only for a new or changed resource, and `DiscoveryRun.summary` holds the per-run counts. Crawler evidence is valid for 30 days. Evidence over the 16 KB cap is summarised as `{truncated, config_hash, ai_actions, statement_count}`, never refused. A deleted resource is ended with `valid_to` and gets no ChangeEvent.
+
+**Write order**, so a failed run is repaired by the next: the run, then each `ChangeEvent` and `AFFECTS` before the node changes, resources, `RUNS_ON`/`ASSUMES`/`CALLS`, Candidates, Evidence, the ending of resources not seen, and finally the run again with `finished_at`. The crawler writes only `AWSResource`, `Candidate`, `DiscoveryRun`, `ChangeEvent` and `Evidence`, and never an `AISystem`.
+
+**Candidate lifecycle.** Created when a function qualifies, ended with `valid_to` when it stops or its resource goes. If its resource becomes linked to a system it **stays open** with `PROMOTED_TO`, because an open edge to an ended node is refused. It is reopened if it qualifies again.
+
+**Capability without usage (VC-060).** For each system that runs on a role, the crawler writes one `automated_test` Evidence with `control: ctl:VC-060`, the system as `scope`, `outcome`, `granted`, `unused` and `unparsed`. The outcome is `fail` if a granted AI action has no matching CloudTrail event for that role. Only CloudTrail counts, never `U#` records, because the demo's usage comes from a mock. Only `Effect: Allow` counts, and a `NotAction` statement is ignored and marked `unparsed`. No other control is raised by the crawler.
+
+**IAM:** a custom least-privilege policy, rather than the broader AWS-managed `SecurityAudit`. It allows exactly these read actions and no others:
+
+`lambda:ListFunctions` · `tag:GetResources` · `iam:ListRoles` · `iam:ListRolePolicies` · `iam:GetRolePolicy` · `iam:ListAttachedRolePolicies` · `iam:GetPolicy` · `iam:GetPolicyVersion` · `dynamodb:ListTables` · `ssm:GetParametersByPath` · `cloudtrail:LookupEvents`
+
+It deliberately excludes `lambda:GetFunction` (which would allow code download), and its only write access is to `verity-graph`. A test records every operation the collector calls and fails on any other.
 
 ## E. Knowledge graph schema
 
@@ -116,6 +130,7 @@ The pipeline is a sequence of pure functions over plain data, so it can be unit-
 - `DataClassification` is an enum property on `Dataset` (Public · Internal · Confidential · Restricted, plus a `personal_data` flag), not a node. We can promote it to a node later if controls start attaching to classifications.
 - `Model.origin ∈ {in_house, third_party}`. Only third-party models get `PROVIDED_BY`.
 - `Provider.simulated: bool` makes mocks explicit in the data itself.
+- `AWSResource` carries `ai_likelihood` and `signals` for Lambda functions, and `DiscoveryRun` carries `summary`, a map of counts ([ADR 0021](adr/0021-m6-discovery.md)).
 - **The tenant is the organisation:** each tenant has exactly one `Organisation`, enforced on write, so a system finds its organisation without an edge ([ADR 0012](adr/0012-graph-schema-refinements.md)).
 
 ### Identifiers
@@ -321,6 +336,7 @@ An open assessment that a run no longer produces is ended with `valid_to`, and r
 | `no_owner` | A system has no `OWNS` edge | Medium |
 | `evidence_expiring` | The deciding evidence is expiring | Low |
 | `conditional_obligation` | One per system with a conditional edge | Low |
+| `shadow_ai_candidate` | An open Candidate has no open `PROMOTED_TO` edge. The subject is the Candidate | High for `declared`, `confirmed_usage` and `probable`; medium for `possible` |
 
 `binding` is a fact on `Framework`: true for the EU AI Act, false for the standards Kestrel adopted by choice ([ADR 0020](adr/0020-m5-review-fixes.md)).
 
@@ -353,12 +369,12 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
 
 - **CLI:**
   - `verity seed`: load content and organisation YAML. It refuses an edited or removed decision
-  - `verity crawl [--local]`
+  - `verity crawl --local [--fixture PATH] [--verbose]`: crawl a recorded fixture (default `content/fixtures/crawl/estate.json`) into a fresh in-memory graph, then assess it. It prints that the data is simulated and nothing was read from AWS, each function with its likelihood and signals, the Candidates, what was written, and the assessment. Without `--local` it is refused until the deployed crawler exists (M8). Only `full` crawls exist
   - `verity lint`: check the content
   - `verity assess [--as-of DATE] [--system ID] [--target memory|dynamodb] [--verbose]`: derive applicability and assess the controls. Memory (the default) seeds and assesses a fresh graph and writes nothing to AWS. It prints counts, lists every high finding and counts the rest by code; `--verbose` lists them all. An unknown `--system` is refused
   - `verity attest <control> <scope> --by <person>`: scaffolds a YAML file under `content/decisions/` for review; it never writes to the graph
   - `verity export`: write the redacted snapshot
-- **Crawler Lambda:** event `{ "mode": "full" | "incremental" }`, triggered by the schedule or a manual invoke.
+- **Crawler Lambda (M8):** event `{ "mode": "full" | "incremental" }`, triggered by the schedule or a manual invoke. Only `full` is built ([ADR 0021](adr/0021-m6-discovery.md)).
 - **Snapshot contract:** `snapshot.schema.json` is generated from the pydantic models, and the TS types are generated from that schema, so the frontend and backend cannot drift.
 - **Governance as code:** human decisions live as reviewed YAML under `content/decisions/` (§G). The approving pull request is the approval record. Risk treatment decisions are deferred ([ADR 0019](adr/0019-m5-rules-and-assessment.md)). See [ADR 0008](adr/0008-governance-as-code.md).
 - **No public API in the MVP.** _Later:_ an admin write API on a Function URL with `AWS_IAM` auth.
@@ -412,6 +428,7 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
 | [0018](adr/0018-unread-standards.md) | Mappings from a standard nobody read claim only an overlap, so ISO requirements never show as Satisfied |
 | [0019](adr/0019-m5-rules-and-assessment.md) | M5 rules and assessment: automated-only guardrail, Art. 111(2) conditional edges, high-risk candidates, decisions as Evidence, Not met |
 | [0020](adr/0020-m5-review-fixes.md) | M5 review fixes: immutable decisions with `supersedes` and revocation, risk-tier expiry, unknown facts, severity from binding law, ended assessments |
+| [0021](adr/0021-m6-discovery.md) | M6 discovery: evidence written on change, summarised over the cap, one cleaning boundary, VC-060 for unused permissions, Candidate lifecycle |
 
 ## L. Schema validation walkthrough
 

@@ -5,7 +5,9 @@ upserts idempotent. IDs end up inside `#`-delimited DynamoDB keys, so they use a
 restricted charset and can never contain `#`.
 """
 
+import hashlib
 import re
+from datetime import UTC, datetime
 
 from verity_core.model.enums import NodeType
 
@@ -137,3 +139,31 @@ def ca_id(control: str, scope: str) -> str:
     if node_type_of(scope) not in _CA_SCOPES:
         raise ValueError(f"{scope!r} cannot scope a ControlAssessment")
     return f"{PREFIXES[NodeType.CONTROL_ASSESSMENT]}:{control.partition(':')[2]}:{scope}"
+
+
+def discovery_run_id(started_at: datetime) -> str:
+    """`run:20261106T090000.000000Z`, from the run's start time."""
+    if started_at.tzinfo is None:
+        raise ValueError("started_at must be timezone-aware")
+    stamp = started_at.astimezone(UTC).strftime("%Y%m%dT%H%M%S.%fZ")
+    return make_id(NodeType.DISCOVERY_RUN, stamp)
+
+
+def change_event_id(run_id: str, resource: str) -> str:
+    """`chg:<run part>:<16 hex>`: one change per resource per run."""
+    check_id(run_id, NodeType.DISCOVERY_RUN)
+    check_id(resource, NodeType.AWS_RESOURCE)
+    digest = hashlib.sha256(resource.encode()).hexdigest()[:16]
+    return make_id(NodeType.CHANGE_EVENT, run_id.partition(":")[2], digest)
+
+
+_NOT_PART = re.compile(r"[^A-Za-z0-9._-]")
+
+
+def iam_role_part(name: str) -> str:
+    """A role name as an ID part. IAM allows `+=,@` in names and an ID part does not, so each
+    is replaced by `-`, and a short hash of the whole name keeps two such names apart."""
+    part = _NOT_PART.sub("-", name)
+    if part == name:
+        return name
+    return f"{part}-{hashlib.sha256(name.encode()).hexdigest()[:8]}"

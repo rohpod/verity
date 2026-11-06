@@ -1,4 +1,5 @@
-"""Only the DynamoDB repository may use boto3 (CLAUDE.md, ADR 0003, M2 validation).
+"""Only the DynamoDB repository and the discovery collector may use boto3 (CLAUDE.md, ADR 0003,
+M2 validation, ADR 0021). The collector lists resources and is not graph access.
 
 The check reads every tracked Python file outside `tests/`, so a new package or Lambda is
 covered without editing this test."""
@@ -9,6 +10,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 ALLOWED = ROOT / "core" / "verity_core" / "graph" / "dynamodb"
+COLLECTOR = "core/verity_core/discovery/aws.py"
 AWS_LIBRARIES = {"boto3", "botocore", "aioboto3", "aiobotocore"}
 
 
@@ -49,13 +51,14 @@ def test_the_scan_sees_the_repository_and_the_files_that_should_use_boto3():
     assert len(files) > 20
     users = {f.relative_to(ROOT).as_posix() for f in files if aws_uses(f)}
     assert "core/verity_core/graph/dynamodb/client.py" in users
+    assert COLLECTOR in users
 
 
-def test_no_source_file_outside_the_dynamodb_package_uses_boto3():
+def test_no_source_file_outside_the_two_allowed_places_uses_boto3():
     offenders = {
         f.relative_to(ROOT).as_posix(): aws_uses(f)
         for f in source_files()
-        if ALLOWED not in f.parents and aws_uses(f)
+        if ALLOWED not in f.parents and f.relative_to(ROOT).as_posix() != COLLECTOR and aws_uses(f)
     }
     assert offenders == {}
 

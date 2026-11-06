@@ -1,0 +1,433 @@
+{
+  "_comment": "A recorded, invented estate in the shape of the AWS responses (ADR 0021). Nothing was read from AWS. Every env var holds the canary, so a test can prove values are discarded (D1).",
+  "functions": [
+    {
+      "FunctionName": "support-assistant",
+      "FunctionArn": "arn:aws:lambda:eu-north-1:000000000000:function:support-assistant",
+      "Runtime": "python3.12",
+      "Role": "arn:aws:iam::000000000000:role/support-assistant-role",
+      "Handler": "app.handler",
+      "CodeSha256": "sha-of-support-assistant-v1",
+      "MemorySize": 128,
+      "Timeout": 10,
+      "Architectures": [
+        "arm64"
+      ],
+      "Description": "Answers customer support questions",
+      "LastModified": "2026-11-01T09:00:00.000+0000",
+      "RevisionId": "rev-0",
+      "Environment": {
+        "Variables": {
+          "MODEL_ADAPTER": "VERITY-CANARY-7f3a",
+          "HELP_ARTICLES_TABLE": "VERITY-CANARY-7f3a",
+          "LOG_LEVEL": "VERITY-CANARY-7f3a"
+        }
+      }
+    },
+    {
+      "FunctionName": "talent-screening",
+      "FunctionArn": "arn:aws:lambda:eu-north-1:000000000000:function:talent-screening",
+      "Runtime": "python3.12",
+      "Role": "arn:aws:iam::000000000000:role/talent-screening-role",
+      "Handler": "app.handler",
+      "CodeSha256": "sha-of-talent-screening-v1",
+      "MemorySize": 128,
+      "Timeout": 10,
+      "Architectures": [
+        "arm64"
+      ],
+      "Description": "Scores job applicants with a small local model",
+      "LastModified": "2026-11-01T09:00:00.000+0000",
+      "RevisionId": "rev-1",
+      "Environment": {
+        "Variables": {
+          "COEFFICIENTS_FILE": "VERITY-CANARY-7f3a",
+          "LOG_LEVEL": "VERITY-CANARY-7f3a"
+        }
+      }
+    },
+    {
+      "FunctionName": "contract-insights",
+      "FunctionArn": "arn:aws:lambda:eu-north-1:000000000000:function:contract-insights",
+      "Runtime": "python3.12",
+      "Role": "arn:aws:iam::000000000000:role/contract-insights-role",
+      "Handler": "app.handler",
+      "CodeSha256": "sha-of-contract-insights-v1",
+      "MemorySize": 128,
+      "Timeout": 10,
+      "Architectures": [
+        "arm64"
+      ],
+      "Description": "Summarises customer contracts for sales and legal",
+      "LastModified": "2026-11-01T09:00:00.000+0000",
+      "RevisionId": "rev-2",
+      "Environment": {
+        "Variables": {
+          "OPENAI_BASE_URL": "VERITY-CANARY-7f3a",
+          "LOG_LEVEL": "VERITY-CANARY-7f3a"
+        }
+      }
+    },
+    {
+      "FunctionName": "shadow-summariser",
+      "FunctionArn": "arn:aws:lambda:eu-north-1:000000000000:function:shadow-summariser",
+      "Runtime": "python3.12",
+      "Role": "arn:aws:iam::000000000000:role/shadow-summariser-role",
+      "Handler": "app.handler",
+      "CodeSha256": "sha-of-shadow-summariser-v1",
+      "MemorySize": 128,
+      "Timeout": 10,
+      "Architectures": [
+        "arm64"
+      ],
+      "Description": "Summarises documents for one team",
+      "LastModified": "2026-11-01T09:00:00.000+0000",
+      "RevisionId": "rev-3",
+      "Environment": {
+        "Variables": {
+          "OPENAI_BASE_URL": "VERITY-CANARY-7f3a"
+        }
+      }
+    },
+    {
+      "FunctionName": "invoice-renderer",
+      "FunctionArn": "arn:aws:lambda:eu-north-1:000000000000:function:invoice-renderer",
+      "Runtime": "python3.12",
+      "Role": "arn:aws:iam::000000000000:role/invoice-renderer-role",
+      "Handler": "app.handler",
+      "CodeSha256": "sha-of-invoice-renderer-v1",
+      "MemorySize": 128,
+      "Timeout": 10,
+      "Architectures": [
+        "arm64"
+      ],
+      "Description": "Renders invoices as PDF",
+      "LastModified": "2026-11-01T09:00:00.000+0000",
+      "RevisionId": "rev-4",
+      "Environment": {
+        "Variables": {
+          "TEMPLATE_BUCKET": "VERITY-CANARY-7f3a"
+        }
+      }
+    },
+    {
+      "FunctionName": "mock-openai",
+      "FunctionArn": "arn:aws:lambda:eu-north-1:000000000000:function:mock-openai",
+      "Runtime": "python3.12",
+      "Role": "arn:aws:iam::000000000000:role/mock-openai-role",
+      "Handler": "app.handler",
+      "CodeSha256": "sha-of-mock-openai-v1",
+      "MemorySize": 128,
+      "Timeout": 10,
+      "Architectures": [
+        "arm64"
+      ],
+      "Description": "Simulated OpenAI-shaped endpoint. Nothing real is called",
+      "LastModified": "2026-11-01T09:00:00.000+0000",
+      "RevisionId": "rev-5"
+    }
+  ],
+  "tag_mappings": [
+    {
+      "ResourceARN": "arn:aws:lambda:eu-north-1:000000000000:function:support-assistant",
+      "Tags": [
+        {
+          "Key": "ai:system-id",
+          "Value": "sys:support-assistant"
+        },
+        {
+          "Key": "project",
+          "Value": "kestrel-demo"
+        }
+      ]
+    },
+    {
+      "ResourceARN": "arn:aws:lambda:eu-north-1:000000000000:function:contract-insights",
+      "Tags": [
+        {
+          "Key": "ai:system-id",
+          "Value": "sys:contract-insights"
+        },
+        {
+          "Key": "project",
+          "Value": "kestrel-demo"
+        }
+      ]
+    },
+    {
+      "ResourceARN": "arn:aws:lambda:eu-north-1:000000000000:function:mock-openai",
+      "Tags": [
+        {
+          "Key": "verity:component",
+          "Value": "mock-openai"
+        }
+      ]
+    }
+  ],
+  "roles": [
+    {
+      "role": {
+        "RoleName": "support-assistant-role",
+        "Path": "/",
+        "Arn": "arn:aws:iam::000000000000:role/support-assistant-role",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        }
+      },
+      "inline_policies": [
+        {
+          "PolicyName": "logs",
+          "PolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "logs:CreateLogStream",
+                  "logs:PutLogEvents"
+                ],
+                "Resource": "arn:aws:logs:eu-north-1:000000000000:log-group:/aws/lambda/support-assistant:*"
+              }
+            ]
+          }
+        },
+        {
+          "PolicyName": "model-and-data",
+          "PolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "bedrock:Converse"
+                ],
+                "Resource": "arn:aws:bedrock:eu-north-1::foundation-model/*"
+              },
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "dynamodb:GetItem"
+                ],
+                "Resource": "arn:aws:dynamodb:eu-north-1:000000000000:table/verity-graph"
+              }
+            ]
+          }
+        }
+      ],
+      "attached_policies": []
+    },
+    {
+      "role": {
+        "RoleName": "talent-screening-role",
+        "Path": "/",
+        "Arn": "arn:aws:iam::000000000000:role/talent-screening-role",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        }
+      },
+      "inline_policies": [
+        {
+          "PolicyName": "logs",
+          "PolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "logs:CreateLogStream",
+                  "logs:PutLogEvents"
+                ],
+                "Resource": "arn:aws:logs:eu-north-1:000000000000:log-group:/aws/lambda/talent-screening:*"
+              }
+            ]
+          }
+        }
+      ],
+      "attached_policies": []
+    },
+    {
+      "role": {
+        "RoleName": "contract-insights-role",
+        "Path": "/",
+        "Arn": "arn:aws:iam::000000000000:role/contract-insights-role",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        }
+      },
+      "inline_policies": [
+        {
+          "PolicyName": "logs",
+          "PolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "logs:CreateLogStream",
+                  "logs:PutLogEvents"
+                ],
+                "Resource": "arn:aws:logs:eu-north-1:000000000000:log-group:/aws/lambda/contract-insights:*"
+              }
+            ]
+          }
+        }
+      ],
+      "attached_policies": []
+    },
+    {
+      "role": {
+        "RoleName": "shadow-summariser-role",
+        "Path": "/",
+        "Arn": "arn:aws:iam::000000000000:role/shadow-summariser-role",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        }
+      },
+      "inline_policies": [
+        {
+          "PolicyName": "logs",
+          "PolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "logs:CreateLogStream",
+                  "logs:PutLogEvents"
+                ],
+                "Resource": "arn:aws:logs:eu-north-1:000000000000:log-group:/aws/lambda/shadow-summariser:*"
+              }
+            ]
+          }
+        }
+      ],
+      "attached_policies": []
+    },
+    {
+      "role": {
+        "RoleName": "invoice-renderer-role",
+        "Path": "/",
+        "Arn": "arn:aws:iam::000000000000:role/invoice-renderer-role",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        }
+      },
+      "inline_policies": [
+        {
+          "PolicyName": "logs",
+          "PolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "logs:CreateLogStream",
+                  "logs:PutLogEvents"
+                ],
+                "Resource": "arn:aws:logs:eu-north-1:000000000000:log-group:/aws/lambda/invoice-renderer:*"
+              }
+            ]
+          }
+        }
+      ],
+      "attached_policies": []
+    },
+    {
+      "role": {
+        "RoleName": "mock-openai-role",
+        "Path": "/",
+        "Arn": "arn:aws:iam::000000000000:role/mock-openai-role",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        }
+      },
+      "inline_policies": [
+        {
+          "PolicyName": "logs",
+          "PolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "logs:CreateLogStream",
+                  "logs:PutLogEvents"
+                ],
+                "Resource": "arn:aws:logs:eu-north-1:000000000000:log-group:/aws/lambda/mock-openai:*"
+              }
+            ]
+          }
+        }
+      ],
+      "attached_policies": []
+    }
+  ],
+  "tables": [
+    "verity-graph"
+  ],
+  "manifests": [
+    {
+      "Name": "/verity/manifests/talent-screening.yaml",
+      "Value": "system: sys:talent-screening\nresources:\n  - {type: lambda, name: talent-screening}\n"
+    },
+    {
+      "Name": "/verity/manifests/contract-insights.yaml",
+      "Value": "system: sys:contract-insights\nresources:\n  - {type: lambda, name: contract-insights}\n"
+    }
+  ],
+  "trail_events": []
+}

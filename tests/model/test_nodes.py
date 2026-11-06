@@ -3,6 +3,7 @@ from factories import COMMON, one_of_each
 from pydantic import ValidationError
 from verity_core.model import ids
 from verity_core.model.enums import (
+    AiLikelihood,
     AssuranceLevel,
     ControlKind,
     ImplementationStatus,
@@ -150,3 +151,18 @@ def test_env_var_names_are_accepted():
 def test_a_value_cannot_be_stored_as_an_env_var_name(smuggled):
     with pytest.raises(ValidationError):
         resource(smuggled)
+
+
+def test_a_resource_is_unscored_until_the_crawler_scores_it():
+    resource = NODES[NodeType.AWS_RESOURCE]
+    assert resource.ai_likelihood is None
+    assert resource.signals == []
+    scored = resource.model_copy(update={"ai_likelihood": AiLikelihood.PROBABLE, "signals": ["x"]})
+    assert parse_node(scored.model_dump()).ai_likelihood is AiLikelihood.PROBABLE
+
+
+def test_a_run_summary_holds_counts_only():
+    run = NODES[NodeType.DISCOVERY_RUN]
+    assert run.summary == {}
+    with pytest.raises(ValidationError):
+        type(run).model_validate({**run.model_dump(), "summary": {"functions": "many"}})

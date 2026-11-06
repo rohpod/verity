@@ -7,6 +7,8 @@ in force or conditional (ADR 0020). Everything else it backs is a standard Kestr
 `risk_tier_unconfirmed`, `risk_tier_expired` and `unknown_fact` come from the applicability
 engine, so the caller passes them in. Everything else is derived here from the graph, the
 control results and the requirement statuses.
+
+`shadow_ai_candidate` is one per open Candidate that has no open `PROMOTED_TO` edge (ADR 0021).
 """
 
 from collections.abc import Iterable, Sequence
@@ -17,12 +19,12 @@ import networkx as nx
 from verity_core.assess.controls import ControlResult
 from verity_core.assess.freshness import Freshness
 from verity_core.assess.requirements import RequirementStatus
-from verity_core.graph.loader import in_edges, node_record
+from verity_core.graph.loader import in_edges, node_record, out_edges
 from verity_core.graph.traversals import Resolution
 from verity_core.model import ids
 from verity_core.model.edges import AppliesToEdge
-from verity_core.model.enums import EdgeType, ImplementationStatus
-from verity_core.model.nodes import AISystem, Framework
+from verity_core.model.enums import AiLikelihood, EdgeType, ImplementationStatus
+from verity_core.model.nodes import AISystem, Candidate, Framework
 from verity_core.rules.finding import Finding, Severity
 from verity_core.rules.status import ApplicabilityStatus, applicability_status
 
@@ -33,6 +35,20 @@ _IN_SCOPE = (ApplicabilityStatus.IN_FORCE, ApplicabilityStatus.CONDITIONAL)
 def _binding(graph: nx.MultiDiGraph, requirement_id: str) -> bool:
     framework = node_record(graph, ids.framework_id(requirement_id.split(":")[1]))
     return isinstance(framework, Framework) and framework.binding
+
+
+def _shadow(candidate: Candidate) -> Finding:
+    """Declared, confirmed and probable signs are high; a name that merely suggests AI is not."""
+    severity = (
+        Severity.MEDIUM if candidate.ai_likelihood is AiLikelihood.POSSIBLE else Severity.HIGH
+    )
+    return Finding(
+        "shadow_ai_candidate",
+        severity,
+        candidate.id,
+        f"{candidate.name} looks like AI ({candidate.ai_likelihood.value}: "
+        f"{', '.join(candidate.signals)}) and is not in the registry.",
+    )
 
 
 def derive_findings(
@@ -95,6 +111,11 @@ def derive_findings(
                 )
 
     for node_id in sorted(graph.nodes):
+        candidate = node_record(graph, node_id)
+        if isinstance(candidate, Candidate) and not out_edges(
+            graph, candidate.id, EdgeType.PROMOTED_TO
+        ):
+            found.append(_shadow(candidate))
         system = node_record(graph, node_id)
         if not isinstance(system, AISystem):
             continue

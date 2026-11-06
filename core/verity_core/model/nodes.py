@@ -93,6 +93,10 @@ class AWSResource(NodeBase):
     # of defence that refuses `NAME=value`; it cannot recognise a bare value as one.
     env_var_names: list[EnvVarName] = Field(default_factory=list)
     config_hash: str | None = None  # compared between runs to produce ChangeEvents
+    # Set by the crawler for Lambda functions only (ADR 0021): the strongest signal and every
+    # signal that fired. Roles and tables stay None.
+    ai_likelihood: AiLikelihood | None = None
+    signals: list[str] = Field(default_factory=list)
 
 
 class Model(NodeBase):
@@ -191,8 +195,10 @@ class DiscoveryRun(NodeBase):
     type: Literal[NodeType.DISCOVERY_RUN] = NodeType.DISCOVERY_RUN
     mode: RunMode
     started_at: UtcDatetime
-    finished_at: UtcDatetime | None = None
+    finished_at: UtcDatetime | None = None  # empty on a run that did not finish
     crawler_version: NonEmpty
+    # Counts for the run, because most records are written on change only (ADR 0021).
+    summary: dict[str, int] = Field(default_factory=dict)
 
 
 class ChangeEvent(NodeBase):

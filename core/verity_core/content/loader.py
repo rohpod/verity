@@ -7,7 +7,7 @@ written anywhere: `seed.py` does that, through `GraphRepository`.
 Layout under the root; every file is optional:
 
     frameworks/*.yaml  controls.yaml  mappings/*.yaml  org/*.yaml  decisions/*.yaml
-    rules/obligation_dates.yaml  rules/applicability.yaml
+    rules/obligation_dates.yaml  rules/applicability.yaml  rules/ai_signals.yaml
 """
 
 from dataclasses import dataclass, field
@@ -17,6 +17,7 @@ from typing import Any
 from verity_core.content.decisions import load_decisions
 from verity_core.content.org import load_estate
 from verity_core.content.schema import (
+    AiSignalsFile,
     ApplicabilityFile,
     ControlsFile,
     FrameworkFile,
@@ -43,6 +44,8 @@ class Content:
     edges: tuple[Edge, ...] = ()
     dates: tuple[ObligationDate, ...] = ()
     rules: ApplicabilityFile | None = None
+    # What the crawler treats as a sign of AI (ADR 0021).
+    signals: AiSignalsFile | None = None
     # The fictional organisation and its AI estate, from `org/*.yaml`.
     estate: tuple[Node, ...] = ()
     # Human decisions from `decisions/*.yaml`, as Evidence (ADR 0019).
@@ -189,6 +192,9 @@ def load_content(root: Path | str, *, tenant: str = DEFAULT_TENANT) -> Content:
         if repeated is not None:
             raise ContentError(rules_path, f"rule {repeated!r} is defined twice")
 
+    signals_path = root / "rules" / "ai_signals.yaml"
+    signals = parse(signals_path, AiSignalsFile) if signals_path.exists() else None
+
     estate, estate_edges = load_estate(root, tenant, control_ids)
     decisions, decision_edges = load_decisions(root, tenant)
 
@@ -202,6 +208,7 @@ def load_content(root: Path | str, *, tenant: str = DEFAULT_TENANT) -> Content:
         decisions=tuple(decisions),
         dates=tuple(dates),
         rules=rules,
+        signals=signals,
         copyrighted=frozenset(copyrighted),
         listing_sources=listing,
     )
