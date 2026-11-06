@@ -1,7 +1,7 @@
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
-from rules_support import COMMON, date_of
+from rules_support import COMMON, CONTENT, date_of
 from verity_core.model.edges import AppliesToEdge
 from verity_core.model.enums import AppliesCondition, Role
 from verity_core.rules.status import ApplicabilityStatus, applicability_status
@@ -25,15 +25,11 @@ def at(day: date, delta: timedelta = timedelta()) -> datetime:
     return datetime(day.year, day.month, day.day, tzinfo=UTC) + delta
 
 
-@pytest.mark.parametrize(
-    "date_id",
-    [
-        "euaia-chapters-1-2",
-        "euaia-general",
-        "euaia-art50-2-legacy",
-        "euaia-high-risk-annex-iii",
-    ],
-)
+# Nothing in the content or the estate falls under these, so no rule reads them yet.
+UNREAD_DATES = {"euaia-omnibus-in-force", "euaia-art5-new", "euaia-high-risk-annex-i"}
+
+
+@pytest.mark.parametrize("date_id", [d.id for d in CONTENT.dates])
 def test_each_obligation_date_is_upcoming_the_day_before_and_in_force_on_the_day(date_id):
     day = date_of(date_id)
     e = edge(in_force_from=day)
@@ -42,6 +38,11 @@ def test_each_obligation_date_is_upcoming_the_day_before_and_in_force_on_the_day
     assert applicability_status(e, at(day)) is ApplicabilityStatus.IN_FORCE
     assert applicability_status(e, at(day, NOON)) is ApplicabilityStatus.IN_FORCE
     assert applicability_status(e, at(day + timedelta(days=400))) is ApplicabilityStatus.IN_FORCE
+
+
+def test_every_date_is_read_by_a_rule_or_named_as_unread():
+    read = {d for r in CONTENT.rules.rules for d in (r.date, r.legacy_date) if d is not None}
+    assert {d.id for d in CONTENT.dates} - read == UNREAD_DATES
 
 
 def test_no_date_means_in_force():

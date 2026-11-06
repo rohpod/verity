@@ -1,9 +1,9 @@
 """The assessment of one control for one scope, from the evidence about it (ADR 0005 and 0019).
 
 Usable evidence names the control in `content["control"]` and the scope in `content["scope"]`,
-was collected by `as_of`, and is not stale. The first matching row of the table wins. A row for
-automated evidence needs an automatable control, so the only way to make a non-automatable
-control Implemented is a person's verification decision (row 2).
+was collected by `as_of`, and is not stale. The first matching row of the table in architecture
+section G wins. A row for automated evidence needs an automatable control, so the only way to
+make a non-automatable control Implemented is a person's verification decision (row 2).
 
 Pure: it reads the graph and an explicit `as_of`.
 """

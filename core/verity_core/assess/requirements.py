@@ -1,10 +1,11 @@
-"""Whether a requirement is satisfied for a system (architecture section F, ADR 0019).
+"""Whether a requirement is satisfied for a system (architecture section F, ADR 0019). The
+numbered comments below are the rows of the table there.
 
 Built on `obligations_for`, which resolves whose assessment answers each control (the system,
 the organisation or a provider, D13). This module does not copy that resolution. It takes each
-row's control and resolution, finds the scope the way the plan says (`DIRECT` is the system,
-`INHERITED_ORG` the organisation, `INHERITED_PROVIDER` the row's provider), and asks the
-`ControlAssessor` for that control and scope, so nothing has to be stored first.
+row's control and resolution, finds the scope (`DIRECT` is the system, `INHERITED_ORG` the
+organisation, `INHERITED_PROVIDER` the row's provider), and asks the `ControlAssessor` for that
+control and scope, so nothing has to be stored first.
 
 A requirement that applies to the organisation is evaluated for each system, because a control
 mapped to it may be assessed at system level.

@@ -1,11 +1,12 @@
 """What applies to whom: requirements to the organisation and to systems (ADR 0019).
 
-Pure. It reads the graph, the rules and the obligation dates, and takes no clock: whether an
-edge is in force is `status.py`'s job, from an `as_of` the caller supplies. Every edge is
-`source=derived` and its `reason` is one plain sentence naming the rule and the fact.
+Pure. It reads the graph, the rules, the obligation dates and an `as_of` the caller supplies,
+which picks the decisions in force (ADR 0020). Whether an edge is in force is `status.py`'s job.
+Every edge is `source=derived` and its `reason` is one plain sentence naming the rule and the
+fact. The rule tables are in architecture section E.
 
-High-risk is a candidate until a person decides (ADR 0008, ADR 0019). A `risk_tier` decision
-confirms or rejects it, and the latest one wins. Rules apply to unconfirmed candidates.
+High-risk is a candidate until a person decides (ADR 0008, ADR 0019). A `risk_tier` decision in
+force confirms or rejects it, and the latest one wins. Rules apply to unconfirmed candidates.
 """
 
 from collections.abc import Iterable
