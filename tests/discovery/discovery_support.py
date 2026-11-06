@@ -147,3 +147,47 @@ def aws_collector(clock, *, trail=None, **kw) -> AwsCollector:
         trail_lookback_days=90,
         **kw,
     )
+
+
+# --- clean records, built directly for the pure tests -------------------------------------
+
+from verity_core.content.loader import load_content  # noqa: E402
+from verity_core.discovery.boundary import (  # noqa: E402
+    CollectedFunction,
+    CollectedRole,
+    Policy,
+    Statement,
+)
+
+SIGNALS = load_content(CONTENT).signals
+
+
+def make_function(name, env=(), description="", role=None) -> CollectedFunction:
+    return CollectedFunction(
+        name=name,
+        arn=f"arn:aws:lambda:{REGION}:<account>:function:{name}",
+        runtime="python3.12",
+        handler="app.handler",
+        role_arn=f"arn:aws:iam::<account>:role/{role or name + '-role'}",
+        architectures=("arm64",),
+        memory_mb=128,
+        timeout_s=10,
+        env_names=tuple(sorted(env)),
+        code_sha256="x",
+        description=description,
+    )
+
+
+def allow(actions, resources="*", effect="Allow", negated=False) -> Statement:
+    actions = (actions,) if isinstance(actions, str) else tuple(sorted(actions))
+    resources = (resources,) if isinstance(resources, str) else tuple(sorted(resources))
+    return Statement(effect, actions, resources, negated)
+
+
+def make_role(name, *statements) -> CollectedRole:
+    return CollectedRole(
+        name=name,
+        arn=f"arn:aws:iam::<account>:role/{name}",
+        trust=(),
+        policies=(Policy("p", "inline", tuple(statements)),),
+    )
