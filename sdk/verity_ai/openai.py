@@ -5,6 +5,7 @@ in eu-north-1 or localhost (ADR 0023, decision 8), and the request is signed by 
 `sign` callable because the Function URL uses `AWS_IAM` auth (ADR 0009).
 """
 
+import http.client
 import json
 import urllib.error
 import urllib.request
@@ -19,7 +20,7 @@ Signer = Callable[[str, str, bytes, dict], dict]
 # method, url, body, headers, timeout -> status, response body
 Transport = Callable[[str, str, bytes, dict, float], tuple[int, bytes]]
 
-TIMEOUT = 5.0
+TIMEOUT = 5.0  # per socket read, not a total: a body that trickles in can take longer
 _URL_SUFFIX = ".lambda-url.eu-north-1.on.aws"
 
 
@@ -56,7 +57,7 @@ def urllib_transport(method: str, url: str, body: bytes, headers: dict, timeout:
             return response.status, response.read()
     except urllib.error.HTTPError as error:
         return error.code, b""  # includes a 3xx, which is not followed
-    except (urllib.error.URLError, TimeoutError):
+    except (OSError, http.client.HTTPException):  # `getresponse` and `read` raise these bare
         raise AdapterError(None) from None
 
 

@@ -12,6 +12,7 @@ The mocks' real handlers answer, so the replies are the SIMULATED ones.
 
 import json
 import shutil
+import socket
 import subprocess
 import sys
 import threading
@@ -77,6 +78,8 @@ class Fake:
     server: ThreadingHTTPServer
     throttle: bool = False
     redirect_to: str | None = None
+    url_fault: str | None = None  # "drop" or "truncate"
+    invoke_body: bytes | None = None
     puts: list = field(default_factory=list)
     put_attempts: int = 0
     url_requests: list = field(default_factory=list)
@@ -88,6 +91,7 @@ class Fake:
 
     def reset(self):
         self.throttle, self.redirect_to = False, None
+        self.url_fault, self.invoke_body = None, None
         self.puts, self.put_attempts, self.url_requests, self.other_hits = [], 0, [], []
 
 
@@ -105,6 +109,17 @@ def handler_for(fake: "Fake", *, other: bool):
                 self.send_header(name, value)
             self.end_headers()
             self.wfile.write(data)
+
+        def cut(self, partial: bytes = b""):
+            """Closes the connection, with no response or partway through a body."""
+            if partial:
+                self.send_response(200)
+                self.send_header("Content-Length", "1000")
+                self.end_headers()
+                self.wfile.write(partial)
+                self.wfile.flush()
+            self.connection.shutdown(socket.SHUT_RDWR)
+            self.close_connection = True
 
         def do_GET(self):
             self.route(b"")
@@ -125,9 +140,13 @@ def handler_for(fake: "Fake", *, other: bool):
                 fake.puts.append(json.loads(body))
                 return self.reply(200, {}, "application/x-amz-json-1.0")
             if self.path == "/2015-03-31/functions/mock-bedrock/invocations":
+                if fake.invoke_body is not None:
+                    return self.reply(200, fake.invoke_body)
                 return self.reply(200, bedrock.handler(json.loads(body), None))
             if self.path == "/v1/chat/completions":
                 fake.url_requests.append(dict(self.headers))
+                if fake.url_fault:
+                    return self.cut(b"{" if fake.url_fault == "truncate" else b"")
                 if fake.redirect_to:
                     return self.reply(302, b"", headers={"Location": fake.redirect_to})
                 event = {
@@ -375,3 +394,22 @@ def test_a_redirect_from_the_function_url_is_refused_and_the_second_host_is_neve
         f"\nmeasured, redirect: {result.output['error']} status {result.output['status']}, "
         f"second host requests: {len(clean_fake.other_hits)}"
     )
+
+
+@pytest.mark.parametrize("fault", ["drop", "truncate"])
+def test_a_broken_function_url_connection_is_an_adapter_error(clean_fake, run_zip, fault):
+    clean_fake.url_fault = fault
+    result = run_zip("shadow-summariser", {"text": "hello"}, url_env(clean_fake))
+    assert result.output["error"] == "AdapterError" and result.output["status"] is None
+    print(f"\nmeasured, URL {fault}: {result.output['error']}")
+
+
+def test_a_lambda_payload_that_is_not_json_is_an_adapter_error_and_writes_no_usage(
+    clean_fake, run_zip
+):
+    clean_fake.invoke_body = f"<html>{CONTENT_CANARY}".encode()
+    result = run_zip("support-assistant", SUPPORT_EVENT, support_env(clean_fake))
+    assert result.output["error"] == "AdapterError" and result.output["status"] is None
+    assert CONTENT_CANARY not in result.output["message"] + result.stderr
+    assert clean_fake.put_attempts == 0
+    print(f"\nmeasured, non-JSON payload: {result.output['error']}")

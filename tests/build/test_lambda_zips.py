@@ -125,7 +125,7 @@ def test_a_tracked_file_deleted_from_disk_is_not_collected(builds, tmp_path):
 
 def test_the_real_sources_hold_no_stray_file_in_any_zip(builds):
     _, first, _ = builds
-    stray = re.compile(r"(^|/)(\.DS_Store|\.env.*|.*\.pyc|.*\.swp)$")
+    stray = re.compile(r"(^|/)(\.DS_Store|\.lock|\.env.*|.*\.pyc|.*\.swp)$")
     assert {f: [n for n in names(p) if stray.search(n)] for f, p in first.items()} == {
         f: [] for f in first
     }

@@ -20,6 +20,8 @@ from verity_ai.errors import AdapterError, RefusedTarget
 
 REGION = "eu-north-1"  # the only region Verity uses (ADR 0011)
 MOCK_PREFIX = "mock-"
+CONNECT_TIMEOUT = 0.5
+READ_TIMEOUT = 5
 # At DEBUG these log request bodies and the session token, whatever the root logger's level.
 QUIET_LOGGERS = ("botocore", "boto3", "urllib3")
 
@@ -36,18 +38,22 @@ def lambda_invoker(function_name: str, *, client: Any = None) -> Callable[[dict]
     _quiet()
     if client is None:
         # One attempt: a retried model call would be counted twice.
-        config = Config(retries={"total_max_attempts": 1}, connect_timeout=0.5, read_timeout=5)
+        config = Config(
+            retries={"total_max_attempts": 1},
+            connect_timeout=CONNECT_TIMEOUT,
+            read_timeout=READ_TIMEOUT,
+        )
         client = boto3.client("lambda", region_name=REGION, config=config)
     lambda_client = client
 
     def invoke(event: dict) -> dict:
         try:
             response = lambda_client.invoke(FunctionName=function_name, Payload=json.dumps(event))
-        except (ClientError, BotoCoreError):  # a timeout is a BotoCoreError
-            raise AdapterError(None) from None
-        if response.get("FunctionError"):
-            raise AdapterError(response["StatusCode"])
-        return json.loads(response["Payload"].read())
+            if response.get("FunctionError"):
+                raise AdapterError(response["StatusCode"])
+            return json.loads(response["Payload"].read())
+        except (ClientError, BotoCoreError, ValueError):  # a timeout is a BotoCoreError
+            raise AdapterError(None) from None  # `ValueError.doc` would hold the payload
 
     return invoke
 

@@ -105,6 +105,12 @@ def test_a_value_that_cannot_exist_is_refused_naming_the_feature_and_never_the_v
     assert str(value) not in str(caught.value)
 
 
+def test_an_integer_too_large_for_a_float_is_refused_like_any_other_bad_number():
+    with pytest.raises(ValueError, match="years_experience") as caught:
+        ranked(years_experience=10**400)
+    assert "1000" not in str(caught.value)
+
+
 def test_years_experience_of_25_is_ranked_and_flagged_never_refused():
     result = ranked(years_experience=25)
     assert result["outside_training_range"] == ["years_experience"]
