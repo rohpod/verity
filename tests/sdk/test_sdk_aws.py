@@ -2,9 +2,12 @@
 
 import io
 import json
+import logging
 
 import pytest
 from botocore.credentials import Credentials
+from botocore.exceptions import ClientError, ReadTimeoutError
+from verity_ai import aws
 from verity_ai.aws import lambda_invoker, sigv4_signer
 from verity_ai.errors import AdapterError, RefusedTarget
 
@@ -62,3 +65,47 @@ def test_the_signature_covers_the_body():
     first = sign("POST", url, b"one", {})["Authorization"]
     second = sign("POST", url, b"two", {})["Authorization"]
     assert first.split("Signature=")[1] != second.split("Signature=")[1]
+
+
+class Raising:
+    def __init__(self, error):
+        self.error = error
+
+    def invoke(self, **kwargs):
+        raise self.error
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        ClientError({"Error": {"Code": "TooManyRequestsException", "Message": "x"}}, "Invoke"),
+        ReadTimeoutError(endpoint_url="https://lambda.eu-north-1.amazonaws.com"),
+    ],
+)
+def test_a_client_error_or_a_timeout_becomes_an_adapter_error_holding_nothing(error):
+    with pytest.raises(AdapterError) as caught:
+        lambda_invoker("mock-bedrock", client=Raising(error))({"a": 1})
+    assert caught.value.status is None
+    assert caught.value.__suppress_context__ and caught.value.__cause__ is None
+
+
+def test_the_default_lambda_client_makes_one_attempt_with_short_timeouts(monkeypatch):
+    made = {}
+    monkeypatch.setattr(aws.boto3, "client", lambda *a, **kw: made.update(kw) or object())
+    lambda_invoker("mock-bedrock")
+    config = made["config"]
+    assert config.retries["total_max_attempts"] == 1
+    assert (config.connect_timeout, config.read_timeout) == (0.5, 5)
+
+
+@pytest.mark.parametrize("build", ["invoker", "signer"])
+def test_the_aws_loggers_are_quieted_whatever_the_root_level_is(build):
+    names = aws.QUIET_LOGGERS
+    assert set(names) == {"botocore", "boto3", "urllib3"}
+    for name in names:
+        logging.getLogger(name).setLevel(logging.DEBUG)
+    if build == "invoker":
+        lambda_invoker("mock-bedrock", client=FakeLambda(reply({})))
+    else:
+        sigv4_signer(credentials=Credentials("a", "b"))
+    assert all(logging.getLogger(n).level == logging.WARNING for n in names)

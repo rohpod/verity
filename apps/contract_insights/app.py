@@ -40,7 +40,8 @@ def _model():
     from verity_ai.telemetry import UsageRecorder
     from verity_core.graph.dynamodb.usage import DynamoDBUsageSink
 
-    logging.getLogger().setLevel(os.environ.get("LOG_LEVEL", "INFO"))
+    logging.getLogger("verity_ai").setLevel(os.environ.get("LOG_LEVEL", "INFO"))
+    sign = sigv4_signer()  # first: it quiets botocore (ADR 0024)
     usage = UsageRecorder(
         DynamoDBUsageSink(TENANT, table_name=os.environ["USAGE_TABLE"]),
         tenant=TENANT,
@@ -49,7 +50,7 @@ def _model():
         model_id="model:gpt-class",
         clock=lambda: datetime.now(UTC),
     )
-    return OpenAICompatible(os.environ["OPENAI_BASE_URL"], sign=sigv4_signer(), usage=usage)
+    return OpenAICompatible(os.environ["OPENAI_BASE_URL"], sign=sign, usage=usage)
 
 
 def handler(event, context):

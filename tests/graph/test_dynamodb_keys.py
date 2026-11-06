@@ -14,6 +14,7 @@ APPLIES = EdgeKey("req:euaia:art4", EdgeType.APPLIES_TO, "sys:b", "provider")
 
 def test_the_documented_key_formats():
     assert keys.node_pk("kestrel", "sys:b") == "T#kestrel#N#sys:b"
+    assert keys.usage_pk("kestrel", "sys:b") == "T#kestrel#U#sys:b"
     assert keys.edge_sk(OWNS) == "E#OWNS#sys:b"
     assert keys.reverse_sk(OWNS) == "R#OWNS#person:a"
     assert keys.edge_sk(APPLIES) == "E#APPLIES_TO#sys:b#provider"
@@ -151,3 +152,8 @@ def test_neighbour_order_is_exactly_the_sort_key_order():
         (k.type, k.src, k.qualifier or "")
         for k in sorted(all_keys, key=lambda k: neighbor_sort_key(k, Direction.IN))
     ]
+
+
+def test_a_usage_partition_never_equals_a_node_partition():
+    assert keys.usage_pk("kestrel", "sys:b") != keys.node_pk("kestrel", "sys:b")
+    assert keys.usage_pk("kestrel", "sys:b").startswith(keys.tenant_prefix("kestrel"))

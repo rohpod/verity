@@ -55,16 +55,14 @@ class AwsClients:
     def create(cls, region: str = REGION) -> "AwsClients":
         import boto3
 
-        def client(service: str) -> Any:
-            return boto3.client(service, region_name=region)
-
+        # Each service name is a constant, so a test can prove none is a Bedrock client (ADR 0024).
         return cls(
-            lambda_=client("lambda"),
-            tagging=client("resourcegroupstaggingapi"),
-            iam=client("iam"),
-            dynamodb=client("dynamodb"),
-            ssm=client("ssm"),
-            cloudtrail=client("cloudtrail"),
+            lambda_=boto3.client("lambda", region_name=region),
+            tagging=boto3.client("resourcegroupstaggingapi", region_name=region),
+            iam=boto3.client("iam", region_name=region),
+            dynamodb=boto3.client("dynamodb", region_name=region),
+            ssm=boto3.client("ssm", region_name=region),
+            cloudtrail=boto3.client("cloudtrail", region_name=region),
         )
 
 

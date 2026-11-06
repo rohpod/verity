@@ -47,6 +47,7 @@ def run(event: dict, articles: list[dict], model) -> dict:
         "disclosure": DISCLOSURE,
         "handoff": article is None,
         "article_id": article["id"] if article else None,
+        "simulated": True,
     }
 
 
@@ -57,7 +58,8 @@ def _dependencies():
     from verity_ai.telemetry import UsageRecorder
     from verity_core.graph.dynamodb.usage import DynamoDBUsageSink
 
-    logging.getLogger().setLevel(os.environ.get("LOG_LEVEL", "INFO"))
+    logging.getLogger("verity_ai").setLevel(os.environ.get("LOG_LEVEL", "INFO"))
+    invoke = lambda_invoker(os.environ["MODEL_ADAPTER"])  # first: it quiets botocore (ADR 0024)
     sink = DynamoDBUsageSink(TENANT, table_name=os.environ["USAGE_TABLE"])
     usage = UsageRecorder(
         sink,
@@ -67,7 +69,7 @@ def _dependencies():
         model_id="model:bedrock-fm",
         clock=lambda: datetime.now(UTC),
     )
-    model = BedrockCompatible(lambda_invoker(os.environ["MODEL_ADAPTER"]), usage=usage)
+    model = BedrockCompatible(invoke, usage=usage)
     articles = json.loads((Path(__file__).parent / os.environ["HELP_ARTICLES_FILE"]).read_text())
     return articles, model
 

@@ -246,9 +246,9 @@
                 ],
                 "Resource": "arn:aws:dynamodb:eu-north-1:000000000000:table/verity-graph",
                 "Condition": {
-                  "ForAllValues:StringLike": {
+                  "ForAllValues:StringEquals": {
                     "dynamodb:LeadingKeys": [
-                      "T#kestrel#N#sys:support-assistant"
+                      "T#kestrel#U#sys:support-assistant"
                     ]
                   }
                 }
@@ -351,9 +351,9 @@
                 ],
                 "Resource": "arn:aws:dynamodb:eu-north-1:000000000000:table/verity-graph",
                 "Condition": {
-                  "ForAllValues:StringLike": {
+                  "ForAllValues:StringEquals": {
                     "dynamodb:LeadingKeys": [
-                      "T#kestrel#N#sys:contract-insights"
+                      "T#kestrel#U#sys:contract-insights"
                     ]
                   }
                 }

@@ -2,11 +2,13 @@
 
 import json
 import logging
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 from verity_ai.bedrock import BedrockCompatible
 from verity_ai.errors import AdapterError, RefusedTarget
-from verity_ai.openai import OpenAICompatible
+from verity_ai.openai import OpenAICompatible, urllib_transport
 
 CANARY = "VERITY-CANARY-7f3a"
 URL = "https://abc123.lambda-url.eu-north-1.on.aws/v1"
@@ -103,7 +105,7 @@ def test_chat_completions_posts_signed_json_to_the_completions_path():
     assert (method, url) == ("POST", URL + "/chat/completions")
     assert json.loads(data) == {"model": "mock-gpt-class", "messages": [], "temperature": 0}
     assert headers["Authorization"] == "signed"
-    assert timeout == 8.0
+    assert timeout == 5.0
     assert tokens == [5]
 
 
@@ -148,3 +150,98 @@ def test_prompts_and_replies_are_never_logged(caplog):
         adapter.chat_completions(model="m", messages=MESSAGES)
     assert CANARY not in caplog.text
     assert "[SIMULATED]" not in caplog.text
+
+
+def test_a_response_with_no_usage_fails_one_way_and_holds_no_body():
+    tokens = []
+    with pytest.raises(AdapterError) as caught:
+        BedrockCompatible(lambda r: {"output": CANARY}, usage=tokens.append).converse(
+            modelId="m", messages=MESSAGES
+        )
+    assert CANARY not in str(caught.value) and caught.value.__cause__ is None
+    assert caught.value.__suppress_context__ and tokens == []
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        CANARY.encode(),
+        b"",
+        json.dumps({"choices": [CANARY]}).encode(),
+        json.dumps({"usage": CANARY}).encode(),
+        json.dumps([CANARY]).encode(),
+    ],
+)
+def test_an_openai_body_that_is_not_json_or_has_no_usage_is_an_adapter_error(body):
+    tokens = []
+    adapter = OpenAICompatible(
+        URL, sign=no_sign, usage=tokens.append, transport=transport_returning(200, body)
+    )
+    with pytest.raises(AdapterError) as caught:
+        adapter.chat_completions(model="m", messages=[])
+    assert caught.value.status == 200 and CANARY not in str(caught.value)
+    assert caught.value.__suppress_context__ and tokens == []
+
+
+class Recorder(BaseHTTPRequestHandler):
+    seen: list
+    location: str | None = None
+
+    def do_POST(self):
+        self.server.seen.append(self.headers.get("Authorization"))
+        self.rfile.read(int(self.headers.get("Content-Length", 0)))
+        self.send_response(302 if self.server.location else 200)
+        if self.server.location:
+            self.send_header("Location", self.server.location)
+        self.end_headers()
+
+    def log_message(self, *args):
+        pass
+
+
+def serve(location=None):
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Recorder)
+    server.seen, server.location = [], location
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server
+
+
+def test_a_redirect_is_not_followed_and_surfaces_as_its_status():
+    target = serve()
+    origin = serve(location=f"http://127.0.0.1:{target.server_port}/elsewhere")
+    try:
+        url = f"http://127.0.0.1:{origin.server_port}/v1/chat/completions"
+        assert urllib_transport("POST", url, b"{}", {"Authorization": "signed"}, 2.0) == (302, b"")
+        adapter = OpenAICompatible(
+            "http://localhost/v1",
+            sign=no_sign,
+            usage=None,
+            transport=lambda m, u, b, h, t: urllib_transport(m, url, b, {"Authorization": "x"}, t),
+        )
+        with pytest.raises(AdapterError) as caught:
+            adapter.chat_completions(model="m", messages=[])
+        assert caught.value.status == 302
+        assert origin.seen == ["signed", "x"] and target.seen == []
+    finally:
+        origin.shutdown()
+        target.shutdown()
+
+
+def test_a_refused_connection_and_a_timeout_are_adapter_errors_without_a_status():
+    free = serve()
+    port = free.server_port
+    free.shutdown()
+    free.server_close()
+    with pytest.raises(AdapterError) as refused:
+        urllib_transport("POST", f"http://127.0.0.1:{port}/", b"{}", {}, 1.0)
+    assert refused.value.status is None
+
+
+def test_a_timeout_is_an_adapter_error(monkeypatch):
+    def slow(*args, **kwargs):
+        raise TimeoutError("timed out")
+
+    monkeypatch.setattr("verity_ai.openai._opener.open", slow)
+    with pytest.raises(AdapterError) as caught:
+        urllib_transport("POST", "http://127.0.0.1:1/", b"{}", {}, 0.1)
+    assert caught.value.status is None

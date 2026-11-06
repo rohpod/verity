@@ -73,7 +73,14 @@ verity/
 - `shadow-summariser` has no tags and no manifest but has an `OPENAI_BASE_URL` env var. It must be classified *probable* and surface as a shadow-AI candidate. It really calls mock-openai through `OpenAICompatible` with `usage=None`, has no `verity_core` in its zip and writes no usage records, like a team that wired up a client and never registered the system ([ADR 0023](adr/0023-m7-demo-estate.md)).
 - `invoice-renderer` is an ordinary function and must be classified *none*.
 
-**Bundled data.** The help articles ship in the support assistant's zip (`HELP_ARTICLES_FILE`) and the invoice template in the invoice renderer's (`INVOICE_TEMPLATE`), because a second table is impossible at 25 of 25 capacity units and S3 is banned. App roles write usage records with `dynamodb:PutItem` only, limited by `dynamodb:LeadingKeys` to their own partition (D8). Every mock labels itself simulated: `additionalModelResponseFields: {"simulated": true}` and a `[SIMULATED]` reply for mock-bedrock, `system_fingerprint: "verity-mock"`, the `x-verity-simulated` header and a `[SIMULATED]` reply for mock-openai.
+**Bundled data.** The help articles ship in the support assistant's zip (`HELP_ARTICLES_FILE`) and the invoice template in the invoice renderer's (`INVOICE_TEMPLATE`), because a second table is impossible at 25 of 25 capacity units and S3 is banned. App roles write usage records with `dynamodb:PutItem` only, limited by `dynamodb:LeadingKeys` to their own usage partition, which holds nothing else (D8, [ADR 0024](adr/0024-m7-review-fixes.md)). Every mock labels itself simulated: `additionalModelResponseFields: {"simulated": true}` and a `[SIMULATED]` reply for mock-bedrock, `system_fingerprint: "verity-mock"`, the `x-verity-simulated` header and a `[SIMULATED]` reply for mock-openai.
+
+**Guards** ([ADR 0024](adr/0024-m7-review-fixes.md)). These were found by running the built zips' handlers against a local fake, and `tests/build/test_zip_handlers.py` keeps them true.
+- **Telemetry has a time budget.** A usage write makes at most 2 attempts with 0.5 s to connect and 1 s to read, so it gives up within about 4 seconds. The model call's timeout is 5 s, and a test pins the sum against every function's 10 s timeout. A throttled write loses that usage record and logs `usage_write_failed`.
+- **Apps never touch the root logger.** `LOG_LEVEL` sets the app's own logger and `verity_ai`'s. `verity_ai.aws` holds `botocore`, `boto3` and `urllib3` at `WARNING`, so a `DEBUG` run logs neither the customer's message nor the session token, even if Lambda sets the root level.
+- **Adapters fail one way.** A redirect is not followed (the signed headers would reach an unchecked host), and a connection error, a timeout, a bad body, a response with no `usage` or a Lambda client error is an `AdapterError` holding no body.
+- **Impossible input is refused, unusual input is flagged.** Talent Screening refuses a value outside `valid_ranges` and names the feature, never the value. A value outside `training_ranges` is ranked and listed in `outside_training_range`, because refusing it would turn away long careers: an age proxy.
+- **The zips hold tracked files at locked versions,** and only the part of `verity_core` the two functions import. Build from a clean tree before deploying: an uncommitted edit to a tracked file still ships.
 
 **Synthetic estate:** about 25 additional AI systems for the fictional **Kestrel Cloud Ltd**, with `source=synthetic` and no AWS resources, so posture charts have realistic volume. Every record in the UI carries a provenance badge: **Live-discovered · Declared · Synthetic**.
 
@@ -88,7 +95,7 @@ The pipeline is a sequence of pure functions over plain data, so it can be unit-
 | 3 | Signal & score | Rules in `content/rules/ai_signals.yaml` combine signals into `ai_likelihood ∈ {declared, confirmed_usage, probable, possible, none}`. Every result stores the signals that fired, so the UI can explain *why*. Only Lambda functions are scored. |
 | 4 | Correlate | The `ai:system-id` tag (a full ID such as `sys:talent-screening`) or a manifest links a resource to an `AISystem`. An unlinked function scored *probable* or *possible*, or one that names a system that does not exist, becomes a `Candidate` (the shadow-AI inbox). |
 | 5 | Relate | `RUNS_ON` (system → function), `ASSUMES` (function → role) and `CALLS` (function → table or function, from the resource ARNs in the role's `Allow` statements; `Resource: "*"` makes no edge). The crawler creates no system → provider link: §E's path through Model stands. |
-| 6 | Usage | `verity_ai` adapters write `U#` usage records (system, provider, model, timestamp, token estimate), labelled simulated. This is evidence of **third-party model calls** only: an in-house model has no provider, so Talent Screening writes none, and a failed write never fails the call ([ADR 0023](adr/0023-m7-demo-estate.md)). CloudTrail `LookupEvents` is also queried for `bedrock.amazonaws.com`; the honest expected result is *none observed*. Capability without usage is the control VC-060 (below). |
+| 6 | Usage | `verity_ai` adapters write `U#` usage records (system, provider, model, timestamp, token estimate), labelled simulated. This is evidence of **third-party model calls** only: an in-house model has no provider, so Talent Screening writes none, and a failed write never fails the call, because it gives up within about 4 seconds ([ADR 0023](adr/0023-m7-demo-estate.md), [ADR 0024](adr/0024-m7-review-fixes.md)). They sit in `T#{tenant}#U#{system}`, a partition of their own (§H). CloudTrail `LookupEvents` is also queried for `bedrock.amazonaws.com`; the honest expected result is *none observed*. Capability without usage is the control VC-060 (below). |
 | 7 | Diff | Config hashes are compared with the stored ones to produce `ChangeEvent`s. Evidence collected from a changed resource becomes **stale**. |
 | 8 | Persist | Idempotent upserts with deterministic IDs, plus a `DiscoveryRun` node for provenance. |
 
@@ -355,9 +362,10 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
 | Outgoing edge | `T#{tenant}#N#{src}` | `E#{type}#{dst}[#{qualifier}]` |
 | Reverse edge (mirror) | `T#{tenant}#N#{dst}` | `R#{type}#{src}[#{qualifier}]` |
 | Node history | `T#{tenant}#N#{id}` | `H#{iso_ts}#{version}` (version zero-padded to 10 digits, so keys sort numerically) |
-| Usage record | `T#{tenant}#N#{system}` | `U#{iso_ts}#{usage_id}` |
+| Usage record | `T#{tenant}#U#{system}` | `U#{iso_ts}#{usage_id}` |
 
 - The qualifier is `role` on `APPLIES_TO` and `purpose` on `PROCESSES`; other edge types have none ([ADR 0012](adr/0012-graph-schema-refinements.md)).
+- Usage records have their own partition because `dynamodb:LeadingKeys` limits the partition key and IAM has no matching condition for a sort key. An app role's condition names `T#kestrel#U#sys:<system>`, so the worst it can do is damage its own simulated usage ([ADR 0024](adr/0024-m7-review-fixes.md)).
 - Every item holds the whole record as a JSON string in `doc`. Evidence has no `H#` items, because it never changes ([ADR 0013](adr/0013-dynamodb-write-model.md)).
 - `E#` and `R#` are written together in one transaction, as are `META` and `H#`.
 - **GSI1** (`GSI1PK=T#{tenant}#TYPE#{type}`, `GSI1SK=id`) lists nodes by type. It holds keys only and is eventually consistent.

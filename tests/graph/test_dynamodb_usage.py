@@ -52,7 +52,9 @@ def test_the_sink_works_with_a_client_that_can_only_put(table):
     sink = DynamoDBUsageSink("kestrel", client=OnlyPut(table.client))
     record = usage()
     sink.append_usage(record)
-    assert rows(table) == [(keys.node_pk("kestrel", SYSTEM), keys.usage_sk(START, record.usage_id))]
+    assert rows(table) == [
+        (keys.usage_pk("kestrel", SYSTEM), keys.usage_sk(START, record.usage_id))
+    ]
 
 
 def test_the_sink_is_the_narrow_interface_and_not_a_repository(table):
@@ -60,11 +62,13 @@ def test_the_sink_is_the_narrow_interface_and_not_a_repository(table):
     assert isinstance(sink, UsageSink) and not isinstance(sink, GraphRepository)
 
 
-def test_a_usage_item_lives_in_the_systems_partition_with_no_graph_keys(table):
+def test_a_usage_item_lives_in_its_own_usage_partition_with_no_graph_keys(table):
     record = usage()
     DynamoDBUsageSink("kestrel", client=table.client).append_usage(record)
     (item,) = table.client.scan(TableName=TABLE_NAME)["Items"]
-    assert item["PK"]["S"] == keys.node_pk("kestrel", SYSTEM)
+    assert (
+        item["PK"]["S"] == keys.usage_pk("kestrel", SYSTEM) == "T#kestrel#U#sys:support-assistant"
+    )
     assert item["SK"]["S"].startswith("U#2026-11-05T09:00:00.000000Z#")
     assert {"ver", "GSI1PK", "GSI1SK"}.isdisjoint(item)
 
@@ -159,3 +163,16 @@ def test_usage_never_turns_up_in_a_node_listing_or_the_graph(table):
     repo = repo_for(table)
     repo.append_usage(usage())
     assert repo.load_graph().number_of_nodes() == 0
+
+
+def test_writing_usage_leaves_the_systems_node_partition_without_a_usage_item(table):
+    repo = repo_for(table)
+    repo.append_usage(usage())
+    node_partition = keys.node_pk("kestrel", SYSTEM)
+    assert not [sk for pk, sk in rows(table) if pk == node_partition]
+    found = table.client.query(
+        TableName=TABLE_NAME,
+        KeyConditionExpression="PK = :pk",
+        ExpressionAttributeValues={":pk": {"S": node_partition}},
+    )
+    assert found["Count"] == 0

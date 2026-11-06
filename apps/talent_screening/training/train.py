@@ -27,18 +27,36 @@ FEATURES = [
     "certifications",
     "relevant_projects",
 ]
+# What the model saw. Outside it an applicant is still ranked but flagged, because the score is an
+# extrapolation. Refusing here would turn away anyone with over 20 years' experience: an age proxy.
+TRAINING_RANGES = {
+    "years_experience": (0, 20),
+    "skills_match": (0.0, 1.0),
+    "assessment_score": (30, 100),
+    "certifications": (0, 5),
+    "relevant_projects": (0, 10),
+}
+# What can exist. Outside it the request is refused (ADR 0024, decision 6).
+VALID_RANGES = {
+    "years_experience": (0, 60),
+    "skills_match": (0.0, 1.0),
+    "assessment_score": (0, 100),
+    "certifications": (0, 60),
+    "relevant_projects": (0, 60),
+}
 HERE = Path(__file__).resolve().parent
 
 
 def generate(rng: random.Random, count: int) -> tuple[list[list[float]], list[int]]:
     rows, labels = [], []
     for _ in range(count):
+        years, _, assessment, certifications, projects = TRAINING_RANGES.values()
         row = [
-            float(rng.randint(0, 20)),
+            float(rng.randint(*years)),
             round(rng.random(), 3),
-            float(rng.randint(30, 100)),
-            float(rng.randint(0, 5)),
-            float(rng.randint(0, 10)),
+            float(rng.randint(*assessment)),
+            float(rng.randint(*certifications)),
+            float(rng.randint(*projects)),
         ]
         z = -6.0 + 0.12 * row[0] + 3.0 * row[1] + 0.03 * row[2] + 0.25 * row[3] + 0.2 * row[4]
         z += rng.gauss(0, 0.5)
@@ -71,6 +89,8 @@ def build() -> tuple[dict, dict]:
         "coefficients": [float(v) for v in model.coef_[0]],
         "intercept": float(model.intercept_[0]),
         "auc": float(auc),
+        "valid_ranges": {name: list(bounds) for name, bounds in VALID_RANGES.items()},
+        "training_ranges": {name: list(bounds) for name, bounds in TRAINING_RANGES.items()},
     }
     golden = {
         "cases": [

@@ -90,11 +90,11 @@ def usage(**overrides):
     return UsageRecord(**fields)
 
 
-def test_a_usage_item_round_trips_and_lives_in_the_systems_partition():
+def test_a_usage_item_round_trips_and_lives_in_the_usage_partition():
     record = usage()
     item = items.usage_item(record)
     assert items.usage_from_item(item) == record
-    assert item["PK"]["S"] == keys.node_pk("kestrel", record.system_id)
+    assert item["PK"]["S"] == keys.usage_pk("kestrel", record.system_id)
     assert item["SK"]["S"] == keys.usage_sk(record.timestamp, record.usage_id)
     assert {"ver", "GSI1PK"}.isdisjoint(item)
 

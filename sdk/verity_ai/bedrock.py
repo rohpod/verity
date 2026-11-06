@@ -6,6 +6,7 @@ SIMULATED. Nothing here calls Bedrock. It takes an injected `invoke` callable, w
 
 from collections.abc import Callable
 
+from verity_ai.errors import AdapterError
 from verity_ai.hook import UsageHook, notify
 
 
@@ -22,5 +23,9 @@ class BedrockCompatible:
         if inferenceConfig is not None:
             request["inferenceConfig"] = inferenceConfig
         response = self._invoke(request)
-        notify(self._usage, response["usage"]["totalTokens"])
+        try:
+            tokens = response["usage"]["totalTokens"]
+        except (KeyError, TypeError):
+            raise AdapterError(None) from None  # the response may hold personal data
+        notify(self._usage, tokens)
         return response

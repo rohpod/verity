@@ -69,6 +69,85 @@ def test_unknown_or_missing_fields_and_bad_values_are_refused(bad):
         app.run({"applicants": [bad]}, MODEL)
 
 
+def ranked(**overrides):
+    return app.run({"applicants": [applicant("a", **overrides)]}, MODEL)["ranking"][0]
+
+
+def test_the_review_case_is_refused_not_ranked_first():
+    # skills_match 50 and years_experience -40 used to score 1.0 and rank first.
+    with pytest.raises(ValueError, match="years_experience|skills_match"):
+        app.run(
+            {"applicants": [applicant("a"), applicant("b", skills_match=50, years_experience=-40)]},
+            MODEL,
+        )
+
+
+@pytest.mark.parametrize(
+    ("feature", "value"),
+    [
+        ("skills_match", 50),
+        ("skills_match", 1.01),
+        ("skills_match", -0.1),
+        ("years_experience", -1),
+        ("years_experience", 61),
+        ("assessment_score", 101),
+        ("assessment_score", -1),
+        ("certifications", 61),
+        ("relevant_projects", -1),
+    ],
+)
+def test_a_value_that_cannot_exist_is_refused_naming_the_feature_and_never_the_value(
+    feature, value
+):
+    with pytest.raises(ValueError) as caught:
+        ranked(**{feature: value})
+    assert feature in str(caught.value)
+    assert str(value) not in str(caught.value)
+
+
+def test_years_experience_of_25_is_ranked_and_flagged_never_refused():
+    result = ranked(years_experience=25)
+    assert result["outside_training_range"] == ["years_experience"]
+    assert 0 < result["score"] < 1
+
+
+def test_a_value_at_each_bound_is_accepted():
+    for name, (low, high) in MODEL["valid_ranges"].items():
+        for edge in (low, high):
+            assert ranked(**{name: edge})["applicant_ref"] == "a"
+    for name, (low, high) in MODEL["training_ranges"].items():
+        for edge in (low, high):
+            assert ranked(**{name: edge})["outside_training_range"] == []
+
+
+def test_the_flag_is_a_sorted_list_that_is_empty_when_nothing_applies():
+    assert ranked()["outside_training_range"] == []
+    flagged = ranked(years_experience=30, relevant_projects=40, assessment_score=10)
+    assert flagged["outside_training_range"] == [
+        "assessment_score",
+        "relevant_projects",
+        "years_experience",
+    ]
+
+
+def test_the_flag_does_not_change_the_score():
+    inside = {"applicants": [applicant("a", years_experience=20)]}
+    outside = {"applicants": [applicant("a", years_experience=21)]}
+    assert (
+        app.run(inside, MODEL)["ranking"][0]["score"]
+        < app.run(outside, MODEL)["ranking"][0]["score"]
+    )
+
+
+def test_the_ranges_are_shipped_and_the_valid_range_contains_the_training_range():
+    assert (
+        set(MODEL["valid_ranges"]) == set(MODEL["training_ranges"]) == set(MODEL["feature_names"])
+    )
+    for name in MODEL["feature_names"]:
+        (vlow, vhigh), (tlow, thigh) = MODEL["valid_ranges"][name], MODEL["training_ranges"][name]
+        assert vlow <= tlow <= thigh <= vhigh
+
+
 def test_the_sigmoid_is_stable_at_the_extremes():
     assert app.sigmoid(1000) == 1.0
     assert app.sigmoid(-1000) == 0.0
@@ -103,6 +182,8 @@ def test_retraining_reproduces_the_shipped_files(tmp_path):
         assert new[key] == pytest.approx(MODEL[key], abs=1e-9)
     assert new["intercept"] == pytest.approx(MODEL["intercept"], abs=1e-9)
     assert new["auc"] == pytest.approx(MODEL["auc"], abs=1e-9)
+    assert new["valid_ranges"] == MODEL["valid_ranges"]
+    assert new["training_ranges"] == MODEL["training_ranges"]
     golden = json.loads((tmp_path / "training" / "golden.json").read_text())
     for a, b in zip(golden["cases"], GOLDEN["cases"], strict=True):
         assert a["features"] == b["features"]

@@ -68,6 +68,21 @@ def test_mirrors_and_usage_are_read_but_not_mistaken_for_graph_content(table):
     assert graph.number_of_nodes() == 2 and graph.number_of_edges() == 1  # not 2: no mirror twin
 
 
+def test_a_usage_item_in_its_own_partition_is_scanned_past_and_breaks_nothing(table):
+    repo = repo_for(table)
+    repo.upsert_node(SYSTEM)
+    table.client.put_item(
+        TableName=TABLE_NAME,
+        Item={
+            "PK": {"S": keys.usage_pk("kestrel", SYSTEM.id)},
+            "SK": {"S": "U#2026-11-05T09:00:00.000000Z#x"},
+            "doc": {"S": "{}"},
+        },
+    )
+    graph = repo.load_graph()
+    assert list(graph.nodes) == [SYSTEM.id]
+
+
 def test_another_tenants_items_are_scanned_past_not_loaded(table):
     mine, theirs = repo_for(table, "kestrel"), repo_for(table, "other")
     mine.upsert_node(SYSTEM)
