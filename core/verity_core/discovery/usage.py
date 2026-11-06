@@ -39,18 +39,6 @@ def granted_ai_actions(
     return tuple(sorted(granted))
 
 
-def trail_shows_ai(
-    role_name: str | None, events: Iterable[TrailEvent], sources: Collection[str]
-) -> bool:
-    return role_name is not None and any(
-        e.role_name == role_name
-        and e.event_source in sources
-        and e.event_type != SERVICE_EVENT
-        and e.error_code is None
-        for e in events
-    )
-
-
 def usage_shows_ai(records: Sequence[UsageRecord]) -> bool:
     return len(records) > 0
 
@@ -64,6 +52,22 @@ def _proves(event: TrailEvent, action: AiAction) -> bool:
         and event.error_code is None
         and event.event_source.partition(".")[0] == service
         and event.event_name.lower() in {name.lower() for name in action.trail_events}
+    )
+
+
+def trail_shows_ai(
+    role_name: str | None,
+    events: Iterable[TrailEvent],
+    sources: Collection[str],
+    ai_actions: Collection[AiAction],
+) -> bool:
+    """Did this role call a listed AI action? A call that invokes no model, such as `List*`,
+    is not usage (ADR 0028, decision 6)."""
+    return role_name is not None and any(
+        e.role_name == role_name
+        and e.event_source in sources
+        and any(_proves(e, action) for action in ai_actions)
+        for e in events
     )
 
 

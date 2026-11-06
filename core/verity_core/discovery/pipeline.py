@@ -160,7 +160,10 @@ def build_plan(
             and bool(granted_ai_actions(rules.ai_actions, role.statements)),
             usage=any(usage[s] for s in found[function.name].systems),
             trail_event=trail_shows_ai(
-                role_name_of(function.role_arn), collected.trail_events, rules.trail_event_sources
+                role_name_of(function.role_arn),
+                collected.trail_events,
+                rules.trail_event_sources,
+                rules.ai_actions,
             ),
         )
 
