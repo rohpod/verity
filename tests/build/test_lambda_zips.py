@@ -18,7 +18,9 @@ FORBIDDEN_TOP = {"boto3", "botocore", "networkx", "yaml", "training"}
 
 
 def load_build_script():
-    spec = importlib.util.spec_from_file_location("build_lambdas", ROOT / "scripts/build_lambdas.py")
+    spec = importlib.util.spec_from_file_location(
+        "build_lambdas", ROOT / "scripts/build_lambdas.py"
+    )
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -124,9 +126,7 @@ def run_blocked(code: str, blocked: tuple[str, ...] = ()) -> subprocess.Complete
 
 
 def test_the_usage_sink_imports_without_networkx_or_yaml():
-    done = run_blocked(
-        "import verity_core.graph.dynamodb.usage", blocked=("networkx", "yaml")
-    )
+    done = run_blocked("import verity_core.graph.dynamodb.usage", blocked=("networkx", "yaml"))
     assert done.returncode == 0, done.stderr
 
 
