@@ -1,12 +1,12 @@
-"""Findings, derived on read and never stored (ADR 0019). Sorted: severity, then code, subject,
-message, so the same graph and `as_of` always give the same list.
+"""Findings, derived on read and never stored (architecture section G, ADR 0019). Sorted:
+severity, then code, subject, message, so the same graph and `as_of` always give the same list.
 
 A missing piece of evidence is high only if it backs a requirement of a binding framework that is
 in force or conditional (ADR 0020). Everything else it backs is a standard Kestrel adopted.
 
-`risk_tier_unconfirmed` and `unknown_fact` come from the applicability engine, so the caller
-passes them in. Everything else is derived here from the graph, the control results and the
-requirement statuses.
+`risk_tier_unconfirmed`, `risk_tier_expired` and `unknown_fact` come from the applicability
+engine, so the caller passes them in. Everything else is derived here from the graph, the
+control results and the requirement statuses.
 """
 
 from collections.abc import Iterable, Sequence

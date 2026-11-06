@@ -160,7 +160,7 @@ Every node and edge carries `tenant`, `source` (discovered · declared · seeded
 | Risk | AISystem `HAS_RISK` Risk · Risk `MITIGATED_BY` Control | |
 | Obligations | Requirement `PART_OF` Framework \| Requirement | Parent may be a requirement, for hierarchy such as Art. 9 → 9(2)(a) *(§L)* |
 | | Requirement `MAPS_TO` Control | `{strm, strength 1–10, rationale_type, rationale, sufficiency: full \| partial}`. `strength` and `sufficiency` are empty for `no_relationship` |
-| | Requirement `APPLIES_TO` AISystem \| Organisation | `{role, rule_id, reason, in_force_from}`, with `role` as the edge qualifier. `in_force \| upcoming` is derived from `as_of`, not stored (D5) *(org target added §L)* |
+| | Requirement `APPLIES_TO` AISystem \| Organisation | `{role, rule_id, reason, in_force_from, condition}`, with `role` as the edge qualifier. `in_force \| upcoming \| conditional` is derived from `as_of`, not stored (D5) *(org target added §L)* |
 | Assurance | ControlAssessment `ASSESSES` Control · ControlAssessment `SCOPED_TO` AISystem \| Organisation \| Provider | *(Provider scope added §L)* |
 | | Person `ASSESSED` ControlAssessment | Named human verifier, required for L4 *(§L)* |
 | | Evidence `SUPPORTS` ControlAssessment · Evidence `ABOUT` any node · Evidence `COLLECTED_FROM` AWSResource | `ABOUT` lets a DPA document describe a Provider *(§L)* |
@@ -170,6 +170,47 @@ Every node and edge carries `tenant`, `source` (discovered · declared · seeded
 > **Key modelling choice: status lives on `ControlAssessment`, not on `Control`.** "Is human oversight implemented?" has a different answer for each system. A `Control` is a reusable definition. A `ControlAssessment` is *control × scope* and holds `status`, `assurance_level`, `method`, `assessed_at` and `assessor`. Keeping these apart is what lets the data distinguish **mapping**, **implementing** and **demonstrating**, not just the UI.
 
 **Control scope inheritance:** `Control.scope_level ∈ {organisation, system, provider}`. When a system-level question asks about an organisation-level control (for example the AI policy or AI literacy), the engine resolves it to the organisation's ControlAssessment and shows it as *inherited*. Provider-level controls resolve through system → model → provider, and to *Not applicable* only when every model of the system is known to be in-house (D13). A system with no recorded model, or a third-party model with no `PROVIDED_BY`, is a gap: *provider unknown*.
+
+### Applicability
+
+`verity assess` derives `APPLIES_TO` edges from `content/rules/applicability.yaml`, the obligation dates, each system's facts and the decisions in force at `as_of` ([ADR 0019](adr/0019-m5-rules-and-assessment.md), [ADR 0020](adr/0020-m5-review-fixes.md)). The rules are our reading of the law, not legal advice. All are EU AI Act rules except the last.
+
+| Rule | Requirements | Target and role | When | Date |
+|---|---|---|---|---|
+| `eu-literacy` | Art. 4 | Organisation, one edge for each of provider and deployer that any system holds | Always | `euaia-chapters-1-2` |
+| `eu-disclosure` | Art. 50(1) | System, provider | `interacts_with_people` | `euaia-general` |
+| `eu-marking` | Art. 50(2) | System, provider | `generates_synthetic_content` | `euaia-art50-2-legacy` if placed on the market before `euaia-general`, otherwise `euaia-general` |
+| `eu-high-risk-provider` | Art. 9, 10, 11, 12, 13, 14, 25(4), with the sub-clauses held | System, provider | High-risk | `euaia-high-risk-annex-iii`, with Art. 111(2) |
+| `eu-high-risk-deployer` | Art. 26, 26(2), 26(7) | System, deployer | High-risk | `euaia-high-risk-annex-iii`, with Art. 111(2) |
+| `adopted-frameworks` | Every leaf of NIST AI RMF, ISO 42001 and ISO 27001 | Organisation, any role | Always, because Kestrel adopted them | None |
+
+**Risk tier.** A `risk_tier` decision counts only while in force: unsuperseded, collected by `as_of` and not past `valid_until`. The latest one in force wins. Rules apply to *Confirmed* and *Candidate*.
+
+| Decisions at `as_of` | Annex III domain? | Tier | Finding |
+|---|---|---|---|
+| In force, `high_risk` | Any | Confirmed | None |
+| In force, `not_high_risk` | Any | Not high-risk | None |
+| None, or all superseded | Yes | Candidate | `risk_tier_unconfirmed`, high |
+| None, or all superseded | No | Not high-risk | None |
+| Only expired, either tier | Yes | Candidate | `risk_tier_expired`, high |
+| Only expired, `high_risk` | No | Candidate | `risk_tier_expired`, high |
+| Only expired, `not_high_risk` | No | Not high-risk | `risk_tier_expired`, medium |
+
+**Art. 111(2).** A high-risk system placed on the market before the Annex III date is in scope only after a significant change in its design.
+- `significant_change_on` empty or before that date: the edge has the Annex III date as `in_force_from` and `condition: legacy_significant_change`.
+- `significant_change_on` on or after that date: the edge starts on the change date, with no condition.
+- "Put into service" and the 2 August 2030 deadline for systems intended for public authorities are not modelled ([ADR 0020](adr/0020-m5-review-fixes.md)).
+
+**Status**, derived on read: *Conditional* if the edge has a `condition`, whatever the date. Otherwise *Upcoming* before `in_force_from`, else *In force*. No date means *In force*.
+
+**Unknown facts.** Left out means unknown, not false. No rule applies on an unknown fact, and `unknown_fact` asks a person to record it.
+
+| Fact missing | Effect | Severity |
+|---|---|---|
+| `roles` | No system rule applies | High |
+| `use_domains` | No Annex III candidate. Exempt while a risk-tier decision is in force | High |
+| A fact a rule reads, such as `interacts_with_people` | That rule does not apply | Medium |
+| `first_placed_on_market` | The exception: the rule applies on the non-legacy path | Medium |
 
 ### Core traversals
 
@@ -192,13 +233,19 @@ Every node and edge carries `tenant`, `source` (discovered · declared · seeded
   - a written rationale
   - a `sufficiency` flag (empty for `no_relationship`)
 - **Why a hub, not pairwise mappings:** pairwise mapping of 4 frameworks needs 6 mapping sets, and that number grows as N² while errors compound. A hub needs only N sets. Cross-framework links are **derived** by composing two spokes. Each one is labelled "related via VC-xxx", carries **no STRM type**, shows both spokes, takes the weaker of the two strengths, and `no_relationship` never composes. The Secure Controls Framework uses the same approach.
-- **When a requirement counts as satisfied** ([ADR 0019](adr/0019-m5-rules-and-assessment.md)). A control is *met* if its assessment is Implemented at L2 or above from non-stale evidence.
-  - **Satisfied:** its `sufficiency: full` set is **non-empty**, every control in it is met, and at least one is non-automatable or at L4. A set of automated controls alone stops at *Partially addressed* (`automated_only`).
-  - **Partially addressed:** at least one mapped control is met but the above does not hold. This is never shown green.
-  - **Not met:** it has usable mappings and none is met.
-  - **Not addressed:** no usable mapping, either never mapped or reviewed as `no_relationship`.
-  - **Not applicable:** every target resolves to an in-house model.
-  - A parent requirement is never *Satisfied* from its children.
+- **When a requirement counts as satisfied** ([ADR 0019](adr/0019-m5-rules-and-assessment.md)). A control is *met* if its assessment is Implemented at L2 or above from non-stale evidence. Every provider target must be met, and *provider unknown* is unmet. The first matching row wins:
+
+  | # | Condition | Status | Reason |
+  |---|---|---|---|
+  | 1 | Every target resolves to an in-house model | Not applicable | `in_house_only` |
+  | 2 | A parent with no mappings of its own | Partially addressed if any child is Satisfied or Partially addressed, else Not met. Never Satisfied | `rollup` |
+  | 3 | No usable mapping | Not addressed | `never_mapped`, or `reviewed_no_control` for `no_relationship` |
+  | 4 | Its `sufficiency: full` set is non-empty, every control in it is met, and at least one is non-automatable or at L4 | Satisfied | |
+  | 5 | That set is non-empty and all met, but the automated-only guardrail stops it | Partially addressed | `automated_only` |
+  | 6 | At least one mapped control is met | Partially addressed | `partial_only` |
+  | 7 | Nothing is met | Not met | |
+
+  *Partially addressed* is never shown green. A status resting on a simulated sign-off carries `simulated: true`, and the CLI counts those apart.
 - **Content rules:**
   - ISO entries contain the clause/control ID plus our own summary. No ISO text is reproduced.
   - EU AI Act and NIST entries may quote short excerpts with a citation.
@@ -238,7 +285,44 @@ Re-collecting evidence creates a new node and never overwrites the old one.
 
 **Implementation status:** Implemented · Partially implemented · Not implemented · Not assessed · Not applicable.
 
+**Assessing a control** ([ADR 0019](adr/0019-m5-rules-and-assessment.md)). Usable evidence names the control and the scope, was collected by `as_of`, is not stale and is not a superseded decision. The first matching row wins, using the latest evidence of that kind:
+
+| # | Evidence | Status | Level |
+|---|---|---|---|
+| 1 | Automatable control, automated test that failed | Not implemented | L3 |
+| 2 | Verification decision by a person | As decided | L4 |
+| 3 | Automatable control, automated test that passed | Implemented | L3 |
+| 4 | `document_ref` | Partially implemented | L2 |
+| 5 | Automatable control, automated `config_snapshot` | Partially implemented | L2 |
+| 6 | Attestation decision saying `not_implemented` | Not implemented | L1 |
+| 7 | Any other attestation decision | Partially implemented | L1 |
+| 8 | Anything else, or nothing | Not assessed | L0 |
+
+An open assessment that a run no longer produces is ended with `valid_to`, and reopened if a later run produces it ([ADR 0020](adr/0020-m5-review-fixes.md)).
+
 **Guardrail:** automated checks can raise only controls with `automatable: true`. Organisational and legal controls are capped at *Partially implemented / L2* until an L4 human verification exists. **An AWS configuration check alone can never make an obligation green.**
+
+**Decisions** are human sign-offs held as YAML under `content/decisions/`, and seeded as Evidence with inline content and an `ABOUT` edge ([ADR 0019](adr/0019-m5-rules-and-assessment.md), [ADR 0020](adr/0020-m5-review-fixes.md)).
+- **Kinds:** `risk_tier`, `verification`, `attestation`, `document` and `revocation`. A revocation names no control, so it can never count as an assessment.
+- **Immutable once seeded.** `verity seed` refuses a stored decision that was edited (`decision_edited`) or removed (`decision_removed`). A change is a new decision naming the old one in `supersedes`.
+- **Supersession is time-aware and permanent.** A decision is superseded at `as_of` if a decision collected by then names it. The new decision's own expiry does not bring the old one back.
+- **Lint refuses** a target that does not exist (`decision_unknown_supersedes`), a target with a different subject, a later date, or a loop (`decision_supersedes_mismatch`), two unsuperseded decisions with the same kind, subject, control and date (`decision_conflict`, which revocations are exempt from), and a statement still holding a `TODO` (`decision_todo`).
+
+**Findings** are derived on read and never stored (D5). They sort by severity, then code, subject and message.
+
+| Code | Raised when | Severity |
+|---|---|---|
+| `control_not_met` | A control's status is Not implemented | High |
+| `no_evidence` | A control's status is Not assessed | High if it backs an in-force or conditional requirement of a framework with `binding: true`, else medium |
+| `provider_unknown` | A control needs a provider and none is recorded. Never *Not applicable* | High |
+| `risk_tier_unconfirmed` | A candidate with no decision (§E) | High |
+| `risk_tier_expired` | Only expired risk-tier decisions remain (§E) | High, or medium if the system stays not high-risk |
+| `unknown_fact` | A fact a rule needs is missing (§E) | High for `roles` and `use_domains`, else medium |
+| `no_owner` | A system has no `OWNS` edge | Medium |
+| `evidence_expiring` | The deciding evidence is expiring | Low |
+| `conditional_obligation` | One per system with a conditional edge | Low |
+
+`binding` is a fact on `Framework`: true for the EU AI Act, false for the standards Kestrel adopted by choice ([ADR 0020](adr/0020-m5-review-fixes.md)).
 
 _Later:_ a per-control hash chain, where each Evidence node stores the previous one's hash, to make tampering evident.
 
@@ -268,15 +352,15 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
 ## I. Interfaces
 
 - **CLI:**
-  - `verity seed`: load content and organisation YAML
+  - `verity seed`: load content and organisation YAML. It refuses an edited or removed decision
   - `verity crawl [--local]`
   - `verity lint`: check the content
-  - `verity assess [--as-of DATE] [--system ID] [--target memory|dynamodb]`: derive applicability and assess the controls. Memory (the default) seeds and assesses a fresh graph and writes nothing to AWS
+  - `verity assess [--as-of DATE] [--system ID] [--target memory|dynamodb] [--verbose]`: derive applicability and assess the controls. Memory (the default) seeds and assesses a fresh graph and writes nothing to AWS. It prints counts, lists every high finding and counts the rest by code; `--verbose` lists them all. An unknown `--system` is refused
   - `verity attest <control> <scope> --by <person>`: scaffolds a YAML file under `content/decisions/` for review; it never writes to the graph
   - `verity export`: write the redacted snapshot
 - **Crawler Lambda:** event `{ "mode": "full" | "incremental" }`, triggered by the schedule or a manual invoke.
 - **Snapshot contract:** `snapshot.schema.json` is generated from the pydantic models, and the TS types are generated from that schema, so the frontend and backend cannot drift.
-- **Governance as code:** human decisions live as reviewed YAML under `content/decisions/` (risk-tier confirmations, attestations, risk treatments). The approving pull request is the approval record. See [ADR 0008](adr/0008-governance-as-code.md).
+- **Governance as code:** human decisions live as reviewed YAML under `content/decisions/` (§G). The approving pull request is the approval record. Risk treatment decisions are deferred ([ADR 0019](adr/0019-m5-rules-and-assessment.md)). See [ADR 0008](adr/0008-governance-as-code.md).
 - **No public API in the MVP.** _Later:_ an admin write API on a Function URL with `AWS_IAM` auth.
 
 ## J. Frontend and security
