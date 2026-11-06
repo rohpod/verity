@@ -177,7 +177,9 @@ def cmd_assess(args: argparse.Namespace) -> int:
         print("cannot assess: content/rules/applicability.yaml is missing", file=sys.stderr)
         return UNREADABLE
     today = _utc_now().date()
-    as_of = _start_of(args.as_of or today)
+    # No date, or today's, means now: a crawl's evidence is collected during the day, and the
+    # start of the day would come before it (ADR 0022). Any other date is the start of that day.
+    as_of = _utc_now() if args.as_of in (None, today) else _start_of(args.as_of)
 
     if args.target == "memory":
         # Seeds a fresh in-memory graph, then assesses it. Nothing reaches AWS.
@@ -355,7 +357,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--as-of",
         type=date.fromisoformat,
         metavar="YYYY-MM-DD",
-        help="assess as of this date (default: today)",
+        help="assess as of this date; today or no date means now",
     )
     assess_parser.add_argument("--system", metavar="ID", help="only this system, such as sys:x")
     assess_parser.add_argument(

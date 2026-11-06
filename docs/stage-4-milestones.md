@@ -75,7 +75,7 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/). Decisions by the owner:
 - **M5:** date-boundary tests either side of every obligation date; role tests; property test that no automated input makes a non-automatable control Implemented; D2, D3, D13 cases; bias-test and DPA gaps appear as findings.
 - **M6:** `shadow-summariser` scores *probable*, `invoice-renderer` *none*; D1 canary appears nowhere; `lambda:GetFunction` never called; re-crawl duplicates nothing except run and evidence records; a config change yields a ChangeEvent and stale evidence.
 - **M7:** adapter shape tests pass; a test fails if a real Bedrock client appears anywhere; pure-Python inference matches training output; zips well under 50 MB; simulated components labelled.
-- **M8:** Function URL pricing confirmed first; all 5 functions classify as expected; an unsigned call to mock-openai is refused; unused `bedrock:Converse` finding appears and CloudTrail shows no Bedrock use; second crawl idempotent; `tofu destroy` then apply rebuilds cleanly; credits unchanged.
+- **M8:** Function URL pricing confirmed first; all 5 functions classify as expected; an unsigned call to mock-openai is refused; unused `bedrock:InvokeModel` finding appears and CloudTrail shows no Bedrock use; second crawl idempotent; `tofu destroy` then apply rebuilds cleanly; credits unchanged.
 - **M9:** scans of a snapshot built from live data find no account ID, Function URL host, env value or email; schema validates; every record has provenance and the file has its `as_of`.
 - **M10:** typecheck and build pass; `snapshot.json` is the only data source; every view shows provenance and timestamp; works at phone width; Pages URL works.
 - **M11:** every §L and ❓ item is closed or explicitly deferred; the README real-vs-simulated table matches what was built.
@@ -125,9 +125,12 @@ Found while building and reviewing M1. Each is open until the named milestone cl
 | M8 | Grant the crawler the actions listed in architecture §D, and never `lambda:GetFunction` |
 | M8 | Tag the mocks and the crawler `verity:component`, or `mock-openai` becomes a shadow-AI candidate |
 | M8 | Publish the manifests to SSM under `/verity/manifests/` |
+| M8 | Check the AI action list in `ai_signals.yaml` against the IAM reference, which could not be read while building M6 ([ADR 0022](adr/0022-m6-review-fixes.md)) |
+| M8 | Confirm the real crawler's function name matches `platform_functions`, and that the demo role grants `bedrock:InvokeModel` |
 | M8 | `verity seed` now reads every Evidence node to check decisions ([ADR 0020](adr/0020-m5-review-fixes.md)). Measure how long that takes once M6 evidence is in the table |
 | M8 | Re-seeding removes nothing, so a mapping deleted from YAML stays open in the graph. Decide on pruning before the first live re-seed |
 | M8 | The first `verity assess --target dynamodb` on the real content writes 1,368 records (65 `APPLIES_TO` edges, 433 ControlAssessments, 870 assessment edges): about 5,900 write units, roughly 6.6 minutes at 15 table units a second, and a second run writes 0. Measured on the in-memory copy that `estimate_apply` uses. It is not yet run on the real table. Decisions that change only add or close a few records |
+| M9 | Replace the `acct_` account digests with ordinals on export. A digest is not anonymous ([ADR 0022](adr/0022-m6-review-fixes.md)) |
 | M9 | A decision's commit SHA is looked up at export, not at seed, because a SHA inside hashed content would make a new Evidence node on every commit ([ADR 0019](adr/0019-m5-rules-and-assessment.md), D10). Build the lookup from the decision's file path and `file_sha256` |
 | M8 | Edge writes do not re-check the nodes they connect, which is safe with one writer at a time ([ADR 0014](adr/0014-m2-measurements-and-evidence-cap.md)). Do not run a seed and a crawl together |
 | M11 | Risk treatment decisions, named in [ADR 0008](adr/0008-governance-as-code.md), are deferred because nothing reads them ([ADR 0019](adr/0019-m5-rules-and-assessment.md)). Build them or drop them from ADR 0008 |
