@@ -14,7 +14,7 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/). Decisions by the owner:
 | `python3.12` supports arm64; deprecation forecast 31 Oct 2028 | Closes the architecture §B ❓ |
 | `aws login` flow works | Closes the architecture §J ❓ |
 | `tofu` 1.13.5 installed, `terraform` not; repo is public; `gh` logged out | Use `tofu`; owner runs `! gh auth login` |
-| Function URL pricing unconfirmed | Verify on the Function URL docs before M8 |
+| Function URL pricing unconfirmed | **Confirmed:** no extra charge ([ADR 0025](adr/0025-m8-deploy-and-crawl.md)) |
 
 ## Design clarifications
 
@@ -44,6 +44,7 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/). Decisions by the owner:
 | D26 | M6 review fixes: concrete AI actions, an inconclusive VC-060 outcome, account digests, signal matching. See [ADR 0022](adr/0022-m6-review-fixes.md) |
 | D27 | M7 demo estate: layered `verity_ai`, corrected crawl fixture, runtime refusal of real endpoints, pure-Python talent model, deterministic zips. See [ADR 0023](adr/0023-m7-demo-estate.md) |
 | D28 | M7 review fixes: bounded telemetry, quiet AWS logs, a usage partition, reproducible zips, input ranges, a permissions boundary in M8. See [ADR 0024](adr/0024-m7-review-fixes.md) |
+| D29 | M8 deploy: the crawler function, refused CloudTrail events prove nothing, simulator proof of the boundary, a real refused write, a fixture-shaped estate. See [ADR 0025](adr/0025-m8-deploy-and-crawl.md) |
 
 ## Milestones
 
@@ -77,7 +78,7 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/). Decisions by the owner:
 - **M5:** date-boundary tests either side of every obligation date; role tests; property test that no automated input makes a non-automatable control Implemented; D2, D3, D13 cases; bias-test and DPA gaps appear as findings.
 - **M6:** `shadow-summariser` scores *probable*, `invoice-renderer` *none*; D1 canary appears nowhere; `lambda:GetFunction` never called; re-crawl duplicates nothing except run and evidence records; a config change yields a ChangeEvent and stale evidence.
 - **M7:** adapter shape tests pass; a test fails if a real Bedrock client appears anywhere; pure-Python inference matches training output; zips well under 50 MB; simulated components labelled.
-- **M8:** Function URL pricing confirmed first; all 5 functions classify as expected; an unsigned call to mock-openai is refused; unused `bedrock:InvokeModel` finding appears and CloudTrail shows no Bedrock use; second crawl idempotent; `tofu destroy` then apply rebuilds cleanly; credits unchanged.
+- **M8:** Function URL pricing confirmed first; all 5 functions classify as expected; an unsigned call to mock-openai is refused; unused `bedrock:InvokeModel` finding appears and CloudTrail shows no Bedrock use; second crawl idempotent; destroying the estate then applying rebuilds it cleanly ([ADR 0025](adr/0025-m8-deploy-and-crawl.md)); credits unchanged.
 - **M9:** scans of a snapshot built from live data find no account ID, Function URL host, env value or email; schema validates; every record has provenance and the file has its `as_of`.
 - **M10:** typecheck and build pass; `snapshot.json` is the only data source; every view shows provenance and timestamp; works at phone width; Pages URL works.
 - **M11:** every §L and ❓ item is closed or explicitly deferred; the README real-vs-simulated table matches what was built.
@@ -172,7 +173,7 @@ Found while building and reviewing M1. Each is open until the named milestone cl
 | M8 | Grant both Function URL actions, `lambda:InvokeFunctionUrl` and `lambda:InvokeFunction`, to every caller of `mock-openai` ([ADR 0023](adr/0023-m7-demo-estate.md)) |
 | M8 | Write the `dynamodb:LeadingKeys` policy for each app role, limited to `T#kestrel#U#sys:<system>` using `ForAllValues:StringEquals`, with `dynamodb:PutItem` only. `shadow-summariser` and `talent-screening` get no table access |
 | M8 | Put a permissions boundary on the app roles that allows everything except `bedrock:Converse*`, `bedrock:Invoke*` and `sagemaker:InvokeEndpoint*`. `verity-never-use` is an inline policy on the user `rohpod`, so it does not cover a Lambda role, and nothing else stops `support-assistant` calling Bedrock ([ADR 0024](adr/0024-m7-review-fixes.md), correcting [ADR 0022](adr/0022-m6-review-fixes.md)). The grant stays in the role's policy so the VC-060 finding stands, and the UI must say the boundary makes it ineffective. Confirm the details and ask for approval first |
-| M8 | Prove the two limits on real IAM, because moto does not enforce them: a refused `PutItem` from an app role on a `META` item, and a refused Bedrock invoke under the boundary |
+| M8 | Prove the two limits, because moto does not enforce them: a real refused `PutItem` on a `META` item from a temporary probe, and the boundary with the IAM simulator. **Never attempt a Bedrock call,** even a refused one: it would count as use of the grant until M8 lands decision 3 of [ADR 0025](adr/0025-m8-deploy-and-crawl.md), and it could run for real if the boundary were wrong |
 | M8 | Measure cold start at 128 MB. `_dependencies` runs inside the handler, so importing boto3 and pydantic and creating two clients counts against the 10-second timeout, on top of the 9 to 9.5 seconds the model and telemetry budgets allow. If it does not fit, move that work to module load or raise the memory, which is free within the allowance only if the GB-seconds still fit |
 | M8 | Build the zips from a clean tree (`git status` empty): the build takes tracked files, so an uncommitted edit to one still ships |
 | M8 | Prove SigV4 against the real Function URL, including the signing name `lambda`, which no page read so far has confirmed. `tests/sdk` only proves the signature's shape |
@@ -183,7 +184,7 @@ Found while building and reviewing M1. Each is open until the named milestone cl
 | M8 | Grant the crawler the actions listed in architecture §D, and never `lambda:GetFunction` |
 | M8 | Tag the mocks and the crawler `verity:component`, or `mock-openai` becomes a shadow-AI candidate |
 | M8 | Publish the manifests to SSM under `/verity/manifests/` |
-| M8 | Check the AI action list in `ai_signals.yaml` against the IAM reference, which could not be read while building M6 ([ADR 0022](adr/0022-m6-review-fixes.md)) |
+| After M8 | Decide whether to add Bedrock's 8 other `Invoke*` actions, such as `InvokeDataAutomation`, to `ai_signals.yaml` ([ADR 0025](adr/0025-m8-deploy-and-crawl.md)) |
 | M8 | Confirm the real crawler's function name matches `platform_functions`, and that the demo role grants `bedrock:InvokeModel` |
 | M8 | `verity seed` now reads every Evidence node to check decisions ([ADR 0020](adr/0020-m5-review-fixes.md)). Measure how long that takes once M6 evidence is in the table |
 | M8 | Re-seeding removes nothing, so a mapping deleted from YAML stays open in the graph. Decide on pruning before the first live re-seed |

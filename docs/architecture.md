@@ -443,6 +443,7 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
 | [0022](adr/0022-m6-review-fixes.md) | M6 review fixes: concrete AI actions with proving events, an inconclusive VC-060 outcome, account digests, signal matching |
 | [0023](adr/0023-m7-demo-estate.md) | M7 demo estate: layered `verity_ai`, corrected crawl fixture, runtime refusal of real endpoints, pure-Python talent model, deterministic zips |
 | [0024](adr/0024-m7-review-fixes.md) | M7 review fixes: bounded telemetry, quiet AWS logs, a usage partition, reproducible zips, input ranges, a permissions boundary in M8 |
+| [0025](adr/0025-m8-deploy-and-crawl.md) | M8 deploy: the crawler function, refused CloudTrail events prove nothing, simulator proof of the boundary, a real refused write, a fixture-shaped estate |
 
 ## L. Schema validation walkthrough
 
