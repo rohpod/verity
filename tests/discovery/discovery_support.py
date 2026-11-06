@@ -57,6 +57,7 @@ def trail_event(
     source: str = "bedrock.amazonaws.com",
     when=None,
     event_type: str = "AwsApiCall",
+    error_code: str | None = None,
 ):
     from datetime import UTC, datetime
 
@@ -64,6 +65,8 @@ def trail_event(
         "userIdentity": {"sessionContext": {"sessionIssuer": {"userName": role}}},
         "requestParameters": {"messages": "a prompt that must never be kept"},
     }
+    if error_code:
+        detail |= {"errorCode": error_code, "errorMessage": "detail that must never be kept"}
     return {
         "EventSource": source,
         "EventName": name,
