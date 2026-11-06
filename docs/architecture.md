@@ -1,6 +1,6 @@
 # Verity — Architecture
 
-_Stage 3 deliverable · 2026-11-05 · Status: accepted, amended in Stage 4 (see [milestone plan](stage-4-milestones.md), [ADR 0009](adr/0009-mock-openai-iam-auth.md), [ADR 0010](adr/0010-assessment-and-crosswalk-semantics.md), [ADR 0012](adr/0012-graph-schema-refinements.md), [ADR 0013](adr/0013-dynamodb-write-model.md), [ADR 0021](adr/0021-m6-discovery.md))._
+_Stage 3 deliverable · 2026-11-05 · Status: accepted, amended in Stage 4 (see [milestone plan](stage-4-milestones.md), [ADR 0009](adr/0009-mock-openai-iam-auth.md), [ADR 0010](adr/0010-assessment-and-crosswalk-semantics.md), [ADR 0012](adr/0012-graph-schema-refinements.md), [ADR 0013](adr/0013-dynamodb-write-model.md), [ADR 0021](adr/0021-m6-discovery.md), [ADR 0023](adr/0023-m7-demo-estate.md))._
 Inputs: [Stage 1 discovery](stage-1-discovery.md) · [Stage 2 feasibility](stage-2-feasibility.md) · decisions in [`adr/`](adr/).
 
 **Locked constraints:** AWS Free plan · single region `eu-north-1` · Terraform/OpenTofu · Python 3.12 backend · React + TS frontend · DynamoDB + NetworkX graph · no S3 · Bedrock/OpenAI mock-only · public demo = static snapshot on GitHub Pages · target customer = mid-size EU SaaS company acting as both AI provider and deployer.
@@ -430,6 +430,7 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
 | [0020](adr/0020-m5-review-fixes.md) | M5 review fixes: immutable decisions with `supersedes` and revocation, risk-tier expiry, unknown facts, severity from binding law, ended assessments |
 | [0021](adr/0021-m6-discovery.md) | M6 discovery: evidence written on change, summarised over the cap, one cleaning boundary, VC-060 for unused permissions, Candidate lifecycle |
 | [0022](adr/0022-m6-review-fixes.md) | M6 review fixes: concrete AI actions with proving events, an inconclusive VC-060 outcome, account digests, signal matching |
+| [0023](adr/0023-m7-demo-estate.md) | M7 demo estate: layered `verity_ai`, corrected crawl fixture, runtime refusal of real endpoints, pure-Python talent model, deterministic zips |
 
 ## L. Schema validation walkthrough
 

@@ -42,6 +42,7 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/). Decisions by the owner:
 | D24 | M5 review fixes: decision lifecycle, risk-tier expiry, unknown facts, severity from binding law, ended assessments. See [ADR 0020](adr/0020-m5-review-fixes.md) |
 | D25 | M6 discovery: evidence on change only, summarised over the cap, one cleaning boundary, VC-060 for unused permissions, Candidate lifecycle. See [ADR 0021](adr/0021-m6-discovery.md) |
 | D26 | M6 review fixes: concrete AI actions, an inconclusive VC-060 outcome, account digests, signal matching. See [ADR 0022](adr/0022-m6-review-fixes.md) |
+| D27 | M7 demo estate: layered `verity_ai`, corrected crawl fixture, runtime refusal of real endpoints, pure-Python talent model, deterministic zips. See [ADR 0023](adr/0023-m7-demo-estate.md) |
 
 ## Milestones
 
