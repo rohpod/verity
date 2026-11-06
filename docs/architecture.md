@@ -434,6 +434,7 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
 | [0021](adr/0021-m6-discovery.md) | M6 discovery: evidence written on change, summarised over the cap, one cleaning boundary, VC-060 for unused permissions, Candidate lifecycle |
 | [0022](adr/0022-m6-review-fixes.md) | M6 review fixes: concrete AI actions with proving events, an inconclusive VC-060 outcome, account digests, signal matching |
 | [0023](adr/0023-m7-demo-estate.md) | M7 demo estate: layered `verity_ai`, corrected crawl fixture, runtime refusal of real endpoints, pure-Python talent model, deterministic zips |
+| [0024](adr/0024-m7-review-fixes.md) | M7 review fixes: bounded telemetry, quiet AWS logs, a usage partition, reproducible zips, input ranges, a permissions boundary in M8 |
 
 ## L. Schema validation walkthrough
 
