@@ -65,7 +65,7 @@ def test_numbers_in_names_do_not_stop_the_run_and_stay_distinct(repo, clock, tmp
         template["Environment"]["Variables"]["KEY_123456789012"] = "x"
 
     report = crawl_fixture(repo, clock, edited_fixture(tmp_path, numbered))
-    assert len(report.functions) == 9
+    assert len(report.functions) == 10
     names = {r.name for r in of_type(repo, NodeType.AWS_RESOURCE) if r.resource_type == "lambda"}
     assert sum(n.startswith("job-acct_") for n in names) == 2
     assert not any("123456789012" in n or "2026110609" in n for n in names)

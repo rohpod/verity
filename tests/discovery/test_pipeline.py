@@ -32,6 +32,7 @@ SIGNALS = {
     "shadow-summariser": (L.PROBABLE, ("env_ai_name", "name_ai_token")),
     "invoice-renderer": (L.NONE, ()),
     "mock-openai": (L.NONE, ("platform_component",)),
+    "mock-bedrock": (L.NONE, ("platform_component",)),
 }
 
 
@@ -69,7 +70,7 @@ def test_roles_and_tables_stay_unscored(repo, clock):
     seeded(repo, clock)
     crawl_fixture(repo, clock)
     others = [r for r in of_type(repo, NodeType.AWS_RESOURCE) if r.resource_type != "lambda"]
-    assert len(others) == 7
+    assert len(others) == 8
     assert all(r.ai_likelihood is None and r.signals == [] for r in others)
 
 
@@ -80,12 +81,16 @@ def test_functions_run_on_assume_and_call(repo, clock):
         (f"sys:{name}", function_id(name))
         for name in ("support-assistant", "talent-screening", "contract-insights")
     }
-    assert len(open_edges(repo, EdgeType.ASSUMES)) == 6
+    assert len(open_edges(repo, EdgeType.ASSUMES)) == 7
     assert (function_id("support-assistant"), role_id("support-assistant-role")) in open_edges(
         repo, EdgeType.ASSUMES
     )
     assert open_edges(repo, EdgeType.CALLS) == {
-        (function_id("support-assistant"), table_id("verity-graph"))
+        (function_id("support-assistant"), table_id("verity-graph")),
+        (function_id("support-assistant"), function_id("mock-bedrock")),
+        (function_id("contract-insights"), table_id("verity-graph")),
+        (function_id("contract-insights"), function_id("mock-openai")),
+        (function_id("shadow-summariser"), function_id("mock-openai")),
     }
 
 
@@ -95,8 +100,8 @@ def test_evidence_is_written_for_every_resource_and_each_system_with_a_role(repo
     items = of_type(repo, NodeType.EVIDENCE)
     snapshots = [e for e in items if e.kind is EvidenceKind.CONFIG_SNAPSHOT]
     checks = [e for e in items if e.kind is EvidenceKind.AUTOMATED_TEST]
-    assert (len(snapshots), len(checks)) == (13, 3)
-    assert report.summary["evidence_written"] == 16
+    assert (len(snapshots), len(checks)) == (15, 3)
+    assert report.summary["evidence_written"] == 18
     assert {e.subject for e in checks} == {
         "sys:support-assistant",
         "sys:talent-screening",
@@ -111,7 +116,7 @@ def test_the_run_is_recorded_with_its_counts(repo, clock):
     (run,) = of_type(repo, NodeType.DISCOVERY_RUN)
     assert run.id == ids.discovery_run_id(started) == report.run_id
     assert run.started_at == started and run.finished_at is not None
-    assert run.summary["functions"] == 6 and run.summary["resources_new"] == 13
+    assert run.summary["functions"] == 7 and run.summary["resources_new"] == 15
     assert run.summary["largest_evidence_bytes"] > 0
     assert open_edges(repo, EdgeType.OBSERVED) == {
         (run.id, r.id) for r in of_type(repo, NodeType.AWS_RESOURCE)
@@ -129,7 +134,7 @@ def test_a_second_crawl_writes_one_run_and_nothing_else(repo, clock):
     assert [len(repo.history(r.id)) for r in runs] == [2, 2]
     assert all(len(repo.history(r.id)) == 1 for r in of_type(repo, NodeType.AWS_RESOURCE))
     assert of_type(repo, NodeType.CHANGE_EVENT) == []
-    assert len(of_type(repo, NodeType.EVIDENCE)) == 16
+    assert len(of_type(repo, NodeType.EVIDENCE)) == 18
 
 
 def test_evidence_is_refreshed_when_8_days_or_less_remain(repo, clock):
@@ -140,7 +145,7 @@ def test_evidence_is_refreshed_when_8_days_or_less_remain(repo, clock):
     clock.advance(days=1)  # the first batch has 8 days left
     refreshed = crawl_fixture(repo, clock)
     assert set(refreshed.written) == {"runs", "evidence", "evidence_edges"}
-    assert refreshed.written["evidence"] == 16
+    assert refreshed.written["evidence"] == 18
 
 
 def test_a_jump_of_23_days_adds_only_refreshed_evidence(repo, clock):
@@ -149,7 +154,7 @@ def test_a_jump_of_23_days_adds_only_refreshed_evidence(repo, clock):
     clock.advance(days=23)
     refreshed = crawl_fixture(repo, clock)
     assert set(refreshed.written) == {"runs", "evidence", "evidence_edges"}
-    assert len(of_type(repo, NodeType.EVIDENCE)) == 32
+    assert len(of_type(repo, NodeType.EVIDENCE)) == 36
     assert all(len(repo.history(r.id)) == 1 for r in of_type(repo, NodeType.AWS_RESOURCE))
 
 
@@ -216,7 +221,10 @@ def test_a_new_env_var_name_is_a_change_but_a_new_value_is_not(repo, clock, tmp_
 
     loud = crawl_fixture(repo, clock, edited_fixture(tmp_path, new_name))
     assert loud.changes == (function_id("invoice-renderer"),)
-    assert resources(repo)["invoice-renderer"].env_var_names == ["EXTRA_SETTING", "TEMPLATE_BUCKET"]
+    assert resources(repo)["invoice-renderer"].env_var_names == [
+        "EXTRA_SETTING",
+        "INVOICE_TEMPLATE",
+    ]
 
 
 def test_a_changed_description_is_not_a_change(repo, clock, tmp_path):

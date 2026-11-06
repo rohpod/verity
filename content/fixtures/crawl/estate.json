@@ -19,7 +19,8 @@
       "Environment": {
         "Variables": {
           "MODEL_ADAPTER": "VERITY-CANARY-7f3a",
-          "HELP_ARTICLES_TABLE": "VERITY-CANARY-7f3a",
+          "HELP_ARTICLES_FILE": "VERITY-CANARY-7f3a",
+          "USAGE_TABLE": "VERITY-CANARY-7f3a",
           "LOG_LEVEL": "VERITY-CANARY-7f3a"
         }
       }
@@ -64,6 +65,7 @@
       "Environment": {
         "Variables": {
           "OPENAI_BASE_URL": "VERITY-CANARY-7f3a",
+          "USAGE_TABLE": "VERITY-CANARY-7f3a",
           "LOG_LEVEL": "VERITY-CANARY-7f3a"
         }
       }
@@ -101,12 +103,12 @@
       "Architectures": [
         "arm64"
       ],
-      "Description": "Renders invoices as PDF",
+      "Description": "Renders invoices from a template",
       "LastModified": "2026-11-01T09:00:00.000+0000",
       "RevisionId": "rev-4",
       "Environment": {
         "Variables": {
-          "TEMPLATE_BUCKET": "VERITY-CANARY-7f3a"
+          "INVOICE_TEMPLATE": "VERITY-CANARY-7f3a"
         }
       }
     },
@@ -125,6 +127,22 @@
       "Description": "Simulated OpenAI-shaped endpoint. Nothing real is called",
       "LastModified": "2026-11-01T09:00:00.000+0000",
       "RevisionId": "rev-5"
+    },
+    {
+      "FunctionName": "mock-bedrock",
+      "FunctionArn": "arn:aws:lambda:eu-north-1:000000000000:function:mock-bedrock",
+      "Runtime": "python3.12",
+      "Role": "arn:aws:iam::000000000000:role/mock-bedrock-role",
+      "Handler": "app.handler",
+      "CodeSha256": "sha-of-mock-bedrock-v1",
+      "MemorySize": 128,
+      "Timeout": 10,
+      "Architectures": [
+        "arm64"
+      ],
+      "Description": "Simulated Bedrock Converse-shaped function. Nothing real is called",
+      "LastModified": "2026-11-01T09:00:00.000+0000",
+      "RevisionId": "rev-6"
     }
   ],
   "tag_mappings": [
@@ -160,6 +178,15 @@
         {
           "Key": "verity:component",
           "Value": "mock-openai"
+        }
+      ]
+    },
+    {
+      "ResourceARN": "arn:aws:lambda:eu-north-1:000000000000:function:mock-bedrock",
+      "Tags": [
+        {
+          "Key": "verity:component",
+          "Value": "mock-bedrock"
         }
       ]
     }
@@ -215,9 +242,23 @@
               {
                 "Effect": "Allow",
                 "Action": [
-                  "dynamodb:GetItem"
+                  "dynamodb:PutItem"
                 ],
-                "Resource": "arn:aws:dynamodb:eu-north-1:000000000000:table/verity-graph"
+                "Resource": "arn:aws:dynamodb:eu-north-1:000000000000:table/verity-graph",
+                "Condition": {
+                  "ForAllValues:StringLike": {
+                    "dynamodb:LeadingKeys": [
+                      "T#kestrel#N#sys:support-assistant"
+                    ]
+                  }
+                }
+              },
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "lambda:InvokeFunction"
+                ],
+                "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:mock-bedrock"
               }
             ]
           }
@@ -297,6 +338,36 @@
               }
             ]
           }
+        },
+        {
+          "PolicyName": "model-and-data",
+          "PolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "dynamodb:PutItem"
+                ],
+                "Resource": "arn:aws:dynamodb:eu-north-1:000000000000:table/verity-graph",
+                "Condition": {
+                  "ForAllValues:StringLike": {
+                    "dynamodb:LeadingKeys": [
+                      "T#kestrel#N#sys:contract-insights"
+                    ]
+                  }
+                }
+              },
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "lambda:InvokeFunctionUrl",
+                  "lambda:InvokeFunction"
+                ],
+                "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:mock-openai"
+              }
+            ]
+          }
         }
       ],
       "attached_policies": []
@@ -332,6 +403,22 @@
                   "logs:PutLogEvents"
                 ],
                 "Resource": "arn:aws:logs:eu-north-1:000000000000:log-group:/aws/lambda/shadow-summariser:*"
+              }
+            ]
+          }
+        },
+        {
+          "PolicyName": "model-and-data",
+          "PolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "lambda:InvokeFunctionUrl",
+                  "lambda:InvokeFunction"
+                ],
+                "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:mock-openai"
               }
             ]
           }
@@ -408,6 +495,44 @@
                   "logs:PutLogEvents"
                 ],
                 "Resource": "arn:aws:logs:eu-north-1:000000000000:log-group:/aws/lambda/mock-openai:*"
+              }
+            ]
+          }
+        }
+      ],
+      "attached_policies": []
+    },
+    {
+      "role": {
+        "RoleName": "mock-bedrock-role",
+        "Path": "/",
+        "Arn": "arn:aws:iam::000000000000:role/mock-bedrock-role",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        }
+      },
+      "inline_policies": [
+        {
+          "PolicyName": "logs",
+          "PolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "logs:CreateLogStream",
+                  "logs:PutLogEvents"
+                ],
+                "Resource": "arn:aws:logs:eu-north-1:000000000000:log-group:/aws/lambda/mock-bedrock:*"
               }
             ]
           }

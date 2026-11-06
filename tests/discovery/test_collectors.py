@@ -48,7 +48,7 @@ def test_the_fixture_collector_reads_the_recorded_estate_and_says_it_is_simulate
     assert [m.system for m in found.manifests] == ["sys:talent-screening", "sys:contract-insights"]
     assert found.manifests_invalid == 0
     assert found.trail_events == ()
-    assert len(found.roles) == 6
+    assert len(found.roles) == 7
 
 
 def test_the_fixture_collector_drops_every_env_value_and_account_id():
