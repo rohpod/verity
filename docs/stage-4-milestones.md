@@ -56,7 +56,7 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/). Decisions by the owner:
 | **Governance logic (local)** | | | | |
 | M4 | Content: hub controls, ~35 requirements, STRM mappings, Kestrel org, synthetic systems, `verity seed` | Sonnet builds the loader, linter, CLI and org data; Opus writes the regulatory content | no | ✅ |
 | M5 | Rules and assessment: applicability, status, assurance, satisfaction, `verity assess`, `verity attest` | Opus, then Sonnet | no | ✅ |
-| M6 | Discovery pipeline (8 stages), `ai_signals.yaml`, `verity crawl --local` | Sonnet | no | 🔄 |
+| M6 | Discovery pipeline (8 stages), `ai_signals.yaml`, `verity crawl --local` | Sonnet | no | ✅ |
 | M7 | Demo estate code: mocks, `verity_ai` with SigV4 hook, 5 apps, local talent model | Sonnet | no | ⬜ |
 | **Live** | | | | |
 | M8 | Deploy and first live crawl: Lambda modules, schedule, SSM manifests, guardrails | Opus (IAM), Sonnet | **yes, approval per apply** | ⬜ |
@@ -111,6 +111,28 @@ The end-of-milestone review reopened M5 until the fixes in [ADR 0020](adr/0020-m
 
 The Talent Screening bias-test gap stays a high finding, and the mock OpenAI DPA gap (VC-050) is a medium one. Requirements resting on demo sign-offs are labelled simulated. The owner's review of `content/rules/applicability.yaml`, which ADR 0019 asks for, is recorded by approving the pull request that closes M5.
 
+## M6 close-out (2026-11-06)
+
+The end-of-milestone review reopened M6 until the fixes in [ADR 0022](adr/0022-m6-review-fixes.md) landed. Its experiments were then run again on merged `main`, on copies of the recorded fixture. Nothing was read from AWS.
+
+| Experiment | Before | After |
+|---|---|---|
+| Role with `NotAction` (PowerUser shape) | VC-060 passed at L3 | Fails: 8 listed AI actions granted, 2 unused, 6 unverifiable |
+| `bedrock:InvokeModel` used through `Converse` | Read as unused | Passes |
+| Trust moved to another external account | No ChangeEvent | One ChangeEvent, and new snapshot and VC-060 Evidence |
+| `LEGAL_OPENAI_API_KEY`, `AWS_BEDROCK_REGION`, `APP_ANTHROPIC_TOKEN`, `CHATGPT_KEY` | Scored none | Probable |
+| `ContractSummariserFn`, `MyStack-OpenAiProxy-AB12` | Scored none | Possible |
+| 12-digit number in a function, env var or role name | Stopped the crawl | Crawls cleanly, as an `acct_` digest |
+| `DEBUG` logging during `collect` | Canary in the log | Canary absent |
+| Crash at the evidence step, then retry | Failed check hidden as `no_evidence` for about 3 weeks | Evidence rewritten, `control_not_met` high, and the next crawl writes only the run |
+| Function whose role the crawler cannot see | VC-060 passed on the rest | Inconclusive |
+| Any tag on a function | Hid shadow AI | `shadow-summariser` stays a Candidate |
+| `verity assess` on the day of a crawl | Ignored the crawl's evidence | Assesses as of now |
+
+The original criteria also hold. `shadow-summariser` scores *probable* and `invoice-renderer` *none*. `lambda:GetFunction` is never called. A second crawl, even with every API list reordered or after a re-seed, writes only the run. A config change gives a ChangeEvent and stale evidence. The seeded `AISystem` facts are untouched. `verity crawl --local` gives 29 high findings, and `verity assess` alone 27.
+
+Open for M8: the AI action list is checked against the IAM reference (below), because that page could not be read while building M6. The live path of the crawler has not run, and M6 proves it against `moto` and a stub only.
+
 ## Notes for later milestones
 
 Found while building and reviewing M1. Each is open until the named milestone closes it.
@@ -119,7 +141,6 @@ Found while building and reviewing M1. Each is open until the named milestone cl
 |---|---|
 | M3 | Last open criterion: the owner re-reads credits in the Billing console at least 24 hours after the last live write (2026-11-05). M3 stays 🔄 until they match. The checks moto could not do are done ([ADR 0016](adr/0016-m3-live-results.md)) |
 | M8 | `load_graph` reads every `U#` usage record in the table and discards it. Demo usage volume is small, so measure the scan on the real table. If usage grows large, load without a scan: list nodes through the type index and read each node's partition |
-| M6 | The end-of-milestone review keeps M6 open until the fixes in [ADR 0022](adr/0022-m6-review-fixes.md) land and the review's experiments pass again |
 | M8 | Read `DiscoveryRun.summary.largest_evidence_bytes` from the first live crawl. Evidence over the 16 KB cap is summarised, never refused ([ADR 0021](adr/0021-m6-discovery.md)); decide whether the cap should rise |
 | M8 | Build `crawler/handler.py` and the live path of `verity crawl`. The CLI refuses it until then |
 | M8 | Grant the crawler the actions listed in architecture §D, and never `lambda:GetFunction` |

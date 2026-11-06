@@ -9,7 +9,7 @@ Verity is an open-source portfolio project exploring what an *AI-specific* GRC p
 - maps systems to **ISO/IEC 42001, ISO/IEC 27001, the EU AI Act and the NIST AI RMF** through a typed crosswalk (NIST IR 8477 set-theory relationships), backed by a **knowledge graph**;
 - separates *mapped*, *implemented*, *evidenced*, *tested* and *verified*, so a single configuration check never turns an obligation green.
 
-> **Status:** Stage 4. The local graph core (M1), its DynamoDB repository (M2), the AWS account baseline (M3: the `verity-graph` table and a cost budget, tested live) the governance content with `verity seed` (M4, not yet seeded to AWS) and the rules with `verity assess` and `verity attest` (M5, run locally) are built. The discovery pipeline with `verity crawl --local` (M6, in review) runs on a recorded fixture and reads nothing from AWS. No Lambda or crawler is deployed yet, so those "Real" rows below describe the plan. See [`docs/stage-4-milestones.md`](docs/stage-4-milestones.md).
+> **Status:** Stage 4. The local graph core (M1), its DynamoDB repository (M2), the AWS account baseline (M3: the `verity-graph` table and a cost budget, tested live) the governance content with `verity seed` (M4, not yet seeded to AWS) the rules with `verity assess` and `verity attest` (M5, run locally) and the discovery pipeline with `verity crawl --local` (M6, tested on `moto` and a recorded fixture; nothing reads AWS yet) are built. The discovery pipeline with `verity crawl --local` (M6, in review) runs on a recorded fixture and reads nothing from AWS. No Lambda or crawler is deployed yet, so those "Real" rows below describe the plan. See [`docs/stage-4-milestones.md`](docs/stage-4-milestones.md).
 
 ## Real vs simulated
 
