@@ -3,7 +3,8 @@
 
 `check_vc060` answers "are the AI permissions that were granted ever exercised?" from CloudTrail
 only. `U#` usage records are never counted here: the demo's come from a mock, and counting them
-would hide the seeded unused `bedrock:InvokeModel` grant.
+would hide the seeded unused `bedrock:InvokeModel` grant. A call that failed or was refused
+carries an `errorCode` and proves nothing (ADR 0025, decision 3).
 """
 
 from collections.abc import Collection, Iterable, Sequence
@@ -42,7 +43,10 @@ def trail_shows_ai(
     role_name: str | None, events: Iterable[TrailEvent], sources: Collection[str]
 ) -> bool:
     return role_name is not None and any(
-        e.role_name == role_name and e.event_source in sources and e.event_type != SERVICE_EVENT
+        e.role_name == role_name
+        and e.event_source in sources
+        and e.event_type != SERVICE_EVENT
+        and e.error_code is None
         for e in events
     )
 
@@ -52,10 +56,12 @@ def usage_shows_ai(records: Sequence[UsageRecord]) -> bool:
 
 
 def _proves(event: TrailEvent, action: AiAction) -> bool:
-    """A call to the action: from its service, by name, and not a service event."""
+    """A call to the action: from its service, by name, not a service event, and not one that
+    failed or was refused."""
     service = action.action.partition(":")[0]
     return (
         event.event_type != SERVICE_EVENT
+        and event.error_code is None
         and event.event_source.partition(".")[0] == service
         and event.event_name.lower() in {name.lower() for name in action.trail_events}
     )

@@ -4,7 +4,8 @@ Each `clean_*` function turns one raw item into a frozen dataclass as it is rece
 raw dict goes no further. What is dropped here can never be stored, logged or put in an error:
 - env var values, so only the names are kept;
 - the Lambda description's place in storage: it is kept for scoring in memory, never written;
-- anything in a CloudTrail event beyond its source, name, time and the role that made the call.
+- anything in a CloudTrail event beyond its source, name, time, the role that made the call and
+  its `errorCode`. The error message is dropped: it can hold request detail (ADR 0025, decision 3).
 
 Twelve-digit account IDs in every kept string become `acct_` and 8 hex digits of their hash
 (ADR 0022). That is valid in an ID part, an env var name and an ARN, and two accounts stay
@@ -139,6 +140,7 @@ class TrailEvent:
     event_time: datetime
     role_name: str | None
     event_type: str | None = None  # `AwsApiCall` is a call; `AwsServiceEvent` is not
+    error_code: str | None = None  # set when the call failed or was refused
 
 
 # --- helpers -------------------------------------------------------------------------------
@@ -322,22 +324,24 @@ def clean_manifest(raw: Mapping[str, Any]) -> CollectedManifest | None:
 
 @_guarded("trail event")
 def clean_trail_event(raw: Mapping[str, Any]) -> TrailEvent:
-    """Only the source, name, time and calling role survive: the rest of a CloudTrail event can
-    hold request parameters."""
+    """Only the source, name, time, calling role and error code survive: the rest of a CloudTrail
+    event, including `errorMessage`, can hold request parameters."""
     when = raw["EventTime"]
     if isinstance(when, str):
         when = datetime.fromisoformat(when)
-    role = event_type = None
+    role = event_type = error_code = None
     detail = raw.get("CloudTrailEvent")
     if isinstance(detail, str):
         parsed = json.loads(detail)
         issuer = parsed.get("userIdentity", {}).get("sessionContext", {}).get("sessionIssuer")
         role = _text(issuer["userName"]) if isinstance(issuer, Mapping) else None
         event_type = _text(parsed["eventType"]) if "eventType" in parsed else None
+        error_code = _text(parsed["errorCode"]) if parsed.get("errorCode") else None
     return TrailEvent(
         event_source=_text(raw["EventSource"]),
         event_name=_text(raw["EventName"]),
         event_time=when.astimezone(UTC),
         role_name=role,
         event_type=event_type,
+        error_code=error_code,
     )

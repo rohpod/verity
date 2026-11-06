@@ -231,12 +231,6 @@ def test_the_module_runs_as_a_script():
 REAL = Path(__file__).parents[2] / "content"
 
 
-def test_crawl_without_local_is_refused_and_names_m8(capsys):
-    assert cli.run(["crawl", "--content", str(REAL)]) == cli.REFUSED
-    err = capsys.readouterr().err
-    assert err.startswith("refused:") and "M8" in err
-
-
 def test_crawl_local_scores_the_fixture_and_assesses_it(capsys):
     assert cli.run(["crawl", "--local", "--content", str(REAL)]) == cli.OK
     out = capsys.readouterr().out

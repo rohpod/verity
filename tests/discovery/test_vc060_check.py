@@ -18,8 +18,10 @@ WHEN = datetime(2026, 11, 1, tzinfo=UTC)
 INVOKE, STREAM = "bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"
 
 
-def event(role, name="Converse", source="bedrock.amazonaws.com", kind="AwsApiCall") -> TrailEvent:
-    return TrailEvent(source, name, WHEN, role, kind)
+def event(
+    role, name="Converse", source="bedrock.amazonaws.com", kind="AwsApiCall", error=None
+) -> TrailEvent:
+    return TrailEvent(source, name, WHEN, role, kind, error)
 
 
 def granted(*statements):
@@ -163,3 +165,19 @@ def test_usage_records_are_a_signal_but_never_part_of_the_vc060_check():
     assert usage_shows_ai([record]) and not usage_shows_ai([])
     roles = [make_role("r", allow(INVOKE))]
     assert check_vc060(AI, roles, [], SOURCES).outcome == "fail"
+
+
+def test_a_refused_call_does_not_count_as_use():
+    role = make_role("r", allow("bedrock:InvokeModel"))
+    refused = event("r", name="InvokeModel", error="AccessDenied")
+    result = check_vc060(AI, [role], [refused], SOURCES)
+    assert result.outcome == "fail"
+    assert result.unused == (INVOKE,)
+    assert not trail_shows_ai("r", [refused], SOURCES)
+
+
+def test_a_successful_call_still_proves_use_beside_a_failed_one():
+    role = make_role("r", allow("bedrock:InvokeModel"))
+    events = [event("r", name="InvokeModel", error="ThrottlingException"), event("r")]
+    assert check_vc060(AI, [role], events, SOURCES).outcome == "pass"
+    assert trail_shows_ai("r", events, SOURCES)

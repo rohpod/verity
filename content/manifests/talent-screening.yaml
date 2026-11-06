@@ -1,0 +1,3 @@
+system: sys:talent-screening
+resources:
+  - {type: lambda, name: talent-screening}

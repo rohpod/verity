@@ -1,3 +1,4 @@
+import dataclasses
 import hashlib
 import json
 import re
@@ -209,6 +210,14 @@ def test_a_trail_event_keeps_source_name_time_and_role_only():
     assert event.event_time == datetime(2026, 11, 1, tzinfo=UTC)
     assert event.event_type == "AwsApiCall"
     assert "prompt" not in repr(event)
+
+
+def test_a_trail_event_keeps_the_error_code_and_never_the_message():
+    event = clean_trail_event(trail_event("r", name="InvokeModel", error_code="AccessDenied"))
+    assert event.error_code == "AccessDenied"
+    assert "errorMessage" not in {f.name for f in dataclasses.fields(event)}
+    assert "must never be kept" not in repr(event)
+    assert clean_trail_event(trail_event("r")).error_code is None
 
 
 def test_a_trail_event_without_detail_has_no_role():

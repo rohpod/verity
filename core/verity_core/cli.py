@@ -35,7 +35,7 @@ from verity_core.graph.memory import InMemoryRepository
 from verity_core.model.enums import ImplementationStatus
 from verity_core.rules.status import ApplicabilityStatus
 
-OK, LINT_FAILED, UNREADABLE, REFUSED = 0, 1, 2, 3
+OK, LINT_FAILED, UNREADABLE, REFUSED, FAILED = 0, 1, 2, 3, 4
 PROGRESS_EVERY = 25
 _SEVERITY = {"high": 0, "medium": 1, "low": 2}
 
@@ -258,16 +258,36 @@ def _print_crawl(report: CrawlReport, fixture: Path, *, verbose: bool) -> None:
         print("run summary: " + ", ".join(f"{k}={v}" for k, v in sorted(report.summary.items())))
 
 
+def _crawl_deployed() -> int:
+    """Runs the deployed `verity-crawler` and prints the counts it returns (ADR 0025, decision
+    2). A failure prints its kind and nothing from the payload or the response."""
+    # Imported here so a local crawl needs no AWS libraries.
+    from verity_core.discovery import aws
+
+    print("invoking the deployed crawler in eu-north-1 (it reads the account and writes the graph)")
+    try:
+        result = aws.invoke_crawler()
+    except aws.CrawlerFailed as exc:
+        print(f"the crawl failed: {exc}. See the function's log group.", file=sys.stderr)
+        return FAILED
+    except Exception as exc:  # a client error can quote the request: print the type only
+        print(f"could not run the crawler: {type(exc).__name__}", file=sys.stderr)
+        return FAILED
+    print("data source: the account, discovered by the deployed crawler")
+    for key in ("functions", "candidates", "changes", "manifests_invalid"):
+        print(f"{key}: {result.get(key)}")
+    print("likelihood: " + ", ".join(f"{k}={v}" for k, v in result.get("likelihood", {}).items()))
+    written = ", ".join(f"{n} {kind}" for kind, n in result.get("written", {}).items())
+    print(f"crawl wrote: {written or 'nothing'}")
+    print("run summary: " + ", ".join(f"{k}={v}" for k, v in result.get("summary", {}).items()))
+    return OK
+
+
 def cmd_crawl(args: argparse.Namespace) -> int:
-    """Crawls a recorded fixture into a fresh in-memory graph, then assesses it. Only `full`
-    crawls exist, and the live path needs the deployed crawler (M8, ADR 0021)."""
+    """Without `--local`, runs the deployed crawler. With it, crawls a recorded fixture into a
+    fresh in-memory graph, then assesses it. Only `full` crawls exist."""
     if not args.local:
-        print(
-            "refused: a live crawl needs the deployed crawler, which arrives in M8. Use --local "
-            "to crawl the recorded fixture; it reads nothing from AWS.",
-            file=sys.stderr,
-        )
-        return REFUSED
+        return _crawl_deployed()
     loaded = _load_and_lint(args.content, args.tenant)
     if isinstance(loaded, int):
         return loaded
@@ -373,7 +393,8 @@ def build_parser() -> argparse.ArgumentParser:
     crawl_parser.add_argument(
         "--local",
         action="store_true",
-        help="crawl a recorded fixture into a fresh in-memory graph; reads nothing from AWS",
+        help="crawl a recorded fixture into a fresh in-memory graph; reads nothing from AWS. "
+        "Without it, the deployed crawler runs",
     )
     crawl_parser.add_argument(
         "--fixture",
