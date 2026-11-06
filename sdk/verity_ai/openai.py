@@ -19,7 +19,7 @@ Signer = Callable[[str, str, bytes, dict], dict]
 # method, url, body, headers, timeout -> status, response body
 Transport = Callable[[str, str, bytes, dict, float], tuple[int, bytes]]
 
-TIMEOUT = 8.0
+TIMEOUT = 5.0
 _URL_SUFFIX = ".lambda-url.eu-north-1.on.aws"
 
 
@@ -39,13 +39,25 @@ def check_base_url(base_url: str) -> str:
     return base_url.rstrip("/")
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """A redirect would send the signed headers to a host the guard never checked."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+_opener = urllib.request.build_opener(_NoRedirect)
+
+
 def urllib_transport(method: str, url: str, body: bytes, headers: dict, timeout: float):
     request = urllib.request.Request(url, data=body, headers=headers, method=method)
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        with _opener.open(request, timeout=timeout) as response:
             return response.status, response.read()
     except urllib.error.HTTPError as error:
-        return error.code, b""
+        return error.code, b""  # includes a 3xx, which is not followed
+    except (urllib.error.URLError, TimeoutError):
+        raise AdapterError(None) from None
 
 
 class OpenAICompatible:
@@ -69,6 +81,10 @@ class OpenAICompatible:
         status, payload = self._transport("POST", url, body, headers, TIMEOUT)
         if status != 200:
             raise AdapterError(status)
-        response = json.loads(payload)
-        notify(self._usage, response["usage"]["total_tokens"])
+        try:
+            response = json.loads(payload)
+            tokens = response["usage"]["total_tokens"]
+        except (ValueError, KeyError, TypeError):
+            raise AdapterError(status) from None  # the body may hold personal data
+        notify(self._usage, tokens)
         return response

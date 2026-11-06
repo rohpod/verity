@@ -70,7 +70,7 @@ def run(event: dict, model: dict) -> dict:
 
 @functools.cache
 def _model() -> dict:
-    logging.getLogger().setLevel(os.environ.get("LOG_LEVEL", "INFO"))
+    log.setLevel(os.environ.get("LOG_LEVEL", "INFO"))
     path = Path(__file__).parent / os.environ["COEFFICIENTS_FILE"]
     return json.loads(path.read_text())
 

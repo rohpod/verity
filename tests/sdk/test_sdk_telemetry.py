@@ -75,3 +75,25 @@ def test_a_sink_that_raises_does_not_fail_the_call(clock):
 def test_a_bad_token_count_is_refused_by_the_record(clock):
     with pytest.raises(ValueError):
         recorder(InMemoryRepository(TENANT, clock), clock)(-1)
+
+
+def test_the_default_usage_client_gives_up_inside_the_budget(monkeypatch):
+    from verity_core.graph.dynamodb import client
+
+    made = {}
+    monkeypatch.setattr(client.boto3, "client", lambda *a, **kw: made.update(kw) or object())
+    client.usage_client()
+    config = made["config"]
+    assert config.retries == {"mode": "standard", "total_max_attempts": 2}
+    assert (config.connect_timeout, config.read_timeout) == (0.5, 1)
+    worst = config.retries["total_max_attempts"] * (config.connect_timeout + config.read_timeout)
+    assert worst < client.USAGE_BUDGET_SECONDS
+
+
+def test_the_repository_keeps_the_graph_clients_retries(monkeypatch):
+    from verity_core.graph.dynamodb import client
+
+    made = {}
+    monkeypatch.setattr(client.boto3, "client", lambda *a, **kw: made.update(kw) or object())
+    client.default_client()
+    assert made["config"].retries["total_max_attempts"] == 10

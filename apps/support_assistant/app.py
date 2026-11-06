@@ -57,7 +57,7 @@ def _dependencies():
     from verity_ai.telemetry import UsageRecorder
     from verity_core.graph.dynamodb.usage import DynamoDBUsageSink
 
-    logging.getLogger().setLevel(os.environ.get("LOG_LEVEL", "INFO"))
+    logging.getLogger("verity_ai").setLevel(os.environ.get("LOG_LEVEL", "INFO"))
     sink = DynamoDBUsageSink(TENANT, table_name=os.environ["USAGE_TABLE"])
     usage = UsageRecorder(
         sink,
