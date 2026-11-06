@@ -17,14 +17,15 @@ Verity is built under a strict **zero-cost, AWS-only** constraint, so some thing
 
 | Component | Status |
 |---|---|
-| AWS resources (Lambda, DynamoDB, IAM, Scheduler) | **Real**, deployed via Terraform in one AWS account |
-| Discovery crawler | **Real**, read-only AWS APIs |
+| AWS resources (Lambda, DynamoDB, IAM, Scheduler) | **Real**, deployed with OpenTofu in one AWS account on the Free plan. The daily crawl schedule is `DISABLED` and has not run yet |
+| Discovery crawler | **Real**: read-only AWS APIs, writing only to its own table. It has been invoked by hand against the account; no scheduled run has happened yet |
 | Talent-screening ML model | **Real**, trained locally on **synthetic** data, with pure-Python inference |
 | Bedrock inference (support assistant) | **Simulated**: `mock-bedrock` has a Converse-API shape and labels itself. Bedrock is never invoked, and a test fails if a real client appears |
 | OpenAI API (contract insights, shadow summariser) | **Simulated**: `mock-openai` is an OpenAI-shaped Function URL that labels itself. The adapters refuse any other endpoint |
 | Usage records | Labelled **simulated**: they record calls to the mocks, and only for third-party models |
 | Company "Kestrel Cloud Ltd", its people and ~25 extra AI systems | **Fictional / synthetic** |
-| Public demo | **Static snapshot** of the real graph, account IDs redacted |
+| Human sign-offs and decisions (L4 attestations, the DPA document, two risk tiers) | **Simulated**: made by fictional people, marked `simulated: true`, and shown as *simulated sign-off* |
+| Public demo | **Planned: a static snapshot** of the live graph with the account ID redacted. The export and the dashboard are built and tested on a recorded fixture, but no live snapshot has been exported or reviewed, and nothing is published |
 
 ## Documentation
 - [Stage 1: Product discovery](docs/stage-1-discovery.md)
