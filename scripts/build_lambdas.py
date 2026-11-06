@@ -121,11 +121,11 @@ def collect(root: Path, prefix: str = "", pathspecs: tuple[str, ...] = (".",)) -
 
 
 def vendored_files(vendored: Path) -> dict[str, Path]:
-    """The installed wheels, without caches, console scripts or `*.dist-info` metadata."""
+    """The installed wheels, without caches, console scripts, uv's `.lock` or `*.dist-info`."""
     found = {}
     for path in sorted(vendored.rglob("*")):
         parts = path.relative_to(vendored).parts
-        if path.is_dir() or parts[0] == "bin" or "__pycache__" in parts:
+        if path.is_dir() or parts[0] == "bin" or "__pycache__" in parts or path.name == ".lock":
             continue
         if any(p.endswith(".dist-info") for p in parts):
             continue
