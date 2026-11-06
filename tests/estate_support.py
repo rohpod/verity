@@ -46,3 +46,17 @@ def url_transport(handler):
         return response["statusCode"], response["body"].encode()
 
     return transport
+
+
+def imported_modules(relative: str) -> set[str]:
+    """Top-level names an `app.py` imports, anywhere in the file, including inside functions."""
+    import ast
+
+    tree = ast.parse((ROOT / relative / "app.py").read_text())
+    found = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            found |= {a.name.split(".")[0] for a in node.names}
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            found.add(node.module.split(".")[0])
+    return found
