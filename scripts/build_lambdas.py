@@ -1,4 +1,4 @@
-"""Builds the seven Lambda zips into `.build/<function-name>.zip` (ADR 0023).
+"""Builds the nine Lambda zips into `.build/<function-name>.zip` (ADR 0023, ADR 0025).
 
 Run with: uv run python scripts/build_lambdas.py [--out .build]
 
@@ -7,8 +7,10 @@ would raise a false ChangeEvent. Entries are sorted, with a fixed timestamp and 
 `__pycache__` or `*.dist-info`. Source files come from `git ls-files`, so an untracked file cannot
 ship (an uncommitted edit to a tracked file still does: build from a clean tree before deploying).
 `pydantic` and everything it depends on are vendored, each at its `uv.lock` version, for arm64.
-Only the part of `verity_core` the functions import is included (ADR 0024). boto3 comes from the
-Lambda runtime. `networkx` and `yaml` are never included.
+Only the part of `verity_core` each function imports is included (ADR 0024), and the list is per
+function. The seven estate zips never carry `networkx` or `yaml`. `verity-crawler` carries both,
+with the 44 modules it imports and `rules/ai_signals.yaml` only (ADR 0025, decision 1).
+`verity-probe` carries the few modules it needs. boto3 comes from the Lambda runtime.
 """
 
 import argparse
@@ -17,6 +19,7 @@ import sys
 import tempfile
 import tomllib
 import zipfile
+from dataclasses import dataclass, field
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -24,37 +27,131 @@ FIXED_TIME = (1980, 1, 1, 0, 0, 0)
 FILE_MODE = 0o644 << 16
 SKIP_DIRS = {"__pycache__", "training"}
 
-# function name -> (source directory, extra packages)
-FUNCTIONS = {
-    "support-assistant": ("apps/support_assistant", ("verity_ai", "verity_core", "pydantic")),
-    "talent-screening": ("apps/talent_screening", ()),
-    "contract-insights": ("apps/contract_insights", ("verity_ai", "verity_core", "pydantic")),
-    "shadow-summariser": ("apps/shadow_summariser", ("verity_ai",)),
-    "invoice-renderer": ("apps/invoice_renderer", ()),
-    "mock-bedrock": ("mocks/mock_bedrock", ()),
-    "mock-openai": ("mocks/mock_openai", ()),
-}
-PACKAGE_SOURCES = {
-    "verity_ai": ROOT / "sdk" / "verity_ai",
-    "verity_core": ROOT / "core" / "verity_core",
-}
+
+@dataclass(frozen=True)
+class Spec:
+    """What goes in one zip. `files` maps an archive name to a tracked file, for a function whose
+    source is not a folder of its own `app.py`. `core` lists the `verity_core` paths (`None` for
+    none), `vendor` the packages whose locked closures are installed for arm64."""
+
+    source: str | None = None
+    packages: tuple[str, ...] = ()
+    core: tuple[str, ...] | None = None
+    vendor: tuple[str, ...] = ()
+    files: dict[str, str] = field(default_factory=dict)
+
+
 # What `verity_core.graph.dynamodb.usage` imports, and nothing else. The rest needs networkx or
 # yaml, and an edit to it would change two functions' hashes for no reason. A test runs the
 # handlers from the built zip, so a file missing from this list fails there.
-CORE_FILES = {
-    "verity_core": (
-        "__init__.py",
-        "model/*.py",
-        "graph/__init__.py",
-        "graph/errors.py",
-        "graph/planning.py",
-        "graph/dynamodb/__init__.py",
-        "graph/dynamodb/client.py",
-        "graph/dynamodb/items.py",
-        "graph/dynamodb/keys.py",
-        "graph/dynamodb/table.py",
-        "graph/dynamodb/usage.py",
-    )
+APP_CORE = (
+    "__init__.py",
+    "model/*.py",
+    "graph/__init__.py",
+    "graph/errors.py",
+    "graph/planning.py",
+    "graph/dynamodb/__init__.py",
+    "graph/dynamodb/client.py",
+    "graph/dynamodb/items.py",
+    "graph/dynamodb/keys.py",
+    "graph/dynamodb/table.py",
+    "graph/dynamodb/usage.py",
+)
+# What `crawler/probe.py` imports. Found by importing it and listing `sys.modules`.
+PROBE_CORE = (
+    "__init__.py",
+    "graph/__init__.py",
+    "graph/dynamodb/__init__.py",
+    "graph/dynamodb/client.py",
+    "graph/dynamodb/keys.py",
+    "graph/dynamodb/probe.py",
+    "model/__init__.py",
+    "model/base.py",
+    "model/edges.py",
+    "model/enums.py",
+    "model/ids.py",
+)
+# What `crawler/handler.py` imports (44 modules, ADR 0025). Found the same way, and written out so
+# that a new import fails a test instead of silently growing the zip.
+CRAWLER_CORE = (
+    "__init__.py",
+    "assess/__init__.py",
+    "assess/freshness.py",
+    "content/__init__.py",
+    "content/decisions.py",
+    "content/loader.py",
+    "content/org.py",
+    "content/schema.py",
+    "content/yamlio.py",
+    "discovery/__init__.py",
+    "discovery/aws.py",
+    "discovery/boundary.py",
+    "discovery/collectors.py",
+    "discovery/correlate.py",
+    "discovery/diff.py",
+    "discovery/names.py",
+    "discovery/persist.py",
+    "discovery/pipeline.py",
+    "discovery/relate.py",
+    "discovery/signals.py",
+    "discovery/usage.py",
+    "graph/__init__.py",
+    "graph/dynamodb/__init__.py",
+    "graph/dynamodb/client.py",
+    "graph/dynamodb/items.py",
+    "graph/dynamodb/keys.py",
+    "graph/dynamodb/repository.py",
+    "graph/dynamodb/table.py",
+    "graph/dynamodb/usage.py",
+    "graph/errors.py",
+    "graph/loader.py",
+    "graph/planning.py",
+    "graph/repository.py",
+    "graph/traversals.py",
+    "model/__init__.py",
+    "model/base.py",
+    "model/edges.py",
+    "model/enums.py",
+    "model/evidence.py",
+    "model/hashing.py",
+    "model/ids.py",
+    "model/nodes.py",
+    "model/usage.py",
+    "model/validation.py",
+)
+
+FUNCTIONS = {
+    "support-assistant": Spec(
+        "apps/support_assistant", ("verity_ai", "verity_core"), APP_CORE, ("pydantic",)
+    ),
+    "talent-screening": Spec("apps/talent_screening"),
+    "contract-insights": Spec(
+        "apps/contract_insights", ("verity_ai", "verity_core"), APP_CORE, ("pydantic",)
+    ),
+    "shadow-summariser": Spec("apps/shadow_summariser", ("verity_ai",)),
+    "invoice-renderer": Spec("apps/invoice_renderer"),
+    "mock-bedrock": Spec("mocks/mock_bedrock"),
+    "mock-openai": Spec("mocks/mock_openai"),
+    "verity-crawler": Spec(
+        packages=("verity_core",),
+        core=CRAWLER_CORE,
+        vendor=("pydantic", "networkx", "pyyaml"),
+        files={
+            "app.py": "crawler/handler.py",
+            "rules/ai_signals.yaml": "content/rules/ai_signals.yaml",
+        },
+    ),
+    "verity-probe": Spec(
+        packages=("verity_core",),
+        core=PROBE_CORE,
+        vendor=("pydantic",),
+        files={"app.py": "crawler/probe.py"},
+    ),
+}
+ESTATE_APPS = tuple(n for n, spec in FUNCTIONS.items() if spec.source)
+PACKAGE_SOURCES = {
+    "verity_ai": ROOT / "sdk" / "verity_ai",
+    "verity_core": ROOT / "core" / "verity_core",
 }
 
 
@@ -79,8 +176,9 @@ def locked_closure(package: str) -> dict[str, str]:
     return dict(sorted(found.items()))
 
 
-def vendor_pydantic(target: Path) -> None:
-    """Linux arm64 wheels of pydantic and its dependencies, each at its locked version."""
+def vendor(target: Path, packages: tuple[str, ...] = ("pydantic",)) -> None:
+    """Linux arm64 wheels of the packages and what they depend on, each at its locked version."""
+    closure = {n: v for package in packages for n, v in locked_closure(package).items()}
     subprocess.run(
         [
             "uv", "pip", "install",
@@ -89,7 +187,7 @@ def vendor_pydantic(target: Path) -> None:
             "--only-binary", ":all:",
             "--no-deps",
             "--target", str(target),
-            *(f"{name}=={version}" for name, version in locked_closure("pydantic").items()),
+            *(f"{name}=={version}" for name, version in sorted(closure.items())),
         ],
         check=True,
         capture_output=True,
@@ -143,25 +241,32 @@ def write_zip(target: Path, entries: dict[str, Path]) -> None:
             archive.writestr(info, entries[name].read_bytes(), compresslevel=9)
 
 
+def entries_for(spec: Spec, vendored: dict[tuple[str, ...], Path]) -> dict[str, Path]:
+    entries = collect(ROOT / spec.source) if spec.source else {}
+    for archive_name, relative in spec.files.items():
+        path = ROOT / relative
+        (found,) = collect(path.parent, pathspecs=(path.name,)).values()  # tracked, or it fails
+        entries[archive_name] = found
+    for package in spec.packages:
+        pathspecs = (spec.core or (".",)) if package == "verity_core" else (".",)
+        entries |= collect(PACKAGE_SOURCES[package], f"{package}/", pathspecs)
+    if spec.vendor:
+        entries |= vendored_files(vendored[spec.vendor])
+    return entries
+
+
 def build(out: Path) -> dict[str, Path]:
     out.mkdir(parents=True, exist_ok=True)
     zips = {}
     with tempfile.TemporaryDirectory() as scratch:
-        vendored = Path(scratch)
-        if any("pydantic" in extra for _, extra in FUNCTIONS.values()):
-            vendor_pydantic(vendored)
-        for name, (source, extra) in FUNCTIONS.items():
-            entries = collect(ROOT / source)
-            for package in extra:
-                if package == "pydantic":
-                    continue
-                entries |= collect(
-                    PACKAGE_SOURCES[package], f"{package}/", CORE_FILES.get(package, (".",))
-                )
-            if "pydantic" in extra:
-                entries |= vendored_files(vendored)
+        vendored = {}
+        for index, packages in enumerate(sorted({spec.vendor for spec in FUNCTIONS.values()})):
+            if packages:
+                vendored[packages] = Path(scratch) / str(index)
+                vendor(vendored[packages], packages)
+        for name, spec in FUNCTIONS.items():
             zips[name] = out / f"{name}.zip"
-            write_zip(zips[name], entries)
+            write_zip(zips[name], entries_for(spec, vendored))
     return zips
 
 
