@@ -1141,6 +1141,50 @@
       "title": "SnapshotDataset",
       "type": "object"
     },
+    "SnapshotDecisionCommit": {
+      "additionalProperties": false,
+      "description": "The commit that introduced a decision file (ADR 0029, decision 9). Null in a fixture\nexport, which runs no git; a live export refuses if one is missing.",
+      "properties": {
+        "commit_sha": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Commit Sha"
+        },
+        "decision_file": {
+          "title": "Decision File",
+          "type": "string"
+        },
+        "decision_id": {
+          "title": "Decision Id",
+          "type": "string"
+        },
+        "file_sha256": {
+          "title": "File Sha256",
+          "type": "string"
+        },
+        "source": {
+          "const": "derived",
+          "default": "derived",
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "decision_id",
+        "decision_file",
+        "file_sha256",
+        "commit_sha"
+      ],
+      "title": "SnapshotDecisionCommit",
+      "type": "object"
+    },
     "SnapshotDepartment": {
       "additionalProperties": false,
       "properties": {
@@ -2894,6 +2938,13 @@
       "title": "Crosswalk",
       "type": "array"
     },
+    "decision_commits": {
+      "items": {
+        "$ref": "#/$defs/SnapshotDecisionCommit"
+      },
+      "title": "Decision Commits",
+      "type": "array"
+    },
     "edges": {
       "items": {
         "discriminator": {
@@ -3072,7 +3123,8 @@
     "control_results",
     "obligations",
     "provider_impact",
-    "crosswalk"
+    "crosswalk",
+    "decision_commits"
   ],
   "title": "Snapshot",
   "type": "object"

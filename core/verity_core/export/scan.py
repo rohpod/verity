@@ -6,8 +6,8 @@ walks every key and every value. A hit means nothing is written.
 
 Each text is read as it stands, percent-decoded and Unicode-normalised, and matching ignores
 case, so a value cannot pass by its spelling. Only a value that is exactly a hash is exempt from
-the digit rule: a 64-hex value under a hash key, or an Evidence or ChangeEvent ID of exactly its
-shape.
+the digit rule: a 64-hex value under a hash key, a 40-hex commit SHA under `commit_sha`, or an
+Evidence or ChangeEvent ID of exactly its shape.
 
 It reports the category and the JSON path of a hit, never the value. A dict key can be the
 sensitive value, so a key appears in a path only if the key itself scans clean.
@@ -37,6 +37,7 @@ _GROUPED_DIGITS = re.compile(r"(?<!\d)\d{4}[- ]\d{4}[- ]\d{4}(?!\d)")
 _THE_PLACEHOLDER = "000000000000"
 _HASH_KEYS = frozenset({"sha256", "file_sha256"})
 _A_HASH = re.compile(r"[0-9a-f]{64}")
+_A_COMMIT = re.compile(r"[0-9a-f]{40}")
 _AN_EVIDENCE_ID = re.compile(r"ev:[0-9a-f]{32}")
 _A_CHANGE_ID = re.compile(r"chg:\d{8}T\d{6}\.\d{6}Z:[0-9a-f]{16}")
 _DIGEST_TEXT = re.compile(r"acct[_-]?[0-9a-f]{8}", re.IGNORECASE)
@@ -102,6 +103,8 @@ def _forms(text: str) -> list[str]:
 def _exempt_from_digits(text: str, key: str) -> bool:
     if _AN_EVIDENCE_ID.fullmatch(text) or _A_CHANGE_ID.fullmatch(text):
         return True
+    if key == "commit_sha":
+        return _A_COMMIT.fullmatch(text) is not None
     return key in _HASH_KEYS and _A_HASH.fullmatch(text) is not None
 
 
