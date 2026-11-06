@@ -45,6 +45,7 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/). Decisions by the owner:
 | D27 | M7 demo estate: layered `verity_ai`, corrected crawl fixture, runtime refusal of real endpoints, pure-Python talent model, deterministic zips. See [ADR 0023](adr/0023-m7-demo-estate.md) |
 | D28 | M7 review fixes: bounded telemetry, quiet AWS logs, a usage partition, reproducible zips, input ranges, a permissions boundary in M8. See [ADR 0024](adr/0024-m7-review-fixes.md) |
 | D29 | M8 deploy: the crawler function, refused CloudTrail events prove nothing, simulator proof of the boundary, a real refused write, a fixture-shaped estate. See [ADR 0025](adr/0025-m8-deploy-and-crawl.md) |
+| D30 | M8 cold start: bytecode in the zips that vendor packages, 512 MB for the apps that load pydantic and for the probe. See [ADR 0026](adr/0026-m8-cold-start.md) |
 
 ## Milestones
 
