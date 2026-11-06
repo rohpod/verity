@@ -1,0 +1,36 @@
+{
+  "model_id": "model:screening-lr",
+  "model_version": "1.0.0",
+  "synthetic_training_data": true,
+  "seed": 20261106,
+  "feature_names": [
+    "years_experience",
+    "skills_match",
+    "assessment_score",
+    "certifications",
+    "relevant_projects"
+  ],
+  "means": [
+    9.955,
+    0.5071593750000001,
+    65.65125,
+    2.564375,
+    5.035625
+  ],
+  "scales": [
+    5.905757783722595,
+    0.28498968222482957,
+    20.373963125457443,
+    1.701354125211731,
+    3.1516830201298833
+  ],
+  "coefficients": [
+    0.7041408626460806,
+    0.9239612317607876,
+    0.6407880859554809,
+    0.47607810387298216,
+    0.49907419430195094
+  ],
+  "intercept": 0.26880703950433354,
+  "auc": 0.8204602774274905
+}
