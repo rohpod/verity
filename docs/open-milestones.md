@@ -43,11 +43,15 @@ Stage 4 showed ⬜ until this page was added, which understated it: everything e
 
 **To close:**
 1. Approve L15, then run it from a clean, current `main`: rebuild the zips, then `tofu plan` and `tofu apply` with `-var schedule_state=ENABLED`. Plain `tofu apply` sets the schedule back to `DISABLED`, so always pass the variable.
-2. Check the plan. It should change the schedule and also update the crawler, because the `trail_shows_ai` fix merged after L16. Anything beyond that is a stop.
+2. Check the plan. It should change the schedule and update the code of **three** functions, and nothing else:
+   - `verity-crawler`, because the `trail_shows_ai` fix (`discovery/pipeline.py`, `discovery/usage.py`) and `graph/traversals.py` changed after L16, and PR 65 added `AWS_ERRORS` to `graph/dynamodb/client.py`.
+   - `support-assistant` and `contract-insights`, only because of that PR 65 change: both zips bundle `graph/dynamodb/client.py` (`APP_CORE` in `scripts/build_lambdas.py`), and nothing else in them changed.
+
+   Anything beyond that is a stop. In particular `talent-screening`, `shadow-summariser`, `invoice-renderer`, `mock-bedrock` and `mock-openai` bundle none of the changed files, so their code hashes must not move. `verity-probe`'s zip also bundles `client.py`, but the probe is destroyed (`enable_probe = false`), so it is not in the plan and the crawler never sees it. This list comes from reading `build_lambdas.py` and git history, not from a plan or a live table: the `tofu plan` output decides.
 3. The next day, confirm exactly one new run with `finished_at` set.
 4. At least 24 hours after that run, the owner reads the credits. Record the results in a new ADR and mark M8 ✅.
 
-**The new crawler changes the data.** Its code hash differs, so the first scheduled run is expected to record a ChangeEvent and new evidence for it. That is why [ADR 0029](adr/0029-m9-snapshot-export.md) decision 13 holds the snapshot until M8 closes. It also means `verity assess --target dynamodb` must run before the export.
+**The new code changes the data.** The three functions' code hashes differ, so the first scheduled run is expected to record **three** ChangeEvents (one each for `verity-crawler`, `support-assistant` and `contract-insights`), with new evidence for each, not one. If the run's summary shows `resources_changed` other than 3, stop and compare it with the plan. That is why [ADR 0029](adr/0029-m9-snapshot-export.md) decision 13 holds the snapshot until M8 closes. It also means `verity assess --target dynamodb` must run before the export.
 
 **This has a deadline.** Crawler evidence lasts 30 days, and only a crawl renews it. With the schedule off, the evidence from 2026-11-06 starts expiring around 29 Nov and goes stale around 6 Dec.
 
