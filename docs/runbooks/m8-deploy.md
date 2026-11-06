@@ -10,7 +10,7 @@ Prices (read 2026-11-06, ADR 0025): Lambda, including Function URLs, is inside t
 |---|---|---|---|---|
 | L0 | **Owner** reads credits in the Billing console | Not `aws ce`: Cost Explorer charges per request | Baseline recorded | n/a |
 | L1 | Clean tree, current `main`, build | `git status`, `git pull --ff-only`, `uv run python scripts/build_lambdas.py`, `shasum -a 256 .build/*.zip` | Empty `git status`. Record each zip's SHA-256 | n/a |
-| L2 | APPROVE: seed the graph | `uv run verity seed --target dynamodb` | Time it. Do not run a second seed | `tofu destroy` removes the table and its data |
+| L2 | APPROVE: seed the graph | `uv run verity seed --target dynamodb` | Time it (measured 649 s on 2026-11-06). Do not run a second seed | `tofu destroy` removes the table and its data |
 | L3 | Plan, shown to the owner in full | `cd infra && tofu plan -var enable_probe=true` | Only approved types. Nothing changes in `module.table` or `module.guardrails`. No table replacement | n/a |
 | L4 | APPROVE: create the estate | `tofu apply -var enable_probe=true` (schedule stays `DISABLED`) | All resources created | `tofu destroy -target=module.estate` |
 | L5 | APPROVE: invoke each of the 5 apps once | `aws lambda invoke --function-name <name> --cli-binary-format raw-in-base64-out --payload file://event.json out.json` with the events in `tests/build/test_zip_handlers.py` | All return. Exactly 2 usage items under `T#kestrel#U#`. Proves the arm64 `pydantic_core` and the SigV4 signing name `lambda` | n/a (2 small items) |
@@ -20,9 +20,9 @@ Prices (read 2026-11-06, ADR 0025): Lambda, including Function URLs, is inside t
 | L9 | APPROVE: simulate the boundary | `aws iam simulate-principal-policy --policy-source-arn <support-assistant-role> --action-names bedrock:InvokeModel`, then again with `--permissions-boundary-policy-input-list` set to an allow-all policy | Deny from the boundary (`PermissionsBoundaryDecisionDetail`), then allow with the control. The simulator calls no Bedrock API | n/a |
 | L10 | APPROVE: remove the probe | `tofu apply -var enable_probe=false` | Probe gone before any crawl | n/a |
 | L11 | APPROVE: first crawl | `uv run verity crawl` | Classifications below | n/a |
-| L12 | APPROVE: assess | `uv run verity assess --target dynamodb` | 29 high findings, or stop. Time it against the 6.6-minute estimate | n/a |
+| L12 | APPROVE: assess | `uv run verity assess --target dynamodb` | 29 high findings, or stop. Time it (measured 41 min on 2026-11-06, against a 6.6-minute estimate) | n/a |
 | L13 | APPROVE: second crawl | `uv run verity crawl` | Writes only the run. Record `largest_evidence_bytes` and the scan's time | n/a |
-| L14 | Check CloudTrail | `aws cloudtrail lookup-events --lookup-attributes AttributeKey=EventSource,AttributeValue=bedrock.amazonaws.com` | No events | n/a |
+| L14 | Check CloudTrail | `aws cloudtrail lookup-events --lookup-attributes AttributeKey=EventSource,AttributeValue=bedrock.amazonaws.com` | No `Invoke*` or `Converse*` events. Resource Explorer's own `List*` calls appear (7 on 2026-11-06) and are not use (ADR 0027) | n/a |
 | L15 | APPROVE: enable the schedule | `tofu apply -var schedule_state=ENABLED` | Next day: one run, `finished_at` set | Apply with `DISABLED` |
 | L16 | APPROVE each: rebuild test | `tofu destroy -target=module.estate`, then `tofu apply`, then a crawl | Table and budget untouched. Same zip hashes. High findings hold | n/a |
 | L17 | **Owner** reads credits at least 24 hours after the last write | Billing console | Unchanged | n/a |
