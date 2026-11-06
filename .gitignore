@@ -49,3 +49,8 @@ override.tf.json
 .DS_Store
 .idea/
 .vscode/
+
+# The dashboard's recorded fixture and test output. A fixture must never be committed or published.
+web/.fixture/
+web/test-results/
+web/playwright-report/

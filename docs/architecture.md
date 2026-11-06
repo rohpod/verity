@@ -402,6 +402,8 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
   5. Controls & evidence, showing the assurance ladder
   6. Graph explorer, with an "impact of…" mode
 - Every view shows provenance badges and the snapshot timestamp.
+- **How it is built (M10, [ADR 0031](adr/0031-m10-dashboard.md)):** one loader fetches `${BASE_URL}data/snapshot.json`, and a Content-Security-Policy with `connect-src 'self'` enforces it. The UI derives no governance result: it joins, filters and counts what the snapshot holds. Only audit trails and `stale_by_change` follow edges in TypeScript, and each is tested against Python. A fixture is served by a development-only Vite plugin and a build holds no snapshot.
+- **Hosting:** `.github/workflows/pages.yml` runs on pushes to `main` that touch `web/` or `core/`. It skips with a notice while `web/public/data/snapshot.json` is missing. Otherwise it builds, copies the snapshot in, runs `verity export --check --require-live` on the exact bytes to publish, and deploys. `pages: write` and `id-token: write` are on the deploy job only. No secrets, no AWS credentials. Pages is set to `build_type: workflow`. The deploy path is proved only when a live snapshot exists (M10 closes then).
 
 **Security:**
 
@@ -448,6 +450,7 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
 | [0028](adr/0028-m8-review.md) | M8 review: seed and assess time came from credential refreshes, the schedule and credit steps reworded, boundary claims matched to the evidence |
 | [0029](adr/0029-m9-snapshot-export.md) | M9 export: listed public fields, rebuilt hashes for redacted Evidence, an independent fail-closed scanner, a generated contract |
 | [0030](adr/0030-m9-redaction-review.md) | M9 redaction review: scan before writing, listed Evidence content and tags, a stricter scanner, a header that names what is not real |
+| [0031](adr/0031-m10-dashboard.md) | M10 dashboard: one data path, no governance derived in the UI, a build that cannot carry a fixture |
 
 ## L. Schema validation walkthrough
 

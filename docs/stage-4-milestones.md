@@ -49,6 +49,7 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/) · [why M3, M8 and M9 ar
 | D31 | M8 review: seed and assess time came from credential refreshes, the schedule and credit steps reworded, boundary claims matched to the evidence. See [ADR 0028](adr/0028-m8-review.md) |
 | D32 | M9 export: listed public fields, rebuilt hashes for redacted Evidence, an independent fail-closed scanner, a generated contract. See [ADR 0029](adr/0029-m9-snapshot-export.md) |
 | D33 | M9 redaction review: scan before writing, listed Evidence content and tags, a stricter scanner, a header that names what is not real. See [ADR 0030](adr/0030-m9-redaction-review.md) |
+| D34 | M10 dashboard: one data path, no governance derived in the UI, a build that cannot carry a fixture. See [ADR 0031](adr/0031-m10-dashboard.md) |
 
 ## Milestones
 
@@ -69,7 +70,7 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/) · [why M3, M8 and M9 ar
 | M8 | Deploy and first live crawl: Lambda modules, schedule, SSM manifests, guardrails | Opus (IAM), Sonnet | **yes, approval per apply** | 🔄 |
 | **Public demo** | | | | |
 | M9 | Snapshot export, redaction, schema, generated TS types | Sonnet; Opus reviews redaction | no | 🔄 |
-| M10 | Dashboard in three slices, GitHub Pages | Sonnet | no | ⬜ |
+| M10 | Dashboard in three slices, GitHub Pages | Sonnet | no | 🔄 |
 | M11 | Stage close: security review, ADR review, final snapshot by 1 Apr 2027, teardown decision | Opus | teardown/refresh only | ⬜ |
 
 ## Validation criteria

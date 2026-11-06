@@ -1,8 +1,56 @@
 {
   "name": "verity-web",
   "private": true,
-  "description": "Only what the snapshot type generation needs. The dashboard (M10) adds the rest.",
+  "description": "The Verity dashboard (M10). It reads snapshot.json only (ADR 0031), and generates the snapshot types (ADR 0029).",
+  "type": "module",
+  "scripts": {
+    "fixture": "cd .. && uv run verity export --local --as-of 2026-11-06T00:00:00+00:00 --out web/.fixture/snapshot.json",
+    "parity": "cd .. && uv run python scripts/write_ui_fixtures.py",
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "e2e": "playwright test",
+    "check:dist": "node scripts/check-dist.mjs dist"
+  },
+  "dependencies": {
+    "@radix-ui/react-slot": "1.5.0",
+    "@radix-ui/react-tabs": "1.2.1",
+    "@tanstack/react-table": "8.21.3",
+    "class-variance-authority": "0.7.1",
+    "clsx": "2.1.1",
+    "cytoscape": "3.34.4",
+    "cytoscape-fcose": "2.2.0",
+    "lucide-react": "0.577.0",
+    "minisearch": "7.2.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "react-router-dom": "7.18.5",
+    "recharts": "3.10.1",
+    "tailwind-merge": "3.7.0"
+  },
   "devDependencies": {
-    "json-schema-to-typescript": "16.0.0"
+    "@eslint/js": "9.39.5",
+    "@playwright/test": "1.65.0",
+    "@tailwindcss/vite": "4.3.5",
+    "@testing-library/jest-dom": "6.10.0",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.1",
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "5.2.0",
+    "eslint": "9.39.5",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "16.5.0",
+    "jsdom": "26.1.0",
+    "json-schema-to-typescript": "16.0.0",
+    "tailwindcss": "4.3.5",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.72.1",
+    "vite": "7.3.7",
+    "vitest": "5.1.0"
   }
 }
