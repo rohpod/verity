@@ -15,4 +15,7 @@ updates:
     directory: /infra
     schedule:
       interval: weekly
-# npm (web/) is added by the milestone that creates that directory.
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly

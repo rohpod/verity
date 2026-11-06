@@ -1,0 +1,8 @@
+{
+  "name": "verity-web",
+  "private": true,
+  "description": "Only what the snapshot type generation needs. The dashboard (M10) adds the rest.",
+  "devDependencies": {
+    "json-schema-to-typescript": "16.0.0"
+  }
+}
