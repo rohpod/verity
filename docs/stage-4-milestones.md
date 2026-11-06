@@ -59,7 +59,7 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/). Decisions by the owner:
 | M4 | Content: hub controls, ~35 requirements, STRM mappings, Kestrel org, synthetic systems, `verity seed` | Sonnet builds the loader, linter, CLI and org data; Opus writes the regulatory content | no | ✅ |
 | M5 | Rules and assessment: applicability, status, assurance, satisfaction, `verity assess`, `verity attest` | Opus, then Sonnet | no | ✅ |
 | M6 | Discovery pipeline (8 stages), `ai_signals.yaml`, `verity crawl --local` | Sonnet | no | ✅ |
-| M7 | Demo estate code: mocks, `verity_ai` with SigV4 hook, 5 apps, local talent model | Sonnet | no | 🔄 |
+| M7 | Demo estate code: mocks, `verity_ai` with SigV4 hook, 5 apps, local talent model | Sonnet | no | ✅ |
 | **Live** | | | | |
 | M8 | Deploy and first live crawl: Lambda modules, schedule, SSM manifests, guardrails | Opus (IAM), Sonnet | **yes, approval per apply** | ⬜ |
 | **Public demo** | | | | |
@@ -135,6 +135,30 @@ The original criteria also hold. `shadow-summariser` scores *probable* and `invo
 
 Open for M8: the AI action list is checked against the IAM reference (below), because that page could not be read while building M6. The live path of the crawler has not run, and M6 proves it against `moto` and a stub only.
 
+## M7 close-out (2026-11-06)
+
+The end-of-milestone review reopened M7 until the fixes in [ADR 0024](adr/0024-m7-review-fixes.md) landed (#48). The re-review ran the review's experiments again on merged `main`, then added failure cases they had not covered, which found more gaps, fixed in #49. Everything ran from the built zips against a local fake with fake credentials. Nothing reached AWS.
+
+| Experiment | Before | After |
+|---|---|---|
+| DynamoDB throttled on `support-assistant` | Held the handler 37.1 s, past the 10 s timeout | Returns in about 1 s, 2 attempts, `usage_write_failed` logged |
+| `LOG_LEVEL=DEBUG`, root logger forced to `DEBUG` | Customer message and session token in the log | Nothing on stderr. A control run with the fix undone shows both canaries, so the check can fail |
+| Usage record location | In the system's node partition, beside `META` | `T#kestrel#U#sys:<system>`, 2 items, none in the node partition |
+| Redirect from the Function URL | Signed headers reached a second host | `AdapterError` with status 302, 0 requests to the second host |
+| `skills_match: 50`, `years_experience: -40` | Ranked first with a score of 1.0 | Refused, naming the feature and not the value |
+| Function URL drops the connection or truncates the body | `RemoteDisconnected`, `IncompleteRead` | `AdapterError` |
+| Lambda payload is not JSON, or stalls after the headers | `JSONDecodeError` holding the body, `ReadTimeoutError` | `AdapterError` |
+| DynamoDB hangs after a 4.5 s model call | Not tested | Returns in about 7.3 s, 2 attempts |
+| `.lock` in the two pydantic zips (introduced by #48) | Shipped | Gone |
+
+Undoing each fix in a throwaway clone fails a test, including the fixture's `LeadingKeys` condition, which no test covered before. The retrain reproduces `coefficients.json` and `golden.json`, with a holdout AUC of 0.8205.
+
+The original criteria hold. Adapter shape tests pass. A test fails if a real Bedrock client appears anywhere. Pure-Python inference matches scikit-learn within `1e-9`. The largest zip is 2.5 MB. Simulated components are labelled. `verity crawl --local` gives 29 high findings, and `verity assess` alone 27.
+
+One case is accepted: the model timeouts are per socket read, so a body that trickles in can pass the 10 s function timeout (12.3 s against a fake). The only server is our own mock, so no total deadline was added.
+
+Open for M8: nothing here has run on AWS. The arm64 `pydantic_core` has never been loaded, because the zip tests use the host's copy. `LeadingKeys`, the permissions boundary, the SigV4 signing name and cold start at 128 MB are all unproven and are in the notes below.
+
 ## Notes for later milestones
 
 Found while building and reviewing M1. Each is open until the named milestone closes it.
@@ -142,7 +166,6 @@ Found while building and reviewing M1. Each is open until the named milestone cl
 | Milestone | Note |
 |---|---|
 | M3 | Last open criterion: the owner re-reads credits in the Billing console at least 24 hours after the last live write (2026-11-05). M3 stays 🔄 until they match. The checks moto could not do are done ([ADR 0016](adr/0016-m3-live-results.md)) |
-| M7 | The end-of-milestone review keeps M7 open until the fixes in [ADR 0024](adr/0024-m7-review-fixes.md) land and the review's experiments pass again |
 | M8 | `load_graph` reads every `U#` usage record in the table and discards it. Demo usage volume is small, so measure the scan on the real table. If usage grows large, load without a scan: list nodes through the type index and read each node's partition |
 | M8 | Read `DiscoveryRun.summary.largest_evidence_bytes` from the first live crawl. Evidence over the 16 KB cap is summarised, never refused ([ADR 0021](adr/0021-m6-discovery.md)); decide whether the cap should rise |
 | M8 | Build `crawler/handler.py` and the live path of `verity crawl`. The CLI refuses it until then |
