@@ -191,13 +191,21 @@ class SignalRule(_Strict):
         return self
 
 
+class AiAction(_Strict):
+    """A real IAM action that invokes an AI model, and the CloudTrail event names that prove a
+    call to it. With no `trail_events`, event history cannot show the action (ADR 0022)."""
+
+    action: Annotated[str, Field(pattern=r"^[a-z0-9-]+:[A-Za-z0-9]+$")]
+    trail_events: list[NonEmpty] = Field(default_factory=list)
+
+
 class AiSignalsFile(_Strict):
     evidence_valid_days: int = Field(gt=0)
     evidence_refresh_days: int = Field(gt=0)
     trail_lookback_days: int = Field(gt=0)
     trail_event_sources: list[NonEmpty]
     platform_tag: NonEmpty
-    ai_actions: list[NonEmpty]
+    ai_actions: list[AiAction]
     signals: list[SignalRule]
 
     @model_validator(mode="after")

@@ -43,7 +43,7 @@ def relations(
         me = function_id(function.name)
         assumes.add((me, role_id(role.name)))
         for statement in role.statements:
-            if statement.effect != "Allow" or statement.negated:
+            if statement.effect != "Allow" or statement.not_resource:
                 continue
             for resource in statement.resources:
                 if resource == "*":

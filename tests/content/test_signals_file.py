@@ -18,7 +18,7 @@ def signals(**changes) -> dict:
         "trail_lookback_days": 90,
         "trail_event_sources": ["bedrock.amazonaws.com"],
         "platform_tag": "verity:component",
-        "ai_actions": ["bedrock:Invoke*"],
+        "ai_actions": [{"action": "bedrock:InvokeModel", "trail_events": ["Converse"]}],
         "signals": [
             {"id": "tag_system_id", "kind": "tag", "key": "ai:system-id", "likelihood": "declared"},
             {"id": "env", "kind": "env_name", "likelihood": "probable", "pattern": "^OPENAI_"},
@@ -133,3 +133,13 @@ def test_every_env_var_in_the_fixture_holds_the_canary():
         for v in f.get("Environment", {}).get("Variables", {}).values()
     }
     assert values == {"VERITY-CANARY-7f3a"}
+
+
+def test_lint_refuses_a_repeated_ai_action(tmp_path):
+    action = {"action": "bedrock:InvokeModel"}
+    assert "signal_duplicate_action" in codes(load(tmp_path, signals(ai_actions=[action, action])))
+
+
+def test_an_ai_action_must_be_a_real_action_name_and_not_a_pattern(tmp_path):
+    with pytest.raises(ContentError):
+        load(tmp_path, signals(ai_actions=[{"action": "bedrock:Invoke*"}]))

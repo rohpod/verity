@@ -120,10 +120,11 @@ def test_a_single_statement_dict_and_a_url_encoded_document_both_read():
     assert found.policies[1].statements[0].effect == "Deny"
 
 
-def test_not_action_statements_are_marked_negated():
-    statement = {"Effect": "Allow", "NotAction": "iam:*", "Resource": "*"}
+def test_not_action_and_not_resource_statements_are_marked():
+    statement = {"Effect": "Allow", "NotAction": "iam:*", "NotResource": "arn:x"}
     found = role(inline=[{"PolicyName": "p", "PolicyDocument": policy(statement)}])
-    assert found.statements[0].negated
+    assert (found.statements[0].not_action, found.statements[0].not_resource) == (True, True)
+    assert found.statements[0].actions == ("iam:*",)
 
 
 def test_an_unknown_effect_is_refused():
@@ -176,6 +177,7 @@ def test_a_trail_event_keeps_source_name_time_and_role_only():
         "support-assistant-role",
     )
     assert event.event_time == datetime(2026, 11, 1, tzinfo=UTC)
+    assert event.event_type == "AwsApiCall"
     assert "prompt" not in repr(event)
 
 

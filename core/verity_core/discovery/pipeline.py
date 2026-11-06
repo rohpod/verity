@@ -410,16 +410,22 @@ def _plan_evidence(
     by_name = {f.name: f for f in collected.functions}
     for system in sorted({s for link in found.values() for s in link.systems}):
         reached: dict[str, CollectedRole] = {}
+        unseen = 0
         sources: set[str] = set()
         for name in sorted(n for n, link in found.items() if system in link.systems):
             role = role_of(by_name[name], collected.roles)
-            if role is not None:
+            sources.add(function_id(name))
+            if role is None:
+                unseen += 1  # a later run that can see the role must check again
+            else:
                 reached[role.name] = role
-                sources |= {function_id(name), role_id(role.name)}
-        if not reached:
-            continue
+                sources.add(role_id(role.name))
         check = check_vc060(
-            rules.ai_actions, reached.values(), collected.trail_events, rules.trail_event_sources
+            rules.ai_actions,
+            reached.values(),
+            collected.trail_events,
+            rules.trail_event_sources,
+            unseen,
         )
         content = check.content(system)
         largest = max(largest, len(canonical_json(content).encode()))

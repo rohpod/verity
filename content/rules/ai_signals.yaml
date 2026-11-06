@@ -10,9 +10,20 @@ trail_lookback_days: 90 # CloudTrail event history keeps 90 days
 trail_event_sources: [bedrock.amazonaws.com]
 platform_tag: "verity:component" # the mocks and the crawler itself: never AI candidates
 
-# A granted IAM action counts as an AI action if it overlaps one of these, in either direction,
-# so a grant of `bedrock:*` or `*` covers them too.
-ai_actions: ["bedrock:Invoke*", "bedrock:Converse*", "sagemaker:InvokeEndpoint*"]
+# The IAM actions that invoke a model, by their real names (ADR 0022). A policy grants one if an
+# `Allow` statement's `Action` pattern matches it, or a `NotAction` statement's patterns do not.
+# `trail_events` are the CloudTrail event names that prove a call to it: Converse needs the
+# `bedrock:InvokeModel` permission, so a `Converse` event proves `bedrock:InvokeModel`. An action
+# with no events cannot be shown by event history, so a grant of it is inconclusive.
+ai_actions:
+  - {action: "bedrock:InvokeModel", trail_events: [InvokeModel, Converse]}
+  - {action: "bedrock:InvokeModelWithResponseStream", trail_events: [InvokeModelWithResponseStream, ConverseStream]}
+  - {action: "bedrock:InvokeAgent"}
+  - {action: "bedrock:InvokeInlineAgent"}
+  - {action: "bedrock:InvokeFlow"}
+  - {action: "sagemaker:InvokeEndpoint"}
+  - {action: "sagemaker:InvokeEndpointAsync"}
+  - {action: "sagemaker:InvokeEndpointWithResponseStream"}
 
 signals:
   - {id: tag_system_id, kind: tag, key: "ai:system-id", likelihood: declared}

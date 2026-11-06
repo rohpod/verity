@@ -208,7 +208,7 @@
               {
                 "Effect": "Allow",
                 "Action": [
-                  "bedrock:Converse"
+                  "bedrock:InvokeModel"
                 ],
                 "Resource": "arn:aws:bedrock:eu-north-1::foundation-model/*"
               },

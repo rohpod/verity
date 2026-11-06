@@ -40,11 +40,11 @@ def test_a_wildcard_inside_an_arn_matches_known_arns_only():
     assert found.calls == {(function_id("f"), table_id("verity-graph"))}
 
 
-def test_deny_and_negated_statements_make_no_edge():
+def test_deny_and_not_resource_statements_make_no_edge():
     role = make_role(
         "f-role",
         allow("dynamodb:GetItem", TABLE.arn, effect="Deny"),
-        allow("dynamodb:GetItem", TABLE.arn, negated=True),
+        allow("dynamodb:GetItem", TABLE.arn, not_resource=True),
     )
     assert relations([make_function("f")], [role], [TABLE]).calls == frozenset()
 

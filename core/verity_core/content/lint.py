@@ -352,6 +352,10 @@ def _signals(content: Content) -> Iterator[LintIssue]:
                 re.compile(signal.pattern)
             except re.error as exc:
                 yield LintIssue("signal_bad_pattern", subject, f"does not compile: {exc}")
+    actions = Counter(a.action.lower() for a in content.signals.ai_actions)
+    for action, count in sorted(actions.items()):
+        if count > 1:
+            yield LintIssue("signal_duplicate_action", "signals", f"{action} is listed twice")
     if len(set(content.signals.trail_event_sources)) != len(content.signals.trail_event_sources):
         yield LintIssue(
             "signal_duplicate_source", "signals", "a trail event source is listed twice"

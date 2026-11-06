@@ -1,56 +1,49 @@
 """What shows an AI capability being used (architecture section D, stage 6; ADR 0021, decision
-9). Pure.
+9, and ADR 0022). Pure.
 
 `check_vc060` answers "are the AI permissions that were granted ever exercised?" from CloudTrail
 only. `U#` usage records are never counted here: the demo's come from a mock, and counting them
-would hide the seeded unused `bedrock:Converse` grant.
+would hide the seeded unused `bedrock:InvokeModel` grant.
 """
 
 from collections.abc import Collection, Iterable, Sequence
 from dataclasses import dataclass
 from fnmatch import fnmatchcase
 
+from verity_core.content.schema import AiAction
 from verity_core.discovery.boundary import CollectedRole, Statement, TrailEvent
 from verity_core.model.usage import UsageRecord
 
 CONTROL = "ctl:VC-060"
+SERVICE_EVENT = "AwsServiceEvent"  # something AWS did, not a call
 
 
-def _overlaps(granted: str, ai_action: str) -> bool:
-    """A grant covers an AI action in either direction, ignoring case: `bedrock:*` and `*` cover
-    `bedrock:Invoke*`, and `bedrock:InvokeModel` falls under it."""
-    a, b = granted.lower(), ai_action.lower()
-    return fnmatchcase(b, a) or fnmatchcase(a, b)
+def _matches(action: str, patterns: Iterable[str]) -> bool:
+    return any(fnmatchcase(action.lower(), p.lower()) for p in patterns)
 
 
 def granted_ai_actions(
-    ai_actions: Collection[str], statements: Iterable[Statement]
+    ai_actions: Collection[AiAction], statements: Iterable[Statement]
 ) -> tuple[str, ...]:
-    """The granted actions, as written, that overlap an AI action. Only `Allow` counts, and a
-    `NotAction` statement is ignored."""
-    return tuple(
-        sorted(
-            {
-                action
-                for s in statements
-                if s.effect == "Allow" and not s.negated
-                for action in s.actions
-                if any(_overlaps(action, ai) for ai in ai_actions)
-            }
-        )
-    )
-
-
-def trail_action(event: TrailEvent) -> str:
-    """`bedrock.amazonaws.com` and `Converse` give `bedrock:Converse`."""
-    return f"{event.event_source.partition('.')[0]}:{event.event_name}"
+    """The listed AI actions the statements grant, sorted. An `Allow` statement grants an action
+    if one of its `Action` patterns matches, or, for `NotAction`, if none of its patterns do.
+    `Deny` is not subtracted, which errs towards reporting a grant."""
+    granted = {
+        listed.action
+        for s in statements
+        if s.effect == "Allow"
+        for listed in ai_actions
+        if _matches(listed.action, s.actions) != s.not_action
+    }
+    return tuple(sorted(granted))
 
 
 def trail_shows_ai(
     role_name: str | None, events: Iterable[TrailEvent], sources: Collection[str]
 ) -> bool:
     return role_name is not None and any(
-        e.role_name == role_name and e.event_source in sources for e in events
+        e.role_name == role_name and e.event_source in sources and e.event_type != SERVICE_EVENT
+        for e in events
     )
 
 
@@ -58,15 +51,28 @@ def usage_shows_ai(records: Sequence[UsageRecord]) -> bool:
     return len(records) > 0
 
 
+def _proves(event: TrailEvent, action: AiAction) -> bool:
+    """A call to the action: from its service, by name, and not a service event."""
+    service = action.action.partition(":")[0]
+    return (
+        event.event_type != SERVICE_EVENT
+        and event.event_source.partition(".")[0] == service
+        and event.event_name.lower() in {name.lower() for name in action.trail_events}
+    )
+
+
 @dataclass(frozen=True)
 class Vc060:
     granted: tuple[str, ...]
-    unused: tuple[str, ...]
-    unparsed: bool
+    unused: tuple[str, ...]  # granted, event history could show it, and nothing did
+    unverifiable: tuple[str, ...]  # granted, and event history cannot show it
+    roles_unseen: int  # roles of the system's functions that the crawler cannot read
 
     @property
     def outcome(self) -> str:
-        return "fail" if self.unused else "pass"
+        if self.unused:
+            return "fail"
+        return "inconclusive" if self.unverifiable or self.roles_unseen else "pass"
 
     def content(self, system_id: str) -> dict:
         """The Evidence content. `control` and `scope` are what the assessor matches on."""
@@ -76,26 +82,35 @@ class Vc060:
             "outcome": self.outcome,
             "granted": list(self.granted),
             "unused": list(self.unused),
-            "unparsed": self.unparsed,
+            "unverifiable": list(self.unverifiable),
+            "roles_unseen": self.roles_unseen,
         }
 
 
 def check_vc060(
-    ai_actions: Collection[str],
+    ai_actions: Collection[AiAction],
     roles: Iterable[CollectedRole],
     events: Iterable[TrailEvent],
     sources: Collection[str],
+    roles_unseen: int = 0,
 ) -> Vc060:
-    """A grant is unused if no event of its own role calls an action it covers."""
+    """`fail` if a granted action has no event from the role that grants it, `inconclusive` if
+    one cannot be checked or a role cannot be seen, otherwise `pass` (ADR 0022, decision 3). Each
+    role is judged by its own events, so one role's use does not excuse another's grant."""
     events = [e for e in events if e.event_source in sources]
+    by_name = {a.action: a for a in ai_actions}
     granted: set[str] = set()
     unused: set[str] = set()
-    unparsed = False
+    unverifiable: set[str] = set()
     for role in roles:
-        own = [trail_action(e).lower() for e in events if e.role_name == role.name]
-        for grant in granted_ai_actions(ai_actions, role.statements):
-            granted.add(grant)
-            if not any(fnmatchcase(action, grant.lower()) for action in own):
-                unused.add(grant)
-        unparsed = unparsed or any(s.effect == "Allow" and s.negated for s in role.statements)
-    return Vc060(tuple(sorted(granted)), tuple(sorted(unused)), unparsed)
+        own = [e for e in events if e.role_name == role.name]
+        for name in granted_ai_actions(ai_actions, role.statements):
+            action = by_name[name]
+            granted.add(name)
+            if not action.trail_events:
+                unverifiable.add(name)
+            elif not any(_proves(e, action) for e in own):
+                unused.add(name)
+    return Vc060(
+        tuple(sorted(granted)), tuple(sorted(unused)), tuple(sorted(unverifiable)), roles_unseen
+    )

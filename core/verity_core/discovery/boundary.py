@@ -63,13 +63,14 @@ class CollectedFunction:
 
 @dataclass(frozen=True)
 class Statement:
-    """One IAM policy statement. `negated` is a `NotAction` or `NotResource` statement, which
-    the crawler ignores and reports as unparsed."""
+    """One IAM policy statement. For `not_action`, `actions` holds the `NotAction` patterns, and
+    the statement grants everything else. `not_resource` is a `NotResource` statement."""
 
     effect: str
     actions: tuple[str, ...]
     resources: tuple[str, ...]
-    negated: bool = False
+    not_action: bool = False
+    not_resource: bool = False
 
 
 @dataclass(frozen=True)
@@ -117,6 +118,7 @@ class TrailEvent:
     event_name: str
     event_time: datetime
     role_name: str | None
+    event_type: str | None = None  # `AwsApiCall` is a call; `AwsServiceEvent` is not
 
 
 # --- helpers -------------------------------------------------------------------------------
@@ -178,16 +180,20 @@ def _effect(raw: Mapping[str, Any]) -> str:
 def _statements(document: Any) -> tuple[Statement, ...]:
     found = []
     for raw in _statement_list(_document(document)):
-        negated = "NotAction" in raw or "NotResource" in raw
         found.append(
             Statement(
                 effect=_effect(raw),
                 actions=_texts(raw.get("Action", raw.get("NotAction"))),
                 resources=_texts(raw.get("Resource", raw.get("NotResource"))),
-                negated=negated,
+                not_action="NotAction" in raw,
+                not_resource="NotResource" in raw,
             )
         )
-    return tuple(sorted(found, key=lambda s: (s.effect, s.actions, s.resources, s.negated)))
+    return tuple(
+        sorted(
+            found, key=lambda s: (s.effect, s.actions, s.resources, s.not_action, s.not_resource)
+        )
+    )
 
 
 def _principals(value: Any) -> tuple[str, ...]:
@@ -303,19 +309,17 @@ def clean_trail_event(raw: Mapping[str, Any]) -> TrailEvent:
     when = raw["EventTime"]
     if isinstance(when, str):
         when = datetime.fromisoformat(when)
-    role = None
+    role = event_type = None
     detail = raw.get("CloudTrailEvent")
     if isinstance(detail, str):
-        issuer = (
-            json.loads(detail)
-            .get("userIdentity", {})
-            .get("sessionContext", {})
-            .get("sessionIssuer")
-        )
+        parsed = json.loads(detail)
+        issuer = parsed.get("userIdentity", {}).get("sessionContext", {}).get("sessionIssuer")
         role = _text(issuer["userName"]) if isinstance(issuer, Mapping) else None
+        event_type = _text(parsed["eventType"]) if "eventType" in parsed else None
     return TrailEvent(
         event_source=_text(raw["EventSource"]),
         event_name=_text(raw["EventName"]),
         event_time=when.astimezone(UTC),
         role_name=role,
+        event_type=event_type,
     )
