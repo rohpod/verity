@@ -39,6 +39,24 @@ def probability(model: dict, features: dict) -> float:
     return sigmoid(z)
 
 
+def check_ranges(model: dict, features: dict) -> list[str]:
+    """Refuses a value that cannot exist and lists the features outside what the model saw.
+
+    The error names the feature, never the value, because the value is applicant data. A value
+    outside the training range is ranked, not refused: refusing it would turn away applicants
+    with long careers, which is an age proxy (ADR 0024, decision 6)."""
+    outside = []
+    for name in model["feature_names"]:
+        value = _number(features[name], name)
+        low, high = model["valid_ranges"][name]
+        if not low <= value <= high:
+            raise ValueError(f"{name} is outside the range that can exist")
+        low, high = model["training_ranges"][name]
+        if not low <= value <= high:
+            outside.append(name)
+    return sorted(outside)
+
+
 def run(event: dict, model: dict) -> dict:
     names = set(model["feature_names"])
     applicants = event["applicants"]
@@ -53,7 +71,8 @@ def run(event: dict, model: dict) -> dict:
             raise ValueError(
                 "each applicant must have applicant_ref and exactly the model features"
             )
-        scored.append((ref, probability(model, applicant)))
+        outside = check_ranges(model, applicant)
+        scored.append((ref, probability(model, applicant), outside))
     scored.sort(key=lambda pair: (-pair[1], pair[0]))
     log.info("scored %d applicants", len(scored))
     return {
@@ -62,8 +81,13 @@ def run(event: dict, model: dict) -> dict:
         "decision_support_only": True,
         "synthetic_training_data": True,
         "ranking": [
-            {"rank": i, "applicant_ref": ref, "score": score}
-            for i, (ref, score) in enumerate(scored, start=1)
+            {
+                "rank": i,
+                "applicant_ref": ref,
+                "score": score,
+                "outside_training_range": outside,
+            }
+            for i, (ref, score, outside) in enumerate(scored, start=1)
         ],
     }
 

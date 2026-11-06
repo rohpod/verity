@@ -133,6 +133,12 @@ def test_openai_accepts_content_parts():
         (completions_event({"messages": []}), 400),
         (completions_event({"messages": [{"role": "user"}]}), 400),
         (completions_event("[1]"), 400),
+        (completions_event({"model": 5, "messages": [{"role": "user", "content": "x"}]}), 400),
+        (completions_event({"model": "", "messages": [{"role": "user", "content": "x"}]}), 400),
+        (completions_event({"model": "m", "messages": ["x"]}), 400),
+        (completions_event({"model": "m", "messages": [{"role": "user", "content": [1]}]}), 400),
+        (completions_event({"model": "m", "messages": [{"role": "user", "content": [None]}]}), 400),
+        (completions_event({"model": "m", "messages": [None]}), 400),
     ],
 )
 def test_openai_errors_use_the_error_object(event, status):
@@ -140,6 +146,28 @@ def test_openai_errors_use_the_error_object(event, status):
     assert response["statusCode"] == status
     error = json.loads(response["body"])["error"]
     assert set(error) == {"message", "type", "param", "code"}
+
+
+def test_a_missing_model_is_a_400_naming_the_model_param():
+    response = openai.handler(
+        completions_event({"messages": [{"role": "user", "content": "x"}]}), None
+    )
+    assert response["statusCode"] == 400
+    assert json.loads(response["body"])["error"]["param"] == "model"
+
+
+def test_a_body_that_cannot_be_decoded_is_a_400_not_a_crash():
+    event = completions_event(COMPLETION_REQUEST)
+    event["isBase64Encoded"] = True
+    event["body"] = "!!not base64!!"
+    assert openai.handler(event, None)["statusCode"] == 400
+    event["body"] = base64.b64encode(b"\xff\xfe").decode()
+    assert openai.handler(event, None)["statusCode"] == 400
+
+
+def test_the_reply_echoes_the_requested_model():
+    response = openai.handler(completions_event(COMPLETION_REQUEST), None)
+    assert json.loads(response["body"])["model"] == COMPLETION_REQUEST["model"]
 
 
 def test_every_mock_docstring_starts_simulated():

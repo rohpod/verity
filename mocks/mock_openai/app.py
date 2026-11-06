@@ -11,7 +11,6 @@ import hashlib
 import json
 import math
 
-MODEL = "mock-gpt-class"  # invented, never a real model name
 HEADERS = {"content-type": "application/json", "x-verity-simulated": "true"}
 
 
@@ -28,6 +27,14 @@ def _error(status: int, message: str, kind: str, param=None, code=None) -> dict:
     return _response(status, {"error": error})
 
 
+class BadRequest(ValueError):
+    """The request cannot be answered. `param` names the field, never its value."""
+
+    def __init__(self, param: str):
+        super().__init__(param)
+        self.param = param
+
+
 def _text(content) -> str:
     if isinstance(content, str):
         return content
@@ -35,9 +42,12 @@ def _text(content) -> str:
 
 
 def complete(request: dict) -> dict:
+    model = request.get("model")
+    if not isinstance(model, str) or not model:
+        raise BadRequest("model")
     messages = request.get("messages")
     if not isinstance(messages, list) or not messages:
-        raise ValueError("messages")
+        raise BadRequest("messages")
     texts = [_text(message["content"]) for message in messages]
     last_user = next(
         (
@@ -57,7 +67,7 @@ def complete(request: dict) -> dict:
         "id": f"chatcmpl-{digest[:16]}",
         "object": "chat.completion",
         "created": 0,
-        "model": request.get("model", MODEL),
+        "model": model,
         "choices": [
             {
                 "index": 0,
@@ -80,13 +90,15 @@ def handler(event, context):
         return _error(404, "Unknown request URL", "invalid_request_error", code="unknown_url")
     if http["method"] != "POST":
         return _error(405, "Method not allowed", "invalid_request_error", code="method_not_allowed")
-    body = event.get("body") or ""
-    if event.get("isBase64Encoded"):
-        body = base64.b64decode(body).decode()
     try:
+        body = event.get("body") or ""
+        if event.get("isBase64Encoded"):
+            body = base64.b64decode(body).decode()
         request = json.loads(body)
         if not isinstance(request, dict):
-            raise ValueError("body")
+            raise BadRequest("body")
         return _response(200, complete(request))
-    except (ValueError, KeyError, TypeError):
+    except BadRequest as bad:
+        return _error(400, "Invalid request body", "invalid_request_error", param=bad.param)
+    except (ValueError, KeyError, TypeError, AttributeError):
         return _error(400, "Invalid request body", "invalid_request_error", param="messages")

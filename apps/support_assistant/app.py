@@ -47,6 +47,7 @@ def run(event: dict, articles: list[dict], model) -> dict:
         "disclosure": DISCLOSURE,
         "handoff": article is None,
         "article_id": article["id"] if article else None,
+        "simulated": True,
     }
 
 

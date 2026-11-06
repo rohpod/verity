@@ -32,5 +32,49 @@
     0.49907419430195094
   ],
   "intercept": 0.26880703950433354,
-  "auc": 0.8204602774274905
+  "auc": 0.8204602774274905,
+  "valid_ranges": {
+    "years_experience": [
+      0,
+      60
+    ],
+    "skills_match": [
+      0.0,
+      1.0
+    ],
+    "assessment_score": [
+      0,
+      100
+    ],
+    "certifications": [
+      0,
+      60
+    ],
+    "relevant_projects": [
+      0,
+      60
+    ]
+  },
+  "training_ranges": {
+    "years_experience": [
+      0,
+      20
+    ],
+    "skills_match": [
+      0.0,
+      1.0
+    ],
+    "assessment_score": [
+      30,
+      100
+    ],
+    "certifications": [
+      0,
+      5
+    ],
+    "relevant_projects": [
+      0,
+      10
+    ]
+  }
 }

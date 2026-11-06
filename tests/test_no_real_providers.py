@@ -20,15 +20,17 @@ PROVIDER_LIBRARIES = {
     "google.generativeai",
 }
 PROVIDER_PACKAGES = {"openai", "anthropic"}
-REAL_SERVICE_NAMES = {
-    "bedrock",
-    "bedrock-runtime",
-    "bedrock-agent",
-    "bedrock-agent-runtime",
-    "sagemaker-runtime",
-}
+# Any string starting `bedrock-` or `sagemaker-` is taken for a real service name, so a service
+# added next year (`bedrock-data-automation-runtime`) is caught without editing this test.
+REAL_SERVICE_PREFIXES = ("bedrock-", "sagemaker-")
+REAL_SERVICE_NAMES = {"bedrock"}
 REAL_ENDPOINT_PARTS = ("api.openai.com", "bedrock-runtime.")
+# The three places allowed to use boto3 (tests/graph/test_boto3_boundary.py).
 ADAPTER_AWS = "sdk/verity_ai/aws.py"
+COLLECTOR = "core/verity_core/discovery/aws.py"
+DYNAMODB_CLIENT = "core/verity_core/graph/dynamodb/client.py"
+BOTO3_FILES = (ADAPTER_AWS, COLLECTOR, DYNAMODB_CLIENT)
+CLIENT_FACTORIES = {"client", "resource", "create_client"}
 
 
 def tracked(*, tests: bool) -> list[Path]:
@@ -63,24 +65,28 @@ def library_imports(path: Path) -> list[str]:
     return found
 
 
+def is_real_service(name: str) -> bool:
+    return name in REAL_SERVICE_NAMES or name.startswith(REAL_SERVICE_PREFIXES)
+
+
 def real_strings(path: Path) -> list[str]:
     """Strings naming a real Bedrock or SageMaker runtime service, or a real endpoint."""
     found = []
     for node in ast.walk(ast.parse(path.read_text())):
         if isinstance(node, ast.Constant) and isinstance(node.value, str):
             value = node.value
-            if value in REAL_SERVICE_NAMES or any(p in value for p in REAL_ENDPOINT_PARTS):
+            if is_real_service(value) or any(p in value for p in REAL_ENDPOINT_PARTS):
                 found.append(value)
     return found
 
 
 def _client_calls(path: Path) -> list[ast.Call]:
+    """`.client(`, `.resource(` and `create_client(`, on any object or called bare."""
     return [
         node
         for node in ast.walk(ast.parse(path.read_text()))
         if isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Attribute)
-        and node.func.attr == "client"
+        and getattr(node.func, "attr", getattr(node.func, "id", "")) in CLIENT_FACTORIES
     ]
 
 
@@ -91,11 +97,11 @@ def _service_name(call: ast.Call) -> ast.expr | None:
 
 
 def bedrock_clients(path: Path) -> list[str]:
-    """`.client("bedrock...")` calls, which are the way to reach the real service."""
+    """Client or resource calls naming a Bedrock or SageMaker service."""
     found = []
     for call in _client_calls(path):
         name = _service_name(call)
-        if isinstance(name, ast.Constant) and str(name.value).startswith("bedrock"):
+        if isinstance(name, ast.Constant) and is_real_service(str(name.value)):
             found.append(str(name.value))
     return found
 
@@ -137,8 +143,12 @@ def test_no_file_anywhere_creates_a_bedrock_client():
     assert offenders == {}
 
 
-def test_the_adapter_aws_module_only_creates_clients_with_a_constant_service_name():
-    assert dynamic_clients(ROOT / ADAPTER_AWS) == 0
+def test_every_file_allowed_to_use_boto3_names_its_services_as_constants():
+    assert {f: dynamic_clients(ROOT / f) for f in BOTO3_FILES} == dict.fromkeys(BOTO3_FILES, 0)
+
+
+def test_the_boto3_files_do_create_clients_so_that_check_is_not_vacuous():
+    assert all(_client_calls(ROOT / f) for f in BOTO3_FILES)
 
 
 def test_the_lock_file_holds_no_provider_package():
@@ -164,7 +174,9 @@ def test_the_detector_catches_each_way_of_reaching_a_real_provider(tmp_path):
         "x = 'bedrock-runtime'",
         "x = 'bedrock-agent'",
         "x = 'bedrock-agent-runtime'",
+        "x = 'bedrock-data-automation-runtime'",
         "x = 'sagemaker-runtime'",
+        "x = 'sagemaker-featurestore-runtime'",
         "x = 'https://api.openai.com/v1'",
         "x = 'https://bedrock-runtime.eu-north-1.amazonaws.com'",
     ]
@@ -176,20 +188,31 @@ def test_the_detector_catches_each_way_of_reaching_a_real_provider(tmp_path):
         "boto3.client('bedrock-runtime')",
         "session.client(service_name='bedrock-agent')",
         "boto3.client('bedrock')",
+        "boto3.resource('bedrock-data-automation-runtime')",
+        "boto3.resource(service_name='bedrock-runtime')",
+        "session.create_client('bedrock-runtime')",
+        "create_client('sagemaker-runtime')",
+        "boto3.client('sagemaker-a2i-runtime')",
     ]
     for i, code in enumerate(clients):
         path = tmp_path / f"cli{i}.py"
         path.write_text(code)
         assert bedrock_clients(path), code
     dynamic = tmp_path / "dynamic.py"
-    dynamic.write_text("boto3.client(name)\nboto3.client(service_name=name)")
-    assert dynamic_clients(dynamic) == 2
+    dynamic.write_text(
+        "boto3.client(name)\nboto3.client(service_name=name)\n"
+        "boto3.client('bed' + 'rock-runtime')\nboto3.client(f'bedrock-{x}')\n"
+        "boto3.client(''.join(['bed', 'rock-runtime']))\nboto3.resource(name)\n"
+        "session.create_client(name)\ncreate_client(name)"
+    )
+    assert dynamic_clients(dynamic) == 8
 
 
 def test_the_detector_leaves_clean_code_alone(tmp_path):
     clean = tmp_path / "clean.py"
     clean.write_text(
-        "import json\nboto3.client('lambda')\nx = 'mock-bedrock'\ny = 'bedrock:InvokeModel'\n"
+        "import json\nboto3.client('lambda')\nboto3.resource('dynamodb')\n"
+        "x = 'mock-bedrock'\ny = 'bedrock:InvokeModel'\nz = 'sagemaker:InvokeEndpoint'\n"
     )
     assert library_imports(clean) == []
     assert real_strings(clean) == []

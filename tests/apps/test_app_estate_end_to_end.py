@@ -66,6 +66,7 @@ def test_support_answers_from_an_article_discloses_the_ai_and_records_usage(cloc
     assert result["article_id"] == "reset-password"
     assert result["handoff"] is False
     assert result["reply"].startswith("[SIMULATED]")
+    assert result["simulated"] is True
     assert "AI assistant" in result["disclosure"]
     [record] = repo.usage_records(support.SYSTEM_ID)
     assert record.source is Source.SIMULATED
