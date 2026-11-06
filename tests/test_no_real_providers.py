@@ -25,11 +25,16 @@ PROVIDER_PACKAGES = {"openai", "anthropic"}
 REAL_SERVICE_PREFIXES = ("bedrock-", "sagemaker-")
 REAL_SERVICE_NAMES = {"bedrock"}
 REAL_ENDPOINT_PARTS = ("api.openai.com", "bedrock-runtime.")
-# The three places allowed to use boto3 (tests/graph/test_boto3_boundary.py).
+# Everything allowed to use boto3: two files and one package (tests/graph/test_boto3_boundary.py).
 ADAPTER_AWS = "sdk/verity_ai/aws.py"
 COLLECTOR = "core/verity_core/discovery/aws.py"
 DYNAMODB_CLIENT = "core/verity_core/graph/dynamodb/client.py"
-BOTO3_FILES = (ADAPTER_AWS, COLLECTOR, DYNAMODB_CLIENT)
+DYNAMODB_PACKAGE = ROOT / "core/verity_core/graph/dynamodb"
+BOTO3_FILES = (
+    ADAPTER_AWS,
+    COLLECTOR,
+    *sorted(p.relative_to(ROOT).as_posix() for p in DYNAMODB_PACKAGE.glob("*.py")),
+)
 CLIENT_FACTORIES = {"client", "resource", "create_client"}
 
 
@@ -148,7 +153,8 @@ def test_every_file_allowed_to_use_boto3_names_its_services_as_constants():
 
 
 def test_the_boto3_files_do_create_clients_so_that_check_is_not_vacuous():
-    assert all(_client_calls(ROOT / f) for f in BOTO3_FILES)
+    assert DYNAMODB_CLIENT in BOTO3_FILES
+    assert all(_client_calls(ROOT / f) for f in (ADAPTER_AWS, COLLECTOR, DYNAMODB_CLIENT))
 
 
 def test_the_lock_file_holds_no_provider_package():

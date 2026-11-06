@@ -6,6 +6,7 @@ import json
 
 import pytest
 from estate_support import ROOT
+from verity_core.graph.dynamodb import keys
 
 FUNCTIONS = {
     "support-assistant": "apps/support_assistant",
@@ -69,3 +70,33 @@ def test_the_scan_finds_names_in_the_apps_that_read_them():
 def test_no_fixture_name_remains_from_the_impossible_estate():
     names = {n for f in ESTATE["functions"] for n in f.get("Environment", {}).get("Variables", {})}
     assert not names & {"HELP_ARTICLES_TABLE", "TEMPLATE_BUCKET"}
+
+
+def table_statements(role: dict) -> list[dict]:
+    """`Allow` statements on the graph table. The crawler reads these, and M8 writes them."""
+    return [
+        statement
+        for policy in role["inline_policies"]
+        for statement in policy["PolicyDocument"]["Statement"]
+        if "dynamodb" in str(statement["Action"]) and statement["Effect"] == "Allow"
+    ]
+
+
+ROLES = {r["role"]["RoleName"].removesuffix("-role"): r for r in ESTATE["roles"]}
+USAGE_WRITERS = {"support-assistant", "contract-insights"}
+
+
+@pytest.mark.parametrize("function", sorted(USAGE_WRITERS))
+def test_an_app_role_may_only_put_into_the_usage_partition_the_code_writes(function):
+    (statement,) = table_statements(ROLES[function])
+    assert statement["Action"] == ["dynamodb:PutItem"]
+    assert statement["Condition"] == {
+        "ForAllValues:StringEquals": {
+            "dynamodb:LeadingKeys": [keys.usage_pk("kestrel", f"sys:{function}")]
+        }
+    }
+
+
+@pytest.mark.parametrize("function", ["talent-screening", "shadow-summariser"])
+def test_an_app_that_writes_no_usage_has_no_table_access(function):
+    assert table_statements(ROLES[function]) == []
