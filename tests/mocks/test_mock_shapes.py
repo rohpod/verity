@@ -139,6 +139,7 @@ def test_openai_accepts_content_parts():
         (completions_event({"model": "m", "messages": [{"role": "user", "content": [1]}]}), 400),
         (completions_event({"model": "m", "messages": [{"role": "user", "content": [None]}]}), 400),
         (completions_event({"model": "m", "messages": [None]}), 400),
+        (completions_event("[" * 200_000), 400),
     ],
 )
 def test_openai_errors_use_the_error_object(event, status):

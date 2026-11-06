@@ -25,9 +25,15 @@ def sigmoid(z: float) -> float:
 
 
 def _number(value, name: str) -> float:
-    if isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value):
+    if isinstance(value, bool) or not isinstance(value, int | float):
         raise ValueError(f"{name} must be a finite number")
-    return float(value)
+    try:
+        number = float(value)
+    except OverflowError:  # an int too large for a float
+        raise ValueError(f"{name} must be a finite number") from None
+    if not math.isfinite(number):
+        raise ValueError(f"{name} must be a finite number")
+    return number
 
 
 def probability(model: dict, features: dict) -> float:

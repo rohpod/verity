@@ -100,5 +100,5 @@ def handler(event, context):
         return _response(200, complete(request))
     except BadRequest as bad:
         return _error(400, "Invalid request body", "invalid_request_error", param=bad.param)
-    except (ValueError, KeyError, TypeError, AttributeError):
+    except (ValueError, KeyError, TypeError, AttributeError, RecursionError):
         return _error(400, "Invalid request body", "invalid_request_error", param="messages")
