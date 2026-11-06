@@ -19,6 +19,11 @@ APPROVED_RESOURCES = {
     "aws_iam_policy",
     "aws_iam_role",
     "aws_iam_role_policy",
+    "aws_lambda_function",
+    "aws_lambda_function_url",
+    "aws_lambda_function_event_invoke_config",
+    "aws_scheduler_schedule",
+    "aws_ssm_parameter",
 }
 PAID_TABLE_SETTINGS = {
     "point_in_time_recovery",

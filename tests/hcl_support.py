@@ -14,7 +14,7 @@ def clean(value):
     if isinstance(value, str):
         return value.strip('"')
     if isinstance(value, dict):
-        return {clean(k): clean(v) for k, v in value.items()}
+        return {clean(k): clean(v) for k, v in value.items() if k != "__is_block__"}
     if isinstance(value, list):
         return [clean(v) for v in value]
     return value

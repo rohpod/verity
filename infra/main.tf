@@ -35,6 +35,12 @@ module "estate" {
   account_id = var.account_id
   table_name = module.table.name
 
+  # The zips come from scripts/build_lambdas.py and the manifests from content/manifests.
+  build_dir      = "${path.root}/../.build"
+  manifests_dir  = "${path.root}/../content/manifests"
+  schedule_state = var.schedule_state
+  enable_probe   = var.enable_probe
+
   providers = {
     aws = aws.estate
   }
