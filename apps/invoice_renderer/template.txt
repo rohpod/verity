@@ -1,0 +1,7 @@
+Kestrel Cloud Ltd (fictional)
+INVOICE $invoice_number
+Customer: $customer
+
+$lines
+
+Total: $total

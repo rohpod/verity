@@ -1,0 +1,32 @@
+[
+  {
+    "id": "reset-password",
+    "title": "Reset your Kestrel Cloud password",
+    "keywords": ["password", "reset", "login", "locked"],
+    "text": "Open the Kestrel Cloud sign-in page and choose Forgot password. We email a reset link that works for 30 minutes."
+  },
+  {
+    "id": "invoices",
+    "title": "Find and download invoices",
+    "keywords": ["invoice", "invoices", "billing", "receipt"],
+    "text": "Invoices are under Billing in the Kestrel Cloud console. Each one can be downloaded as a PDF once the billing month closes."
+  },
+  {
+    "id": "api-keys",
+    "title": "Create and rotate API keys",
+    "keywords": ["api", "key", "keys", "rotate", "token"],
+    "text": "Create an API key under Settings, then API keys. Rotate it by creating a second key, switching your integration over and deleting the old one."
+  },
+  {
+    "id": "status",
+    "title": "Check service status",
+    "keywords": ["status", "outage", "down", "incident"],
+    "text": "Live service status and past incidents are published on the Kestrel Cloud status page. Subscribe there for email updates."
+  },
+  {
+    "id": "export-data",
+    "title": "Export your workspace data",
+    "keywords": ["export", "data", "download", "backup"],
+    "text": "Workspace owners can request a full export under Settings, then Data. The export is ready within one working day."
+  }
+]

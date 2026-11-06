@@ -42,6 +42,7 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/). Decisions by the owner:
 | D24 | M5 review fixes: decision lifecycle, risk-tier expiry, unknown facts, severity from binding law, ended assessments. See [ADR 0020](adr/0020-m5-review-fixes.md) |
 | D25 | M6 discovery: evidence on change only, summarised over the cap, one cleaning boundary, VC-060 for unused permissions, Candidate lifecycle. See [ADR 0021](adr/0021-m6-discovery.md) |
 | D26 | M6 review fixes: concrete AI actions, an inconclusive VC-060 outcome, account digests, signal matching. See [ADR 0022](adr/0022-m6-review-fixes.md) |
+| D27 | M7 demo estate: layered `verity_ai`, corrected crawl fixture, runtime refusal of real endpoints, pure-Python talent model, deterministic zips. See [ADR 0023](adr/0023-m7-demo-estate.md) |
 
 ## Milestones
 
@@ -57,7 +58,7 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/). Decisions by the owner:
 | M4 | Content: hub controls, ~35 requirements, STRM mappings, Kestrel org, synthetic systems, `verity seed` | Sonnet builds the loader, linter, CLI and org data; Opus writes the regulatory content | no | ✅ |
 | M5 | Rules and assessment: applicability, status, assurance, satisfaction, `verity assess`, `verity attest` | Opus, then Sonnet | no | ✅ |
 | M6 | Discovery pipeline (8 stages), `ai_signals.yaml`, `verity crawl --local` | Sonnet | no | ✅ |
-| M7 | Demo estate code: mocks, `verity_ai` with SigV4 hook, 5 apps, local talent model | Sonnet | no | ⬜ |
+| M7 | Demo estate code: mocks, `verity_ai` with SigV4 hook, 5 apps, local talent model | Sonnet | no | 🔄 |
 | **Live** | | | | |
 | M8 | Deploy and first live crawl: Lambda modules, schedule, SSM manifests, guardrails | Opus (IAM), Sonnet | **yes, approval per apply** | ⬜ |
 | **Public demo** | | | | |
@@ -143,6 +144,13 @@ Found while building and reviewing M1. Each is open until the named milestone cl
 | M8 | `load_graph` reads every `U#` usage record in the table and discards it. Demo usage volume is small, so measure the scan on the real table. If usage grows large, load without a scan: list nodes through the type index and read each node's partition |
 | M8 | Read `DiscoveryRun.summary.largest_evidence_bytes` from the first live crawl. Evidence over the 16 KB cap is summarised, never refused ([ADR 0021](adr/0021-m6-discovery.md)); decide whether the cap should rise |
 | M8 | Build `crawler/handler.py` and the live path of `verity crawl`. The CLI refuses it until then |
+| M8 | Grant both Function URL actions, `lambda:InvokeFunctionUrl` and `lambda:InvokeFunction`, to every caller of `mock-openai` ([ADR 0023](adr/0023-m7-demo-estate.md)) |
+| M8 | Write the `dynamodb:LeadingKeys` policy for each app role, limited to `T#kestrel#N#sys:<system>`, with `dynamodb:PutItem` only. `shadow-summariser` and `talent-screening` get no table access |
+| M8 | Prove SigV4 against the real Function URL, including the signing name `lambda`, which no page read so far has confirmed. `tests/sdk` only proves the signature's shape |
+| M8 | Tag `mock-bedrock` and `mock-openai` `verity:component`. `mock-bedrock` is now in the fixture and in `platform_functions` |
+| M8 | Add manifest files under `content/manifests/` for `talent-screening` and `contract-insights`, then publish them |
+| M8 | Set each function's env values from the names in `tests/test_estate_parity.py`: `COEFFICIENTS_FILE=coefficients.json`, `HELP_ARTICLES_FILE=articles.json`, `INVOICE_TEMPLATE=template.txt`, `MODEL_ADAPTER=mock-bedrock`, and so on |
+| M8 | Upload the zips from `uv run python scripts/build_lambdas.py` directly (no S3). They are deterministic, so an unchanged build is not a ChangeEvent |
 | M8 | Grant the crawler the actions listed in architecture §D, and never `lambda:GetFunction` |
 | M8 | Tag the mocks and the crawler `verity:component`, or `mock-openai` becomes a shadow-AI candidate |
 | M8 | Publish the manifests to SSM under `/verity/manifests/` |

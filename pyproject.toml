@@ -3,7 +3,7 @@ name = "verity"
 version = "0.0.0"
 description = "Verity workspace root: AI governance, risk and compliance platform"
 requires-python = ">=3.12,<3.13"
-dependencies = ["verity-core"]
+dependencies = ["verity-core", "verity-ai"]
 
 [dependency-groups]
 dev = [
@@ -12,15 +12,18 @@ dev = [
     "python-hcl2>=8.1.4",
     "ruff>=0.8",
 ]
+# Training only. The Lambda never imports it (ADR 0023, decision 10).
+train = ["scikit-learn"]
 
 [tool.uv]
 package = false
 
 [tool.uv.workspace]
-members = ["core"]
+members = ["core", "sdk"]
 
 [tool.uv.sources]
 verity-core = { workspace = true }
+verity-ai = { workspace = true }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -9,7 +9,7 @@ Verity is an open-source portfolio project exploring what an *AI-specific* GRC p
 - maps systems to **ISO/IEC 42001, ISO/IEC 27001, the EU AI Act and the NIST AI RMF** through a typed crosswalk (NIST IR 8477 set-theory relationships), backed by a **knowledge graph**;
 - separates *mapped*, *implemented*, *evidenced*, *tested* and *verified*, so a single configuration check never turns an obligation green.
 
-> **Status:** Stage 4. The local graph core (M1), its DynamoDB repository (M2), the AWS account baseline (M3: the `verity-graph` table and a cost budget, tested live) the governance content with `verity seed` (M4, not yet seeded to AWS) the rules with `verity assess` and `verity attest` (M5, run locally) and the discovery pipeline with `verity crawl --local` (M6, tested on `moto` and a recorded fixture; nothing reads AWS yet) are built. The discovery pipeline with `verity crawl --local` (M6, in review) runs on a recorded fixture and reads nothing from AWS. No Lambda or crawler is deployed yet, so those "Real" rows below describe the plan. See [`docs/stage-4-milestones.md`](docs/stage-4-milestones.md).
+> **Status:** Stage 4. The local graph core (M1), its DynamoDB repository (M2), the AWS account baseline (M3: the `verity-graph` table and a cost budget, tested live) the governance content with `verity seed` (M4, not yet seeded to AWS) the rules with `verity assess` and `verity attest` (M5, run locally) and the discovery pipeline with `verity crawl --local` (M6, tested on `moto` and a recorded fixture; nothing reads AWS yet) are built. The demo estate code (M7, in review: two mocks, the `verity_ai` adapters, five apps, a local talent model and deterministic zips) is written and tested with `moto` and fakes. No Lambda or crawler is deployed yet and nothing reads AWS, so those "Real" rows below describe the plan. See [`docs/stage-4-milestones.md`](docs/stage-4-milestones.md).
 
 ## Real vs simulated
 
@@ -19,9 +19,10 @@ Verity is built under a strict **zero-cost, AWS-only** constraint, so some thing
 |---|---|
 | AWS resources (Lambda, DynamoDB, IAM, Scheduler) | **Real**, deployed via Terraform in one AWS account |
 | Discovery crawler | **Real**, read-only AWS APIs |
-| Talent-screening ML model | **Real**, trained locally on **synthetic** data |
-| Bedrock inference (support assistant) | **Simulated**: a mock with a Converse-API shape. Bedrock is never invoked |
-| OpenAI API (contract insights) | **Simulated**: an OpenAI-compatible mock endpoint |
+| Talent-screening ML model | **Real**, trained locally on **synthetic** data, with pure-Python inference |
+| Bedrock inference (support assistant) | **Simulated**: `mock-bedrock` has a Converse-API shape and labels itself. Bedrock is never invoked, and a test fails if a real client appears |
+| OpenAI API (contract insights, shadow summariser) | **Simulated**: `mock-openai` is an OpenAI-shaped Function URL that labels itself. The adapters refuse any other endpoint |
+| Usage records | Labelled **simulated**: they record calls to the mocks, and only for third-party models |
 | Company "Kestrel Cloud Ltd", its people and ~25 extra AI systems | **Fictional / synthetic** |
 | Public demo | **Static snapshot** of the real graph, account IDs redacted |
 

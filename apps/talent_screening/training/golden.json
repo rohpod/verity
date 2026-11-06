@@ -1,0 +1,504 @@
+{
+  "cases": [
+    {
+      "features": {
+        "years_experience": 3.0,
+        "skills_match": 0.628,
+        "assessment_score": 87.0,
+        "certifications": 1.0,
+        "relevant_projects": 4.0
+      },
+      "probability": 0.4752818112404237
+    },
+    {
+      "features": {
+        "years_experience": 8.0,
+        "skills_match": 0.275,
+        "assessment_score": 86.0,
+        "certifications": 0.0,
+        "relevant_projects": 7.0
+      },
+      "probability": 0.3814303192134356
+    },
+    {
+      "features": {
+        "years_experience": 3.0,
+        "skills_match": 0.281,
+        "assessment_score": 31.0,
+        "certifications": 5.0,
+        "relevant_projects": 9.0
+      },
+      "probability": 0.2546087686182292
+    },
+    {
+      "features": {
+        "years_experience": 20.0,
+        "skills_match": 0.977,
+        "assessment_score": 35.0,
+        "certifications": 0.0,
+        "relevant_projects": 3.0
+      },
+      "probability": 0.7282563073602513
+    },
+    {
+      "features": {
+        "years_experience": 7.0,
+        "skills_match": 0.932,
+        "assessment_score": 69.0,
+        "certifications": 1.0,
+        "relevant_projects": 4.0
+      },
+      "probability": 0.6894256031286907
+    },
+    {
+      "features": {
+        "years_experience": 7.0,
+        "skills_match": 0.519,
+        "assessment_score": 41.0,
+        "certifications": 1.0,
+        "relevant_projects": 9.0
+      },
+      "probability": 0.3474141190402407
+    },
+    {
+      "features": {
+        "years_experience": 6.0,
+        "skills_match": 0.608,
+        "assessment_score": 92.0,
+        "certifications": 5.0,
+        "relevant_projects": 9.0
+      },
+      "probability": 0.9056977472118068
+    },
+    {
+      "features": {
+        "years_experience": 18.0,
+        "skills_match": 0.344,
+        "assessment_score": 81.0,
+        "certifications": 5.0,
+        "relevant_projects": 10.0
+      },
+      "probability": 0.9339759385387156
+    },
+    {
+      "features": {
+        "years_experience": 12.0,
+        "skills_match": 0.132,
+        "assessment_score": 58.0,
+        "certifications": 5.0,
+        "relevant_projects": 9.0
+      },
+      "probability": 0.5902501763556071
+    },
+    {
+      "features": {
+        "years_experience": 15.0,
+        "skills_match": 0.013,
+        "assessment_score": 87.0,
+        "certifications": 0.0,
+        "relevant_projects": 9.0
+      },
+      "probability": 0.462533644443976
+    },
+    {
+      "features": {
+        "years_experience": 8.0,
+        "skills_match": 0.007,
+        "assessment_score": 73.0,
+        "certifications": 0.0,
+        "relevant_projects": 2.0
+      },
+      "probability": 0.07222611930973519
+    },
+    {
+      "features": {
+        "years_experience": 12.0,
+        "skills_match": 0.038,
+        "assessment_score": 50.0,
+        "certifications": 0.0,
+        "relevant_projects": 9.0
+      },
+      "probability": 0.16931605236765818
+    },
+    {
+      "features": {
+        "years_experience": 17.0,
+        "skills_match": 0.266,
+        "assessment_score": 43.0,
+        "certifications": 4.0,
+        "relevant_projects": 2.0
+      },
+      "probability": 0.3859265799295396
+    },
+    {
+      "features": {
+        "years_experience": 13.0,
+        "skills_match": 0.955,
+        "assessment_score": 44.0,
+        "certifications": 5.0,
+        "relevant_projects": 4.0
+      },
+      "probability": 0.8721818919841403
+    },
+    {
+      "features": {
+        "years_experience": 13.0,
+        "skills_match": 0.033,
+        "assessment_score": 70.0,
+        "certifications": 2.0,
+        "relevant_projects": 9.0
+      },
+      "probability": 0.42585315310730637
+    },
+    {
+      "features": {
+        "years_experience": 3.0,
+        "skills_match": 0.146,
+        "assessment_score": 83.0,
+        "certifications": 2.0,
+        "relevant_projects": 2.0
+      },
+      "probability": 0.1389157525905948
+    },
+    {
+      "features": {
+        "years_experience": 10.0,
+        "skills_match": 0.641,
+        "assessment_score": 89.0,
+        "certifications": 3.0,
+        "relevant_projects": 3.0
+      },
+      "probability": 0.775911548306605
+    },
+    {
+      "features": {
+        "years_experience": 16.0,
+        "skills_match": 0.932,
+        "assessment_score": 87.0,
+        "certifications": 2.0,
+        "relevant_projects": 5.0
+      },
+      "probability": 0.9465865488844342
+    },
+    {
+      "features": {
+        "years_experience": 11.0,
+        "skills_match": 0.563,
+        "assessment_score": 34.0,
+        "certifications": 2.0,
+        "relevant_projects": 10.0
+      },
+      "probability": 0.5516056283318688
+    },
+    {
+      "features": {
+        "years_experience": 14.0,
+        "skills_match": 0.995,
+        "assessment_score": 68.0,
+        "certifications": 4.0,
+        "relevant_projects": 9.0
+      },
+      "probability": 0.9688129830713427
+    },
+    {
+      "features": {
+        "years_experience": 1.0,
+        "skills_match": 0.32,
+        "assessment_score": 88.0,
+        "certifications": 2.0,
+        "relevant_projects": 4.0
+      },
+      "probability": 0.26411274836666926
+    },
+    {
+      "features": {
+        "years_experience": 9.0,
+        "skills_match": 0.097,
+        "assessment_score": 61.0,
+        "certifications": 1.0,
+        "relevant_projects": 5.0
+      },
+      "probability": 0.14622678939993977
+    },
+    {
+      "features": {
+        "years_experience": 17.0,
+        "skills_match": 0.793,
+        "assessment_score": 57.0,
+        "certifications": 1.0,
+        "relevant_projects": 9.0
+      },
+      "probability": 0.8758194242386194
+    },
+    {
+      "features": {
+        "years_experience": 0.0,
+        "skills_match": 0.242,
+        "assessment_score": 86.0,
+        "certifications": 0.0,
+        "relevant_projects": 8.0
+      },
+      "probability": 0.20005425522705317
+    },
+    {
+      "features": {
+        "years_experience": 18.0,
+        "skills_match": 0.053,
+        "assessment_score": 56.0,
+        "certifications": 5.0,
+        "relevant_projects": 8.0
+      },
+      "probability": 0.6463418727629231
+    },
+    {
+      "features": {
+        "years_experience": 15.0,
+        "skills_match": 0.608,
+        "assessment_score": 74.0,
+        "certifications": 0.0,
+        "relevant_projects": 10.0
+      },
+      "probability": 0.8217690362149742
+    },
+    {
+      "features": {
+        "years_experience": 9.0,
+        "skills_match": 0.916,
+        "assessment_score": 63.0,
+        "certifications": 0.0,
+        "relevant_projects": 6.0
+      },
+      "probability": 0.696818500500514
+    },
+    {
+      "features": {
+        "years_experience": 2.0,
+        "skills_match": 0.439,
+        "assessment_score": 62.0,
+        "certifications": 1.0,
+        "relevant_projects": 4.0
+      },
+      "probability": 0.16558856698527716
+    },
+    {
+      "features": {
+        "years_experience": 9.0,
+        "skills_match": 0.668,
+        "assessment_score": 99.0,
+        "certifications": 3.0,
+        "relevant_projects": 6.0
+      },
+      "probability": 0.8807837043969275
+    },
+    {
+      "features": {
+        "years_experience": 12.0,
+        "skills_match": 0.358,
+        "assessment_score": 86.0,
+        "certifications": 3.0,
+        "relevant_projects": 2.0
+      },
+      "probability": 0.5769440036933474
+    },
+    {
+      "features": {
+        "years_experience": 15.0,
+        "skills_match": 0.655,
+        "assessment_score": 67.0,
+        "certifications": 2.0,
+        "relevant_projects": 8.0
+      },
+      "probability": 0.8459966108132096
+    },
+    {
+      "features": {
+        "years_experience": 7.0,
+        "skills_match": 0.667,
+        "assessment_score": 38.0,
+        "certifications": 2.0,
+        "relevant_projects": 7.0
+      },
+      "probability": 0.4300050265581981
+    },
+    {
+      "features": {
+        "years_experience": 20.0,
+        "skills_match": 0.669,
+        "assessment_score": 46.0,
+        "certifications": 1.0,
+        "relevant_projects": 9.0
+      },
+      "probability": 0.8268018203089865
+    },
+    {
+      "features": {
+        "years_experience": 17.0,
+        "skills_match": 0.579,
+        "assessment_score": 69.0,
+        "certifications": 1.0,
+        "relevant_projects": 9.0
+      },
+      "probability": 0.8371307456497983
+    },
+    {
+      "features": {
+        "years_experience": 13.0,
+        "skills_match": 0.949,
+        "assessment_score": 39.0,
+        "certifications": 5.0,
+        "relevant_projects": 10.0
+      },
+      "probability": 0.9366592406541355
+    },
+    {
+      "features": {
+        "years_experience": 4.0,
+        "skills_match": 0.671,
+        "assessment_score": 32.0,
+        "certifications": 4.0,
+        "relevant_projects": 4.0
+      },
+      "probability": 0.3250482163821377
+    },
+    {
+      "features": {
+        "years_experience": 12.0,
+        "skills_match": 0.743,
+        "assessment_score": 58.0,
+        "certifications": 0.0,
+        "relevant_projects": 8.0
+      },
+      "probability": 0.6874979240892154
+    },
+    {
+      "features": {
+        "years_experience": 14.0,
+        "skills_match": 0.06,
+        "assessment_score": 73.0,
+        "certifications": 2.0,
+        "relevant_projects": 10.0
+      },
+      "probability": 0.5400840168899119
+    },
+    {
+      "features": {
+        "years_experience": 4.0,
+        "skills_match": 0.117,
+        "assessment_score": 53.0,
+        "certifications": 0.0,
+        "relevant_projects": 4.0
+      },
+      "probability": 0.04808075819053502
+    },
+    {
+      "features": {
+        "years_experience": 6.0,
+        "skills_match": 0.749,
+        "assessment_score": 68.0,
+        "certifications": 4.0,
+        "relevant_projects": 9.0
+      },
+      "probability": 0.8435232432201049
+    },
+    {
+      "features": {
+        "years_experience": 9.0,
+        "skills_match": 0.429,
+        "assessment_score": 99.0,
+        "certifications": 3.0,
+        "relevant_projects": 9.0
+      },
+      "probability": 0.8455437295666935
+    },
+    {
+      "features": {
+        "years_experience": 20.0,
+        "skills_match": 0.322,
+        "assessment_score": 98.0,
+        "certifications": 5.0,
+        "relevant_projects": 2.0
+      },
+      "probability": 0.8893800258279183
+    },
+    {
+      "features": {
+        "years_experience": 17.0,
+        "skills_match": 0.74,
+        "assessment_score": 47.0,
+        "certifications": 4.0,
+        "relevant_projects": 1.0
+      },
+      "probability": 0.7387989368964057
+    },
+    {
+      "features": {
+        "years_experience": 10.0,
+        "skills_match": 0.177,
+        "assessment_score": 66.0,
+        "certifications": 2.0,
+        "relevant_projects": 6.0
+      },
+      "probability": 0.31206582039039193
+    },
+    {
+      "features": {
+        "years_experience": 17.0,
+        "skills_match": 0.906,
+        "assessment_score": 96.0,
+        "certifications": 2.0,
+        "relevant_projects": 9.0
+      },
+      "probability": 0.9786725802959659
+    },
+    {
+      "features": {
+        "years_experience": 7.0,
+        "skills_match": 0.1,
+        "assessment_score": 71.0,
+        "certifications": 4.0,
+        "relevant_projects": 10.0
+      },
+      "probability": 0.48812746630016907
+    },
+    {
+      "features": {
+        "years_experience": 1.0,
+        "skills_match": 0.29,
+        "assessment_score": 88.0,
+        "certifications": 0.0,
+        "relevant_projects": 2.0
+      },
+      "probability": 0.11938017876865724
+    },
+    {
+      "features": {
+        "years_experience": 17.0,
+        "skills_match": 0.338,
+        "assessment_score": 56.0,
+        "certifications": 1.0,
+        "relevant_projects": 9.0
+      },
+      "probability": 0.6098834759998256
+    },
+    {
+      "features": {
+        "years_experience": 3.0,
+        "skills_match": 0.847,
+        "assessment_score": 40.0,
+        "certifications": 4.0,
+        "relevant_projects": 1.0
+      },
+      "probability": 0.3768982911513943
+    },
+    {
+      "features": {
+        "years_experience": 7.0,
+        "skills_match": 0.488,
+        "assessment_score": 41.0,
+        "certifications": 2.0,
+        "relevant_projects": 8.0
+      },
+      "probability": 0.35218272380607957
+    }
+  ]
+}

@@ -122,6 +122,7 @@ def test_the_crawl_fixture_is_the_recorded_estate_of_the_plan():
         "shadow-summariser",
         "invoice-renderer",
         "mock-openai",
+        "mock-bedrock",
     ]
     assert estate["trail_events"] == []
 

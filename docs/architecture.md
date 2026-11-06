@@ -1,6 +1,6 @@
 # Verity — Architecture
 
-_Stage 3 deliverable · 2026-11-05 · Status: accepted, amended in Stage 4 (see [milestone plan](stage-4-milestones.md), [ADR 0009](adr/0009-mock-openai-iam-auth.md), [ADR 0010](adr/0010-assessment-and-crosswalk-semantics.md), [ADR 0012](adr/0012-graph-schema-refinements.md), [ADR 0013](adr/0013-dynamodb-write-model.md), [ADR 0021](adr/0021-m6-discovery.md))._
+_Stage 3 deliverable · 2026-11-05 · Status: accepted, amended in Stage 4 (see [milestone plan](stage-4-milestones.md), [ADR 0009](adr/0009-mock-openai-iam-auth.md), [ADR 0010](adr/0010-assessment-and-crosswalk-semantics.md), [ADR 0012](adr/0012-graph-schema-refinements.md), [ADR 0013](adr/0013-dynamodb-write-model.md), [ADR 0021](adr/0021-m6-discovery.md), [ADR 0023](adr/0023-m7-demo-estate.md))._
 Inputs: [Stage 1 discovery](stage-1-discovery.md) · [Stage 2 feasibility](stage-2-feasibility.md) · decisions in [`adr/`](adr/).
 
 **Locked constraints:** AWS Free plan · single region `eu-north-1` · Terraform/OpenTofu · Python 3.12 backend · React + TS frontend · DynamoDB + NetworkX graph · no S3 · Bedrock/OpenAI mock-only · public demo = static snapshot on GitHub Pages · target customer = mid-size EU SaaS company acting as both AI provider and deployer.
@@ -45,9 +45,10 @@ verity/
                       export/     snapshot builder + redaction
                       cli.py      `verity` command
   crawler/            handler.py — thin Lambda entrypoint
-  sdk/verity_ai/      provider adapters (BedrockCompatible, OpenAICompatible) + usage telemetry
+  sdk/verity_ai/      provider adapters (BedrockCompatible, OpenAICompatible) + usage telemetry; aws.py is the only module with boto3 (ADR 0023)
   apps/               support_assistant · talent_screening · contract_insights · shadow_summariser · invoice_renderer
   mocks/              mock_bedrock · mock_openai
+  scripts/            build_lambdas.py: deterministic zips into .build/ (ADR 0023)
   content/            frameworks/ · controls.yaml · mappings/ · rules/ · org/ · manifests/ · decisions/ · fixtures/
   infra/              Terraform root + modules (lambda_app, crawler, table, guardrails)
   web/                Vite + React + TS dashboard
@@ -69,8 +70,10 @@ verity/
 | Seeded finding | Role grants `bedrock:InvokeModel` (the permission Converse needs, [ADR 0022](adr/0022-m6-review-fixes.md)) but **no usage is observed**. This is a least-privilege finding; the permission is never exercised, in keeping with the mock-only rule | No bias-test evidence → gap | No DPA evidence for the provider → gap |
 
 **Crawler test fixtures:**
-- `shadow-summariser` has no tags and no manifest but has an `OPENAI_BASE_URL` env var. It must be classified *probable* and surface as a shadow-AI candidate.
+- `shadow-summariser` has no tags and no manifest but has an `OPENAI_BASE_URL` env var. It must be classified *probable* and surface as a shadow-AI candidate. It really calls mock-openai through `OpenAICompatible` with `usage=None`, has no `verity_core` in its zip and writes no usage records, like a team that wired up a client and never registered the system ([ADR 0023](adr/0023-m7-demo-estate.md)).
 - `invoice-renderer` is an ordinary function and must be classified *none*.
+
+**Bundled data.** The help articles ship in the support assistant's zip (`HELP_ARTICLES_FILE`) and the invoice template in the invoice renderer's (`INVOICE_TEMPLATE`), because a second table is impossible at 25 of 25 capacity units and S3 is banned. App roles write usage records with `dynamodb:PutItem` only, limited by `dynamodb:LeadingKeys` to their own partition (D8). Every mock labels itself simulated: `additionalModelResponseFields: {"simulated": true}` and a `[SIMULATED]` reply for mock-bedrock, `system_fingerprint: "verity-mock"`, the `x-verity-simulated` header and a `[SIMULATED]` reply for mock-openai.
 
 **Synthetic estate:** about 25 additional AI systems for the fictional **Kestrel Cloud Ltd**, with `source=synthetic` and no AWS resources, so posture charts have realistic volume. Every record in the UI carries a provenance badge: **Live-discovered · Declared · Synthetic**.
 
@@ -85,7 +88,7 @@ The pipeline is a sequence of pure functions over plain data, so it can be unit-
 | 3 | Signal & score | Rules in `content/rules/ai_signals.yaml` combine signals into `ai_likelihood ∈ {declared, confirmed_usage, probable, possible, none}`. Every result stores the signals that fired, so the UI can explain *why*. Only Lambda functions are scored. |
 | 4 | Correlate | The `ai:system-id` tag (a full ID such as `sys:talent-screening`) or a manifest links a resource to an `AISystem`. An unlinked function scored *probable* or *possible*, or one that names a system that does not exist, becomes a `Candidate` (the shadow-AI inbox). |
 | 5 | Relate | `RUNS_ON` (system → function), `ASSUMES` (function → role) and `CALLS` (function → table or function, from the resource ARNs in the role's `Allow` statements; `Resource: "*"` makes no edge). The crawler creates no system → provider link: §E's path through Model stands. |
-| 6 | Usage | `verity_ai` adapters write `U#` usage records (system, provider, model, timestamp, token estimate). This is evidence of **actual AI usage**, as opposed to infrastructure merely existing. CloudTrail `LookupEvents` is also queried for `bedrock.amazonaws.com`; the honest expected result is *none observed*. Capability without usage is the control VC-060 (below). |
+| 6 | Usage | `verity_ai` adapters write `U#` usage records (system, provider, model, timestamp, token estimate), labelled simulated. This is evidence of **third-party model calls** only: an in-house model has no provider, so Talent Screening writes none, and a failed write never fails the call ([ADR 0023](adr/0023-m7-demo-estate.md)). CloudTrail `LookupEvents` is also queried for `bedrock.amazonaws.com`; the honest expected result is *none observed*. Capability without usage is the control VC-060 (below). |
 | 7 | Diff | Config hashes are compared with the stored ones to produce `ChangeEvent`s. Evidence collected from a changed resource becomes **stale**. |
 | 8 | Persist | Idempotent upserts with deterministic IDs, plus a `DiscoveryRun` node for provenance. |
 
@@ -430,6 +433,7 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
 | [0020](adr/0020-m5-review-fixes.md) | M5 review fixes: immutable decisions with `supersedes` and revocation, risk-tier expiry, unknown facts, severity from binding law, ended assessments |
 | [0021](adr/0021-m6-discovery.md) | M6 discovery: evidence written on change, summarised over the cap, one cleaning boundary, VC-060 for unused permissions, Candidate lifecycle |
 | [0022](adr/0022-m6-review-fixes.md) | M6 review fixes: concrete AI actions with proving events, an inconclusive VC-060 outcome, account digests, signal matching |
+| [0023](adr/0023-m7-demo-estate.md) | M7 demo estate: layered `verity_ai`, corrected crawl fixture, runtime refusal of real endpoints, pure-Python talent model, deterministic zips |
 
 ## L. Schema validation walkthrough
 
