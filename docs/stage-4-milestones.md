@@ -1,7 +1,7 @@
 # Stage 4 — Milestone plan
 
 _2026-11-05 · Approved. Status key: ⬜ not started · 🔄 in progress · ✅ validated._
-Inputs: [architecture](architecture.md) · [ADRs](adr/). Decisions by the owner: mock-openai uses an `AWS_IAM` Function URL ([ADR 0009](adr/0009-mock-openai-iam-auth.md)); milestones run AWS first, UI last.
+Inputs: [architecture](architecture.md) · [ADRs](adr/) · [why M3, M8 and M9 are open](open-milestones.md) · [M10 and M11 plan](m10-m11-plan.md). Decisions by the owner: mock-openai uses an `AWS_IAM` Function URL ([ADR 0009](adr/0009-mock-openai-iam-auth.md)); milestones run AWS first, UI last.
 
 ## Findings from read-only checks (2026-11-05)
 
@@ -66,9 +66,9 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/). Decisions by the owner:
 | M6 | Discovery pipeline (8 stages), `ai_signals.yaml`, `verity crawl --local` | Sonnet | no | ✅ |
 | M7 | Demo estate code: mocks, `verity_ai` with SigV4 hook, 5 apps, local talent model | Sonnet | no | ✅ |
 | **Live** | | | | |
-| M8 | Deploy and first live crawl: Lambda modules, schedule, SSM manifests, guardrails | Opus (IAM), Sonnet | **yes, approval per apply** | ⬜ |
+| M8 | Deploy and first live crawl: Lambda modules, schedule, SSM manifests, guardrails | Opus (IAM), Sonnet | **yes, approval per apply** | 🔄 |
 | **Public demo** | | | | |
-| M9 | Snapshot export, redaction, schema, generated TS types | Sonnet; Opus reviews redaction | no | ⬜ |
+| M9 | Snapshot export, redaction, schema, generated TS types | Sonnet; Opus reviews redaction | no | 🔄 |
 | M10 | Dashboard in three slices, GitHub Pages | Sonnet | no | ⬜ |
 | M11 | Stage close: security review, ADR review, final snapshot by 1 Apr 2027, teardown decision | Opus | teardown/refresh only | ⬜ |
 
@@ -166,7 +166,7 @@ Open for M8: nothing here has run on AWS. The arm64 `pydantic_core` has never be
 
 ## M8 live results (2026-11-06)
 
-PR C ran the runbook against the real account. Full values are in [ADR 0027](adr/0027-m8-live-results.md). Opus reviewed it ([ADR 0028](adr/0028-m8-review.md)). M8 stays ⬜ until the scheduled run and the credit read pass.
+PR C ran the runbook against the real account. Full values are in [ADR 0027](adr/0027-m8-live-results.md). Opus reviewed it ([ADR 0028](adr/0028-m8-review.md)). M8 stays 🔄 until the scheduled run and the credit read pass.
 
 | Criterion | Result |
 |---|---|

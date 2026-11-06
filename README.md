@@ -31,6 +31,8 @@ Verity is built under a strict **zero-cost, AWS-only** constraint, so some thing
 - [Stage 2: Feasibility & zero-cost verification](docs/stage-2-feasibility.md)
 - [Architecture](docs/architecture.md)
 - [Stage 4: Milestone plan](docs/stage-4-milestones.md)
+- [Why M3, M8 and M9 are open](docs/open-milestones.md)
+- [M10 and M11 plan](docs/m10-m11-plan.md)
 - [Architecture Decision Records](docs/adr/)
 
 ## Contributing
