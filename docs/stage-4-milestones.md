@@ -161,6 +161,21 @@ One case is accepted: the model timeouts are per socket read, so a body that tri
 
 Open for M8: nothing here has run on AWS. The arm64 `pydantic_core` has never been loaded, because the zip tests use the host's copy. `LeadingKeys`, the permissions boundary, the SigV4 signing name and cold start at 128 MB are all unproven and are in the notes below.
 
+## M8 live results (2026-11-06)
+
+PR C ran the runbook against the real account. Full values are in [ADR 0027](adr/0027-m8-live-results.md). M8 stays ⬜ until Opus reviews it.
+
+| Criterion | Result |
+|---|---|
+| All 5 functions classify as expected | Yes: `declared=3`, `none=4`, `probable=1`, one Candidate |
+| An unsigned call to mock-openai is refused | Yes: 403 |
+| Unused `bedrock:InvokeModel` finding appears | Yes: VC-060 fails on `support-assistant`, 29 high |
+| CloudTrail shows no Bedrock use | 7 `List*` events by `resource-explorer-2`, no invocation |
+| Second crawl idempotent | Yes: writes only the run |
+| Destroying the estate then applying rebuilds it cleanly | Yes: same code hashes, table and budget untouched, crawl wrote only the run |
+| Credits unchanged | **Not yet read** (owner, 24 hours after the last write) |
+| Scheduled run | **Not yet checked**: the schedule is `DISABLED` after the rebuild |
+
 ## Notes for later milestones
 
 Found while building and reviewing M1. Each is open until the named milestone closes it.
@@ -168,28 +183,28 @@ Found while building and reviewing M1. Each is open until the named milestone cl
 | Milestone | Note |
 |---|---|
 | M3 | Last open criterion: the owner re-reads credits in the Billing console at least 24 hours after the last live write (2026-11-05). M3 stays 🔄 until they match. The checks moto could not do are done ([ADR 0016](adr/0016-m3-live-results.md)) |
-| M8 | `load_graph` reads every `U#` usage record in the table and discards it. Demo usage volume is small, so measure the scan on the real table. If usage grows large, load without a scan: list nodes through the type index and read each node's partition |
-| M8 | Read `DiscoveryRun.summary.largest_evidence_bytes` from the first live crawl. Evidence over the 16 KB cap is summarised, never refused ([ADR 0021](adr/0021-m6-discovery.md)); decide whether the cap should rise |
-| M8 | Build `crawler/handler.py` and the live path of `verity crawl`. The CLI refuses it until then |
-| M8 | Grant both Function URL actions, `lambda:InvokeFunctionUrl` and `lambda:InvokeFunction`, to every caller of `mock-openai` ([ADR 0023](adr/0023-m7-demo-estate.md)) |
-| M8 | Write the `dynamodb:LeadingKeys` policy for each app role, limited to `T#kestrel#U#sys:<system>` using `ForAllValues:StringEquals`, with `dynamodb:PutItem` only. `shadow-summariser` and `talent-screening` get no table access |
-| M8 | Put a permissions boundary on the app roles that allows everything except `bedrock:Converse*`, `bedrock:Invoke*` and `sagemaker:InvokeEndpoint*`. `verity-never-use` is an inline policy on the user `rohpod`, so it does not cover a Lambda role, and nothing else stops `support-assistant` calling Bedrock ([ADR 0024](adr/0024-m7-review-fixes.md), correcting [ADR 0022](adr/0022-m6-review-fixes.md)). The grant stays in the role's policy so the VC-060 finding stands, and the UI must say the boundary makes it ineffective. Confirm the details and ask for approval first |
-| M8 | Prove the two limits, because moto does not enforce them: a real refused `PutItem` on a `META` item from a temporary probe, and the boundary with the IAM simulator. **Never attempt a Bedrock call,** even a refused one: it would count as use of the grant until M8 lands decision 3 of [ADR 0025](adr/0025-m8-deploy-and-crawl.md), and it could run for real if the boundary were wrong |
-| M8 | Measure cold start at 128 MB. `_dependencies` runs inside the handler, so importing boto3 and pydantic and creating two clients counts against the 10-second timeout, on top of the 9 to 9.5 seconds the model and telemetry budgets allow. If it does not fit, move that work to module load or raise the memory, which is free within the allowance only if the GB-seconds still fit |
-| M8 | Build the zips from a clean tree (`git status` empty): the build takes tracked files, so an uncommitted edit to one still ships |
-| M8 | Prove SigV4 against the real Function URL, including the signing name `lambda`, which no page read so far has confirmed. `tests/sdk` only proves the signature's shape |
-| M8 | Tag `mock-bedrock` and `mock-openai` `verity:component`. `mock-bedrock` is now in the fixture and in `platform_functions` |
-| M8 | Add manifest files under `content/manifests/` for `talent-screening` and `contract-insights`, then publish them |
-| M8 | Set each function's env values from the names in `tests/test_estate_parity.py`: `COEFFICIENTS_FILE=coefficients.json`, `HELP_ARTICLES_FILE=articles.json`, `INVOICE_TEMPLATE=template.txt`, `MODEL_ADAPTER=mock-bedrock`, and so on |
-| M8 | Upload the zips from `uv run python scripts/build_lambdas.py` directly (no S3). They are deterministic, so an unchanged build is not a ChangeEvent |
-| M8 | Grant the crawler the actions listed in architecture §D, and never `lambda:GetFunction` |
-| M8 | Tag the mocks and the crawler `verity:component`, or `mock-openai` becomes a shadow-AI candidate |
-| M8 | Publish the manifests to SSM under `/verity/manifests/` |
+| M8 | `load_graph` reads every `U#` usage record in the table and discards it. Demo usage volume is small, so measure the scan on the real table. If usage grows large, load without a scan: list nodes through the type index and read each node's partition **Closed by [ADR 0027](adr/0027-m8-live-results.md).** |
+| M8 | Read `DiscoveryRun.summary.largest_evidence_bytes` from the first live crawl. Evidence over the 16 KB cap is summarised, never refused ([ADR 0021](adr/0021-m6-discovery.md)); decide whether the cap should rise **Closed by [ADR 0027](adr/0027-m8-live-results.md).** |
+| M8 | Build `crawler/handler.py` and the live path of `verity crawl`. The CLI refuses it until then **Closed by [ADR 0027](adr/0027-m8-live-results.md).** |
+| M8 | Grant both Function URL actions, `lambda:InvokeFunctionUrl` and `lambda:InvokeFunction`, to every caller of `mock-openai` ([ADR 0023](adr/0023-m7-demo-estate.md)) **Closed by [ADR 0027](adr/0027-m8-live-results.md).** |
+| M8 | Write the `dynamodb:LeadingKeys` policy for each app role, limited to `T#kestrel#U#sys:<system>` using `ForAllValues:StringEquals`, with `dynamodb:PutItem` only. `shadow-summariser` and `talent-screening` get no table access **Closed by [ADR 0027](adr/0027-m8-live-results.md).** |
+| M8 | Put a permissions boundary on the app roles that allows everything except `bedrock:Converse*`, `bedrock:Invoke*` and `sagemaker:InvokeEndpoint*`. `verity-never-use` is an inline policy on the user `rohpod`, so it does not cover a Lambda role, and nothing else stops `support-assistant` calling Bedrock ([ADR 0024](adr/0024-m7-review-fixes.md), correcting [ADR 0022](adr/0022-m6-review-fixes.md)). The grant stays in the role's policy so the VC-060 finding stands, and the UI must say the boundary makes it ineffective. Confirm the details and ask for approval first **Closed by [ADR 0027](adr/0027-m8-live-results.md).** |
+| M8 | Prove the two limits, because moto does not enforce them: a real refused `PutItem` on a `META` item from a temporary probe, and the boundary with the IAM simulator. **Never attempt a Bedrock call,** even a refused one: it would count as use of the grant until M8 lands decision 3 of [ADR 0025](adr/0025-m8-deploy-and-crawl.md), and it could run for real if the boundary were wrong **Closed by [ADR 0027](adr/0027-m8-live-results.md).** |
+| M8 | Measure cold start at 128 MB. `_dependencies` runs inside the handler, so importing boto3 and pydantic and creating two clients counts against the 10-second timeout, on top of the 9 to 9.5 seconds the model and telemetry budgets allow. If it does not fit, move that work to module load or raise the memory, which is free within the allowance only if the GB-seconds still fit **Closed by [ADR 0027](adr/0027-m8-live-results.md).** |
+| M8 | Build the zips from a clean tree (`git status` empty): the build takes tracked files, so an uncommitted edit to one still ships **Closed by [ADR 0027](adr/0027-m8-live-results.md).** |
+| M8 | Prove SigV4 against the real Function URL, including the signing name `lambda`, which no page read so far has confirmed. `tests/sdk` only proves the signature's shape **Closed by [ADR 0027](adr/0027-m8-live-results.md).** |
+| M8 | Tag `mock-bedrock` and `mock-openai` `verity:component`. `mock-bedrock` is now in the fixture and in `platform_functions` **Closed by [ADR 0027](adr/0027-m8-live-results.md).** |
+| M8 | Add manifest files under `content/manifests/` for `talent-screening` and `contract-insights`, then publish them **Closed by [ADR 0027](adr/0027-m8-live-results.md).** |
+| M8 | Set each function's env values from the names in `tests/test_estate_parity.py`: `COEFFICIENTS_FILE=coefficients.json`, `HELP_ARTICLES_FILE=articles.json`, `INVOICE_TEMPLATE=template.txt`, `MODEL_ADAPTER=mock-bedrock`, and so on **Closed by [ADR 0027](adr/0027-m8-live-results.md).** |
+| M8 | Upload the zips from `uv run python scripts/build_lambdas.py` directly (no S3). They are deterministic, so an unchanged build is not a ChangeEvent **Closed by [ADR 0027](adr/0027-m8-live-results.md).** |
+| M8 | Grant the crawler the actions listed in architecture §D, and never `lambda:GetFunction` **Closed by [ADR 0027](adr/0027-m8-live-results.md).** |
+| M8 | Tag the mocks and the crawler `verity:component`, or `mock-openai` becomes a shadow-AI candidate **Closed by [ADR 0027](adr/0027-m8-live-results.md).** |
+| M8 | Publish the manifests to SSM under `/verity/manifests/` **Closed by [ADR 0027](adr/0027-m8-live-results.md).** |
 | After M8 | Decide whether to add Bedrock's 8 other `Invoke*` actions, such as `InvokeDataAutomation`, to `ai_signals.yaml` ([ADR 0025](adr/0025-m8-deploy-and-crawl.md)) |
-| M8 | Confirm the real crawler's function name matches `platform_functions`, and that the demo role grants `bedrock:InvokeModel` |
+| M8 | Confirm the real crawler's function name matches `platform_functions`, and that the demo role grants `bedrock:InvokeModel` **Closed by [ADR 0027](adr/0027-m8-live-results.md).** |
 | M8 | `verity seed` now reads every Evidence node to check decisions ([ADR 0020](adr/0020-m5-review-fixes.md)). Measure how long that takes once M6 evidence is in the table |
 | M8 | Re-seeding removes nothing, so a mapping deleted from YAML stays open in the graph. Decide on pruning before the first live re-seed |
-| M8 | The first `verity assess --target dynamodb` on the real content writes 1,368 records (65 `APPLIES_TO` edges, 433 ControlAssessments, 870 assessment edges): about 5,900 write units, roughly 6.6 minutes at 15 table units a second, and a second run writes 0. Measured on the in-memory copy that `estimate_apply` uses. It is not yet run on the real table. Decisions that change only add or close a few records |
+| M8 | The first `verity assess --target dynamodb` on the real content writes 1,368 records (65 `APPLIES_TO` edges, 433 ControlAssessments, 870 assessment edges): about 5,900 write units, roughly 6.6 minutes at 15 table units a second, and a second run writes 0. Measured on the in-memory copy that `estimate_apply` uses. It is not yet run on the real table. Decisions that change only add or close a few records **Closed by [ADR 0027](adr/0027-m8-live-results.md).** |
 | M9 | Replace the `acct_` account digests with ordinals on export. A digest is not anonymous ([ADR 0022](adr/0022-m6-review-fixes.md)) |
 | M9 | A decision's commit SHA is looked up at export, not at seed, because a SHA inside hashed content would make a new Evidence node on every commit ([ADR 0019](adr/0019-m5-rules-and-assessment.md), D10). Build the lookup from the decision's file path and `file_sha256` |
 | M8 | Edge writes do not re-check the nodes they connect, which is safe with one writer at a time ([ADR 0014](adr/0014-m2-measurements-and-evidence-cap.md)). Do not run a seed and a crawl together |
