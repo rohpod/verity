@@ -12,6 +12,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, RootModel, model_validator
 
 from verity_core.model.enums import (
+    AiLikelihood,
     ControlKind,
     DataClassification,
     ImplementationStatus,
@@ -160,6 +161,53 @@ class ApplicabilityFile(_Strict):
     # Annex III domains, as `use_domains` values, with where each is listed.
     annex_iii_domains: dict[UseDomain, NonEmpty]
     rules: list[ApplicabilityRule]
+
+
+# --- discovery signals (`rules/ai_signals.yaml`, ADR 0021) ---------------------------------
+
+SignalKind = Literal[
+    "tag", "manifest", "usage_record", "trail_event", "iam_action", "env_name", "name"
+]
+
+
+class SignalRule(_Strict):
+    """One thing the crawler looks for, and how strongly it suggests AI. `tag` needs a `key`;
+    `env_name` and `name` need a `pattern`; the other kinds take neither."""
+
+    id: Slug
+    kind: SignalKind
+    likelihood: AiLikelihood
+    key: NonEmpty | None = None
+    pattern: NonEmpty | None = None
+
+    @model_validator(mode="after")
+    def _consistent(self):
+        if self.likelihood is AiLikelihood.NONE:
+            raise ValueError("a signal that fires cannot score `none`")
+        if (self.kind == "tag") != (self.key is not None):
+            raise ValueError("`key` is for the tag kind, and the tag kind needs it")
+        if (self.kind in ("env_name", "name")) != (self.pattern is not None):
+            raise ValueError("`pattern` is for the env_name and name kinds, and they need it")
+        return self
+
+
+class AiSignalsFile(_Strict):
+    evidence_valid_days: int = Field(gt=0)
+    evidence_refresh_days: int = Field(gt=0)
+    trail_lookback_days: int = Field(gt=0)
+    trail_event_sources: list[NonEmpty]
+    platform_tag: NonEmpty
+    ai_actions: list[NonEmpty]
+    signals: list[SignalRule]
+
+    @model_validator(mode="after")
+    def _refresh_inside_validity(self):
+        if self.evidence_refresh_days >= self.evidence_valid_days:
+            raise ValueError("evidence_refresh_days must be less than evidence_valid_days")
+        return self
+
+    def rule(self, kind: str) -> SignalRule | None:
+        return next((s for s in self.signals if s.kind == kind), None)
 
 
 # --- the fictional organisation and its AI estate (`org/*.yaml`) ----------------------------

@@ -1,0 +1,33 @@
+# What the crawler treats as a sign that a Lambda function is AI (architecture section D, ADR 0021).
+#
+# Signals combine into `ai_likelihood`. The strongest wins, in the order declared, confirmed_usage,
+# probable, possible, and every signal that fired is stored so the UI can say why. The crawler
+# reads env var names only, never values.
+
+evidence_valid_days: 30 # how long crawler evidence stays fresh
+evidence_refresh_days: 8 # write it again when this many days or fewer are left
+trail_lookback_days: 90 # CloudTrail event history keeps 90 days
+trail_event_sources: [bedrock.amazonaws.com]
+platform_tag: "verity:component" # the mocks and the crawler itself: never AI candidates
+
+# A granted IAM action counts as an AI action if it overlaps one of these, in either direction,
+# so a grant of `bedrock:*` or `*` covers them too.
+ai_actions: ["bedrock:Invoke*", "bedrock:Converse*", "sagemaker:InvokeEndpoint*"]
+
+signals:
+  - {id: tag_system_id, kind: tag, key: "ai:system-id", likelihood: declared}
+  - {id: manifest, kind: manifest, likelihood: declared}
+  - {id: usage_records, kind: usage_record, likelihood: confirmed_usage}
+  - {id: trail_ai_event, kind: trail_event, likelihood: confirmed_usage}
+  - {id: iam_ai_action, kind: iam_action, likelihood: probable}
+  # Matched anywhere in an env var name, ignoring case.
+  - id: env_ai_name
+    kind: env_name
+    likelihood: probable
+    pattern: '^(OPENAI|ANTHROPIC|BEDROCK|AZURE_OPENAI|GEMINI|COHERE|MISTRAL|HUGGINGFACE|HF)_|(^|_)(LLM|GPT)(_|$)|^MODEL_(ID|ADAPTER)$'
+  # Matched against each whole token of the name and the description, split on anything that is
+  # not a letter or digit, so `mail`, `email` and `maintenance` never match `ai`.
+  - id: name_ai_token
+    kind: name
+    likelihood: possible
+    pattern: 'ai|ml|llm|gpt|genai|chatbot|copilot|assistant|summariser|summarizer|classifier|embedding|embeddings|inference|openai|bedrock|sagemaker'
