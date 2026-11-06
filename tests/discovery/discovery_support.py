@@ -67,6 +67,11 @@ def trail_event(
     }
 
 
+def trail_event_json(role: str, **kw) -> dict:
+    """The same event with its time as text, for a fixture file."""
+    return trail_event(role, **kw) | {"EventTime": "2026-11-01T00:00:00+00:00"}
+
+
 def zip_bytes() -> bytes:
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as archive:
@@ -98,7 +103,7 @@ def populate_moto(*, tags=None) -> None:
                     {
                         "Effect": "Allow",
                         "Action": "dynamodb:GetItem",
-                        "Resource": f"arn:aws:dynamodb:{REGION}:{MOTO_ACCOUNT}:table/verity-graph",
+                        "Resource": f"arn:aws:dynamodb:{REGION}:{MOTO_ACCOUNT}:table/app-table",
                     }
                 ],
             }
@@ -119,7 +124,7 @@ def populate_moto(*, tags=None) -> None:
     )
     assert function["FunctionName"] == "shadow-summariser"
     boto3.client("dynamodb", region_name=REGION).create_table(
-        TableName="verity-graph",
+        TableName="app-table",
         KeySchema=[{"AttributeName": "PK", "KeyType": "HASH"}],
         AttributeDefinitions=[{"AttributeName": "PK", "AttributeType": "S"}],
         BillingMode="PAY_PER_REQUEST",
@@ -191,3 +196,87 @@ def make_role(name, *statements) -> CollectedRole:
         trust=(),
         policies=(Policy("p", "inline", tuple(statements)),),
     )
+
+
+# --- crawling ------------------------------------------------------------------------------
+
+import dataclasses  # noqa: E402
+
+from verity_core.content.seed import seed  # noqa: E402
+from verity_core.discovery.collectors import FixtureCollector  # noqa: E402
+from verity_core.discovery.pipeline import crawl  # noqa: E402
+from verity_core.graph.dynamodb.table import TABLE_NAME  # noqa: E402
+from verity_core.model.enums import EdgeType, NodeType  # noqa: E402
+from verity_core.model.nodes import AISystem, Organisation  # noqa: E402
+
+CONTENT_LOADED = load_content(CONTENT)
+# Just the organisation and the three systems, so a test seeds in a moment on either backend.
+MINI = dataclasses.replace(
+    CONTENT_LOADED,
+    estate=tuple(n for n in CONTENT_LOADED.estate if isinstance(n, Organisation | AISystem)),
+    frameworks=(),
+    requirements=(),
+    controls=(),
+    edges=(),
+    decisions=(),
+)
+
+
+def seeded(repo, clock, content=MINI):
+    seed(repo, content, clock)
+    clock.advance(hours=1)
+    return repo
+
+
+def crawl_fixture(repo, clock, path=FIXTURE, content=MINI):
+    return crawl(repo, content, FixtureCollector(path), clock)
+
+
+def edited_fixture(tmp_path, edit) -> "Path":
+    """A copy of the recorded estate after `edit(raw)`."""
+    raw = fixture()
+    edit(raw)
+    path = tmp_path / f"estate-{len(list(tmp_path.iterdir()))}.json"
+    path.write_text(json.dumps(raw))
+    return path
+
+
+def role_of(raw, function):
+    return next(r for r in raw["roles"] if r["role"]["RoleName"] == f"{function}-role")
+
+
+def dump(repo) -> str:
+    """Every node, every version and every edge, as text, for a search."""
+    parts = []
+    for node_type in NodeType:
+        for node in repo.nodes_by_type(node_type):
+            parts.append(node.model_dump_json())
+            parts += [v.model_dump_json() for v in repo.history(node.id)]
+    graph = repo.load_graph()
+    parts += [data["record"].model_dump_json() for _, _, data in graph.edges(data=True)]
+    return "\n".join(parts)
+
+
+def table_text(repo) -> str:
+    """The whole DynamoDB table as text, or empty for the in-memory repository."""
+    client = getattr(repo, "_client", None)
+    if client is None:
+        return ""
+    found, token = [], {}
+    while True:
+        page = client.scan(TableName=TABLE_NAME, **token)
+        found.append(json.dumps(page["Items"], default=str))
+        if "LastEvaluatedKey" not in page:
+            return "\n".join(found)
+        token = {"ExclusiveStartKey": page["LastEvaluatedKey"]}
+
+
+def open_edges(repo, edge_type: EdgeType) -> set[tuple[str, str]]:
+    graph = repo.load_graph()
+    return {
+        (e.src, e.dst) for _, _, d in graph.edges(data=True) if (e := d["record"]).type is edge_type
+    }
+
+
+def of_type(repo, node_type: NodeType) -> list:
+    return repo.nodes_by_type(node_type)

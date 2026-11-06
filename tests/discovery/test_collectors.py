@@ -87,7 +87,7 @@ def test_the_aws_collector_reads_a_moto_account_and_drops_values_and_account_ids
     assert {r.name for r in found.roles} == {"shadow-role"}
     role = found.roles[0]
     assert {p.kind for p in role.policies} == {"inline", "managed"}
-    assert [t.name for t in found.tables] == ["verity-graph"]
+    assert [t.name for t in found.tables] == ["app-table"]
     assert [m.system for m in found.manifests] == ["sys:talent-screening"]
     assert found.tags_by_arn == {function.arn: {"ai:system-id": "sys:x"}}
     assert CANARY not in repr(found)
