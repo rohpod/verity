@@ -1,5 +1,7 @@
 """`UsageRecorder` writing through both usage sinks (D8, ADR 0013, ADR 0023)."""
 
+from datetime import timedelta
+
 import boto3
 import pytest
 from factories import TENANT
@@ -47,6 +49,7 @@ def test_the_dynamodb_sink_writes_a_record_the_repository_reads_back(clock):
         sink = DynamoDBUsageSink(TENANT, client=client)
         hook = recorder(sink, clock)
         hook(5)
+        clock.now += timedelta(seconds=1)
         hook(6)
         repo = DynamoDBRepository(TENANT, clock, client=client)
         assert [r.token_estimate for r in repo.usage_records(SYSTEM)] == [5, 6]
