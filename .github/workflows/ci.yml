@@ -31,6 +31,20 @@ jobs:
       - run: uv run python scripts/generate_snapshot_contract.py
       - name: The generated contract matches the models
         run: test -z "$(git status --porcelain -- web/generated)"
+      # The dashboard (ADR 0031). The fixture is generated here and never committed.
+      - run: npm run fixture --prefix web
+      - run: uv run python scripts/write_ui_fixtures.py
+      - name: The dashboard's test data matches the export
+        run: test -z "$(git status --porcelain -- web/src/test)"
+      - run: npm run typecheck --prefix web
+      - run: npm run lint --prefix web
+      - run: npm test --prefix web
+      - run: npm run build --prefix web
+      - name: The build carries no snapshot or fixture
+        run: npm run check:dist --prefix web
+      - run: npx playwright install --with-deps chromium
+        working-directory: web
+      - run: npm run e2e --prefix web
       - name: A committed snapshot passes the scan and is the live one
         run: |
           shopt -s nullglob

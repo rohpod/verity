@@ -1,0 +1,80 @@
+name: Pages
+
+# Publishes the dashboard with the committed live snapshot (ADR 0031). Nothing here holds a
+# secret or an AWS credential. If no snapshot is committed yet, it skips with a notice.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - "core/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      published: ${{ steps.snapshot.outputs.present }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Is there a snapshot to publish?
+        id: snapshot
+        run: |
+          if [ -f web/public/data/snapshot.json ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::web/public/data/snapshot.json is missing, so nothing is published. It arrives with the reviewed live snapshot PR (M9)."
+          fi
+      - uses: astral-sh/setup-uv@v10.3.3
+        if: steps.snapshot.outputs.present == 'true'
+      - uses: actions/setup-node@v7.1.0
+        if: steps.snapshot.outputs.present == 'true'
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --ignore-scripts --prefix web
+        if: steps.snapshot.outputs.present == 'true'
+      - run: uv sync --locked
+        if: steps.snapshot.outputs.present == 'true'
+      - name: Build
+        if: steps.snapshot.outputs.present == 'true'
+        run: npm run build --prefix web
+      - name: The build carries no snapshot of its own
+        if: steps.snapshot.outputs.present == 'true'
+        run: npm run check:dist --prefix web
+      - name: Add the committed snapshot
+        if: steps.snapshot.outputs.present == 'true'
+        run: |
+          mkdir -p web/dist/data
+          cp web/public/data/snapshot.json web/dist/data/snapshot.json
+      - name: Scan the exact bytes that will be published, and require a live snapshot
+        if: steps.snapshot.outputs.present == 'true'
+        run: uv run verity export --check web/dist/data/snapshot.json --require-live
+      - uses: actions/upload-pages-artifact@v4.0.0
+        if: steps.snapshot.outputs.present == 'true'
+        with:
+          path: web/dist
+
+  deploy:
+    needs: build
+    if: needs.build.outputs.published == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4.0.5

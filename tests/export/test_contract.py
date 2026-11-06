@@ -77,19 +77,19 @@ def test_the_schema_step_does_not_need_node():
 # --- web/ stays minimal, and CI regenerates the contract ---------------------------------
 
 
-def test_web_holds_only_what_type_generation_needs():
+def test_web_keeps_the_type_generator_pinned():
     package = json.loads((ROOT / "web" / "package.json").read_text())
-    assert package["devDependencies"] == {"json-schema-to-typescript": "16.0.0"}
-    assert set(package) <= {"name", "private", "description", "devDependencies"}
-    assert not (ROOT / "web" / "src").exists()  # M10 owns the rest of web/
+    assert package["devDependencies"]["json-schema-to-typescript"] == "16.0.0"
     lock = json.loads((ROOT / "web" / "package-lock.json").read_text())
     assert lock["packages"]["node_modules/json-schema-to-typescript"]["version"] == "16.0.0"
 
 
 def test_no_dependency_version_in_web_floats():
+    """Exact versions only, in both sections (ADR 0031, decision 13)."""
     package = json.loads((ROOT / "web" / "package.json").read_text())
-    for version in package["devDependencies"].values():
-        assert re.fullmatch(r"\d+\.\d+\.\d+", version), version
+    for section in ("dependencies", "devDependencies"):
+        for name, version in package[section].items():
+            assert re.fullmatch(r"\d+\.\d+\.\d+", version), f"{name} {version}"
 
 
 def test_node_modules_is_ignored_by_git():

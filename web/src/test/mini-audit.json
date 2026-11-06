@@ -1,0 +1,76 @@
+[
+  {
+    "links": [
+      {
+        "assessedBy": null,
+        "assessmentId": null,
+        "assessmentSource": null,
+        "assuranceLevel": null,
+        "controlId": "ctl:VC-900",
+        "evidence": [],
+        "mapping": {
+          "strength": 7,
+          "strm": "subset_of",
+          "sufficiency": "full"
+        },
+        "providerId": null,
+        "resolution": "not_applicable",
+        "signoffSource": null,
+        "status": null
+      }
+    ],
+    "requirement": "req:minifw:m1",
+    "scope": "org:mini"
+  },
+  {
+    "links": [
+      {
+        "assessedBy": null,
+        "assessmentId": "ca:VC-900:sys:mini-bot",
+        "assessmentSource": "derived",
+        "assuranceLevel": 2,
+        "controlId": "ctl:VC-900",
+        "evidence": [
+          {
+            "collectedAt": "2026-11-06T08:00:00Z",
+            "collector": "person:mini-reviewer",
+            "evidenceId": "ev:9a2e236f193e7490cb2c5fd5b9ef5369",
+            "kind": "attestation",
+            "sha256": "130aec4cdcdbe5010582e37aa1fe1f9672dd16e5f8487e71e84df9521da52dbd",
+            "source": "simulated",
+            "validUntil": "2026-12-06T00:00:00Z"
+          },
+          {
+            "collectedAt": "2026-11-06T09:00:00Z",
+            "collector": "crawler@0.1.0",
+            "evidenceId": "ev:8b8e1917a33394ded8114252f6bebe30",
+            "kind": "config_snapshot",
+            "sha256": "bedf0761cc6e3f1f3f9af07ed373d3eda9ad52566d15936e50505bc1424327d2",
+            "source": "discovered",
+            "validUntil": "2026-12-06T09:00:00Z"
+          },
+          {
+            "collectedAt": "2026-11-06T11:00:00Z",
+            "collector": "crawler@0.1.0",
+            "evidenceId": "ev:7cad16908c132f18824af108a759c63f",
+            "kind": "config_snapshot",
+            "sha256": "50e8a72ee280db1ed423bbf305352715d9e2975656559c9b635a33f38f840bca",
+            "source": "discovered",
+            "validUntil": "2026-12-06T11:00:00Z"
+          }
+        ],
+        "mapping": {
+          "strength": 7,
+          "strm": "subset_of",
+          "sufficiency": "full"
+        },
+        "providerId": null,
+        "resolution": "direct",
+        "signoffSource": null,
+        "status": "implemented"
+      }
+    ],
+    "requirement": "req:minifw:m1",
+    "scope": "sys:mini-bot"
+  }
+]

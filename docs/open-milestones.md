@@ -77,3 +77,17 @@ Stage 4 also showed ⬜ here. PRs 59 to 61 built the export and passed its redac
 6. The owner confirms and merges a PR that adds `web/public/data/snapshot.json`. Mark M9 ✅.
 
 **Known limit that does not block closing:** the listed fields and scan rules cannot prove that nothing sensitive exists beyond them. Free text from reviewed YAML is only scanned. That is why the Opus review is the last check (ADR 0030).
+
+## M10: dashboard (🔄)
+
+Built in one PR ([ADR 0031](adr/0031-m10-dashboard.md)): the six screens, the System profile, the audit trail and `stale_by_change` in TypeScript with parity tests, the development-only fixture flow, Playwright at 390 px, CI for `web/`, and `.github/workflows/pages.yml`. Everything so far runs against the recorded fixture and a generated mini snapshot.
+
+| Criterion | State |
+|---|---|
+| Typecheck and build pass | Passed locally and in CI |
+| `snapshot.json` is the only data source | Passed: a test fails on any other `fetch` or snapshot import, and the page's Content-Security-Policy allows only its own origin |
+| Every view shows provenance and the timestamp | Passed on the fixture and the mini snapshot |
+| Works at phone width | Passed: Playwright at 390 px and at desktop width |
+| Pages URL works | **Open:** the workflow skips while `web/public/data/snapshot.json` is missing. The deploy path is untested until the reviewed live snapshot PR (M9) merges |
+
+**To close:** after the M9 snapshot PR merges, open the Pages URL at desktop and phone width, check every route and the live timestamp, and confirm no fixture banner shows. Then mark M10 ✅.

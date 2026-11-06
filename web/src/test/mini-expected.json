@@ -1,0 +1,15 @@
+{
+  "assessment_ids": [
+    "ca:VC-900:sys:mini-bot"
+  ],
+  "change_id": "chg:20261106T100000.000000Z:8509261fe5feda52",
+  "evidence": [
+    {
+      "assessmentIds": [
+        "ca:VC-900:sys:mini-bot"
+      ],
+      "evidenceId": "ev:8b8e1917a33394ded8114252f6bebe30",
+      "resourceId": "res:lambda:eu-north-1:mini-bot"
+    }
+  ]
+}
