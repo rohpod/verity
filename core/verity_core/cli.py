@@ -313,6 +313,80 @@ def cmd_crawl(args: argparse.Namespace) -> int:
     return OK
 
 
+def _as_of(text: str) -> datetime:
+    """`YYYY-MM-DD` is the start of that day in UTC; a full timestamp needs its offset."""
+    if "T" not in text:
+        return datetime.combine(date.fromisoformat(text), time.min, tzinfo=UTC)
+    value = datetime.fromisoformat(text)
+    if value.tzinfo is None:
+        raise argparse.ArgumentTypeError("a timestamp needs an offset, such as +00:00 or Z")
+    return value.astimezone(UTC)
+
+
+def _check_snapshot(path: Path) -> int:
+    """Runs the scanner on a snapshot file. It cannot test for replaced hashes, which need the
+    graph the file came from (ADR 0029, decision 7)."""
+    from verity_core.export.scan import scan_text
+
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        print(f"cannot read {path}: {type(exc).__name__}", file=sys.stderr)
+        return UNREADABLE
+    hits = scan_text(text)
+    for hit in hits:
+        print(f"scan hit: {hit}", file=sys.stderr)
+    print(f"{path}: {len(hits)} scan hit(s), {len(text.encode()) / 1024:.0f} KB")
+    return FAILED if hits else OK
+
+
+def cmd_export(args: argparse.Namespace) -> int:
+    """Writes the redacted snapshot, or with `--check` scans an existing one. Only `--local`
+    exists so far: a live export reads the account's graph and is a later step."""
+    if args.check is not None:
+        return _check_snapshot(args.check)
+    if not args.local:
+        print(
+            "refused: a live export is not built yet. Use --local to export the recorded "
+            "fixture; it reads nothing from AWS.",
+            file=sys.stderr,
+        )
+        return REFUSED
+    # Imported here so the other commands need no export code.
+    from verity_core.export.build import ScanRejected, build_snapshot, write_snapshot
+    from verity_core.export.local import local_graph
+
+    loaded = _load_and_lint(args.content, args.tenant)
+    if isinstance(loaded, int):
+        return loaded
+    as_of = args.as_of or _utc_now().replace(microsecond=0)
+    fixture = args.fixture or args.content / "fixtures" / "crawl" / "estate.json"
+    try:
+        graph = local_graph(loaded, fixture, as_of)
+        built = build_snapshot(graph, as_of=as_of, data_source="fixture")
+    except (OSError, ValueError, BoundaryError) as exc:  # no raw record is ever in these
+        print(f"cannot build the snapshot: {type(exc).__name__}", file=sys.stderr)
+        return UNREADABLE
+    try:
+        size = write_snapshot(args.out, built)
+    except ScanRejected as rejected:
+        for hit in rejected.hits:
+            print(f"scan hit: {hit}", file=sys.stderr)
+        print("refused: the scan found something, so nothing was written", file=sys.stderr)
+        return FAILED
+    report = built.report
+    print("data source: recorded fixture, simulated. Nothing was read from AWS.")
+    print(f"{len(built.snapshot.nodes)} nodes and {len(built.snapshot.edges)} edges")
+    print(
+        f"redaction: own account {'replaced' if report.own_account_found else 'not found'}, "
+        f"{report.external_accounts} other account(s), {report.content_keys_withheld} hash "
+        f"key(s) withheld, {report.evidence_rebuilt} Evidence rebuilt, "
+        f"{report.evidence_unchanged} unchanged"
+    )
+    print(f"scan: clean. Wrote {args.out} ({size / 1024:.0f} KB)")
+    return OK
+
+
 def cmd_attest(args: argparse.Namespace) -> int:
     """Scaffolds a decision file for review (D9). It never touches the graph."""
     today = _utc_now().date()
@@ -403,6 +477,39 @@ def build_parser() -> argparse.ArgumentParser:
         help="the recorded estate (default: <content>/fixtures/crawl/estate.json)",
     )
     crawl_parser.add_argument("--verbose", action="store_true", help="list every finding")
+
+    export_parser = add("export", cmd_export, "write the redacted snapshot the demo reads")
+    export_parser.add_argument(
+        "--local",
+        action="store_true",
+        help="export the recorded fixture, crawled and assessed in memory; reads nothing from AWS",
+    )
+    export_parser.add_argument(
+        "--check",
+        type=Path,
+        metavar="FILE",
+        help="scan an existing snapshot instead of writing one",
+    )
+    export_parser.add_argument(
+        "--out",
+        type=Path,
+        default=Path(".build/snapshot.json"),
+        metavar="PATH",
+        help="where to write it (default: .build/snapshot.json, which git ignores)",
+    )
+    export_parser.add_argument(
+        "--as-of",
+        type=_as_of,
+        metavar="WHEN",
+        help="YYYY-MM-DD or a timestamp with its offset; the same inputs and --as-of give "
+        "identical bytes (default: now)",
+    )
+    export_parser.add_argument(
+        "--fixture",
+        type=Path,
+        metavar="PATH",
+        help="the recorded estate (default: <content>/fixtures/crawl/estate.json)",
+    )
 
     attest_parser = add("attest", cmd_attest, "scaffold an attestation decision file")
     attest_parser.add_argument("control", help="control code, such as VC-001")
