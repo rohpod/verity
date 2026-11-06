@@ -47,19 +47,19 @@ def test_a_different_as_of_gives_a_different_file(tmp_path):
 
 
 def test_a_scan_hit_leaves_no_file_behind(tmp_path):
-    graph, _ = small_graph({"contact": EMAIL})
+    graph, _ = small_graph({"ai_actions": [EMAIL]})
     target = tmp_path / "out" / "snapshot.json"
     with pytest.raises(ScanRejected) as rejected:
         write_snapshot(target, built_from(graph))
     assert [h.category for h in rejected.value.hits] == [scan.EMAIL]
     assert not target.exists()
-    assert list(tmp_path.rglob("*")) == [target.parent]  # not even a temporary file
+    assert list(tmp_path.rglob("*")) == []  # not a temporary file, not even the folder
 
 
 def test_a_scan_hit_does_not_replace_an_existing_file(tmp_path):
     target = tmp_path / "snapshot.json"
     target.write_text("previous")
-    graph, _ = small_graph({"contact": EMAIL})
+    graph, _ = small_graph({"ai_actions": [EMAIL]})
     with pytest.raises(ScanRejected):
         write_snapshot(target, built_from(graph))
     assert target.read_text() == "previous"
@@ -83,14 +83,14 @@ def test_the_file_the_scan_read_is_the_file_that_was_renamed(tmp_path):
 
 def test_the_command_writes_nothing_when_the_scan_finds_something(tmp_path, capsys):
     fixture = json.loads(FIXTURE.read_text())
-    fixture["tag_mappings"][0]["Tags"].append({"Key": "owner", "Value": EMAIL})
+    fixture["tag_mappings"][0]["Tags"].append({"Key": "project", "Value": EMAIL})
     path = tmp_path / "estate.json"
     path.write_text(json.dumps(fixture))
     out = tmp_path / "snapshot.json"
     assert run("--local", "--as-of", "2026-11-06", "--fixture", path, "--out", out) == cli.FAILED
     captured = capsys.readouterr()
     assert not out.exists() and list(tmp_path.glob(".snapshot-*")) == []
-    assert "scan hit: email at $.nodes[" in captured.err and "tags.owner" in captured.err
+    assert "scan hit: email at $.nodes[" in captured.err and "tags.project" in captured.err
     assert EMAIL not in captured.err + captured.out
     assert "nothing was written" in captured.err
 

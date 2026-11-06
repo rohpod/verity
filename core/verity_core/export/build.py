@@ -1,4 +1,4 @@
-"""Builds the snapshot from a graph and writes it only if the scan passes (ADR 0029).
+"""Builds the snapshot from a graph and writes it only if the scan passes (ADR 0029, ADR 0030).
 
 Reads nothing from AWS: the graph comes from `GraphRepository.load_graph()`, supplied by the
 caller. The same graph and `as_of` give identical bytes.
@@ -21,8 +21,11 @@ from verity_core.export.derive import derive
 from verity_core.export.redact import OWN_ACCOUNT, Redacted, RedactionReport, redact
 from verity_core.export.scan import Hit, scan_text
 from verity_core.export.snapshot import DataSource, Snapshot
-from verity_core.model.enums import NodeType, Source
-from verity_core.model.nodes import Provider
+from verity_core.model.enums import EvidenceKind, Source
+from verity_core.model.nodes import Evidence, Provider
+
+MAX_SNAPSHOT_BYTES = 2 * 1024 * 1024
+_SIGN_OFF_KINDS = (EvidenceKind.ATTESTATION, EvidenceKind.DOCUMENT_REF)
 
 
 class StaleGraphError(ValueError):
@@ -33,6 +36,10 @@ class StaleGraphError(ValueError):
         kinds = ", ".join(f"{n} {kind}" for kind, n in sorted(written.items()))
         super().__init__(f"an assessment would still write {kinds}: run verity assess first")
         self.written = written
+
+
+class SnapshotTooLarge(ValueError):
+    """Over the limit the dashboard is designed for. The message holds a size only."""
 
 
 class ScanRejected(Exception):
@@ -69,19 +76,27 @@ def _ticking_clock(graph: nx.MultiDiGraph, start: datetime) -> Callable[[], date
 
 
 def _simulated_components(graph: nx.MultiDiGraph) -> list[str]:
-    """What in the file is not real: simulated providers, and records marked simulated."""
+    """What in the file is not real: simulated providers, simulated sign-offs, and how many
+    records are synthetic or simulated. The people, companies and decisions are all invented."""
     records = [graph.nodes[n]["record"] for n in graph.nodes]
-    found = {
-        f"{r.name} (simulated provider)" for r in records if isinstance(r, Provider) and r.simulated
-    }
-    signed = [r for r in records if r.type is NodeType.EVIDENCE and r.source is Source.SIMULATED]
+    found = {f"provider: {r.name}" for r in records if isinstance(r, Provider) and r.simulated}
+    signed = [
+        r
+        for r in records
+        if isinstance(r, Evidence) and r.source is Source.SIMULATED and r.kind in _SIGN_OFF_KINDS
+    ]
     if signed:
         found.add("simulated sign-offs")
+    sources = Counter(r.source for r in records)
+    if sources[Source.SYNTHETIC]:
+        found.add(f"{sources[Source.SYNTHETIC]} synthetic records (invented organisation data)")
+    if sources[Source.SIMULATED]:
+        found.add(f"{sources[Source.SIMULATED]} simulated records")
     return sorted(found)
 
 
 def _steps(report: RedactionReport) -> list[str]:
-    steps = ["config hash fields withheld"]
+    steps = ["config hash fields withheld", "only listed tags and content keys published"]
     if report.own_account_found:
         steps.append(f"own account replaced by {OWN_ACCOUNT}")
     if report.external_accounts:
@@ -111,6 +126,8 @@ def build_snapshot(
         raise StaleGraphError(result.written)
     redacted = redact(graph, derive(graph, result))
     report = redacted.report
+    if data_source == "live" and not report.own_account_found:
+        raise ValueError("a live graph must show the owner's account")
     snapshot = Snapshot.model_validate(
         {
             "header": {
@@ -121,6 +138,7 @@ def build_snapshot(
                     "own_account_replaced": report.own_account_found,
                     "external_accounts": report.external_accounts,
                     "content_keys_withheld": report.content_keys_withheld,
+                    "tags_withheld": report.tags_withheld,
                     "evidence_rebuilt": report.evidence_rebuilt,
                     "evidence_unchanged": report.evidence_unchanged,
                 },
@@ -141,23 +159,27 @@ def serialise(snapshot: Snapshot) -> str:
 
 
 def write_snapshot(path: Path | str, built: Built) -> int:
-    """Writes to a temporary file in the same folder, scans what was written, and renames it
-    into place only if the scan is clean. Returns the size in bytes. On a hit, or any error, no
-    file is left behind."""
+    """Scans the text first, so nothing unscanned ever touches the disk, not even after a crash.
+    Then writes to a temporary file in the same folder, flushes it and renames it into place.
+    Returns the size in bytes. On a hit, or any error, no new file is left behind."""
+    text = serialise(built.snapshot)
+    hits = scan_text(text, old_hashes=built.redacted.replaced_hashes)
+    if hits:
+        raise ScanRejected(hits)
+    data = text.encode("utf-8")
+    if len(data) > MAX_SNAPSHOT_BYTES:
+        raise SnapshotTooLarge(f"{len(data)} bytes is over {MAX_SNAPSHOT_BYTES}")
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
     descriptor, name = tempfile.mkstemp(dir=target.parent, prefix=".snapshot-", suffix=".tmp")
     temporary = Path(name)
     try:
-        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
-            handle.write(serialise(built.snapshot))
-        hits = scan_text(
-            temporary.read_text(encoding="utf-8"), old_hashes=built.redacted.replaced_hashes
-        )
-        if hits:
-            raise ScanRejected(hits)
-        size = temporary.stat().st_size
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+        temporary.chmod(0o644)  # `mkstemp` makes it private, and this file is meant to be read
         os.replace(temporary, target)
-        return size
+        return len(data)
     finally:
         temporary.unlink(missing_ok=True)

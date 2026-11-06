@@ -61,7 +61,7 @@ def test_the_same_graph_always_gives_the_same_ordinals():
 
 
 def test_with_no_own_account_found_every_account_is_an_ordinal():
-    graph, _ = small_graph({"note": f"see arn:aws:iam::{OTHER}:root"})
+    graph, _ = small_graph({"ai_actions": [f"see arn:aws:iam::{OTHER}:root"]})
     built = built_from(graph)
     text = text_of(built)
     assert OTHER not in text and "acct_1" in text and OWN_ACCOUNT not in text
@@ -73,20 +73,25 @@ def test_with_no_own_account_found_every_account_is_an_ordinal():
 
 def test_the_config_hash_keys_are_withheld_at_every_depth_inside_evidence():
     nested = {
-        "a": {"config_hash": "x"},
-        "b": [{"previous_config_hash": "y"}],
+        "config": {
+            "policies": [{"name": "p", "config_hash": "x"}],
+            "trust": [{"previous_config_hash": "y"}],
+        },
         "new_config_hash": "z",
     }
-    graph, _ = small_graph({**nested, "kept": 1})
+    graph, _ = small_graph({**nested, "statement_count": 1})
     built = built_from(graph)
     (item,) = evidence_nodes(built)
-    assert item["content"] == {"a": {}, "b": [{}], "kept": 1}
+    assert item["content"] == {
+        "config": {"policies": [{"name": "p"}], "trust": [{}]},
+        "statement_count": 1,
+    }
     assert built.report.content_keys_withheld == 3
     assert "config_hash" not in text_of(built)
 
 
 def test_a_resources_config_hash_field_is_not_published():
-    graph, _ = small_graph({"k": 1})
+    graph, _ = small_graph({"statement_count": 1})
     resource = next(
         n for n in built_from(graph).snapshot.model_dump()["nodes"] if n["type"] == "AWSResource"
     )
@@ -113,18 +118,19 @@ def test_no_old_hash_or_id_of_redacted_evidence_survives_in_the_output():
     text = text_of(built)
     for _, original in made:
         assert original.id not in text and original.sha256 not in text
-    assert built.redacted.replaced_hashes == {value for _, o in made for value in (o.id, o.sha256)}
+    replaced = {value for _, o in made for value in (o.id, o.sha256)}
+    assert built.redacted.replaced_hashes == replaced | {"a" * 64, "b" * 64}  # and config hashes
     assert scan.scan_text(text, old_hashes=built.redacted.replaced_hashes) == []
 
 
 def test_unchanged_evidence_keeps_its_hash_and_id():
-    graph, made = small_graph({"plain": "content", "n": 1})
+    graph, made = small_graph({"truncated": False, "statement_count": 1})
     ((_, original),) = made
     built = built_from(graph)
     (item,) = evidence_nodes(built)
     assert (item["id"], item["sha256"], item["redacted"]) == (original.id, original.sha256, False)
     assert built.report.evidence_unchanged == 1 and built.report.evidence_rebuilt == 0
-    assert built.redacted.replaced_hashes == frozenset()
+    assert built.redacted.replaced_hashes == {"b" * 64}  # the resource's withheld config hash
 
 
 def test_two_items_that_become_identical_are_refused():

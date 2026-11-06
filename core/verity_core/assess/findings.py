@@ -70,7 +70,11 @@ def derive_findings(
         if r.status is ImplementationStatus.NOT_IMPLEMENTED:
             found.append(
                 Finding(
-                    "control_not_met", Severity.HIGH, r.scope_id, f"{where} is not implemented."
+                    "control_not_met",
+                    Severity.HIGH,
+                    r.scope_id,
+                    f"{where} is not implemented.",
+                    r.control_id,
                 )
             )
         if r.status is ImplementationStatus.NOT_ASSESSED:
@@ -85,6 +89,7 @@ def derive_findings(
                     Severity.HIGH if in_scope else Severity.MEDIUM,
                     r.scope_id,
                     f"{where} has no usable evidence.",
+                    r.control_id,
                 )
             )
         if r.freshness is Freshness.EXPIRING:
@@ -94,6 +99,7 @@ def derive_findings(
                     Severity.LOW,
                     r.scope_id,
                     f"The evidence for {where} expires within 7 days.",
+                    r.control_id,
                 )
             )
 

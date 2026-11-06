@@ -9,11 +9,17 @@ Withheld, and why:
 - `config_hash`, `previous_config_hash`, `new_config_hash`: computed over raw configuration that
   includes the account digest, so a published hash lets a reader test candidate digests offline
   (decision 4). The UI needs only that a change happened.
+
+Evidence content and resource tags are free-form, and no pattern can recognise a person's name,
+so they are listed too (ADR 0030). A content key that is not listed refuses the export: the shape
+is Verity's own, so a new key is a decision. A tag that is not listed is left out: tags are set
+outside Verity, so an unknown one is expected.
 """
 
 from pydantic import BaseModel
 
 from verity_core.model.edges import AppliesToEdge, MapsToEdge, PlainEdge, ProcessesEdge
+from verity_core.model.enums import EvidenceKind
 from verity_core.model.nodes import (
     AISystem,
     AWSResource,
@@ -129,6 +135,62 @@ WITHHELD_EDGE_FIELDS: dict[type[BaseModel], tuple[str, ...]] = {}
 # Keys dropped at any depth from Evidence content: the same hash fields, inside the content
 # (decision 4). Dropping one changes the content, so the Evidence is rebuilt (decision 6).
 WITHHELD_CONTENT_KEYS = frozenset({"config_hash", "previous_config_hash", "new_config_hash"})
+
+# The tags the estate uses. Any other tag is left out, at the resource and in its Evidence.
+PUBLIC_TAG_KEYS = frozenset({"ai:system-id", "project", "verity:component"})
+
+_DECISION_KEYS = frozenset(
+    {
+        "basis",
+        "condition",
+        "control",
+        "decision_file",
+        "decision_id",
+        "decision_kind",
+        "file_sha256",
+        "path",
+        "profiling",
+        "scope",
+        "statement",
+        "status",
+        "subject",
+        "supersedes",
+        "system",
+        "tier",
+    }
+)
+# The top-level keys of Evidence content, by kind. `usage_record` Evidence is never written.
+PUBLIC_CONTENT_KEYS: dict[EvidenceKind, frozenset[str]] = {
+    EvidenceKind.CONFIG_SNAPSHOT: frozenset(
+        {"ai_actions", "config", "statement_count", "truncated"}
+    ),
+    EvidenceKind.AUTOMATED_TEST: frozenset(
+        {"control", "granted", "outcome", "roles_unseen", "scope", "unused", "unverifiable"}
+    ),
+    EvidenceKind.USAGE_RECORD: frozenset(),
+    EvidenceKind.ATTESTATION: _DECISION_KEYS,
+    EvidenceKind.DOCUMENT_REF: _DECISION_KEYS,
+}
+# The shape of `content.config`: what `function_config`, `role_config` and `table_config` return.
+PUBLIC_CONFIG_KEYS = frozenset(
+    {
+        "architectures",
+        "code_sha256",
+        "env_names",
+        "handler",
+        "memory_mb",
+        "name",
+        "policies",
+        "role",
+        "runtime",
+        "tags",
+        "timeout_s",
+        "trust",
+    }
+)
+PUBLIC_POLICY_KEYS = frozenset({"kind", "name", "statements"})
+PUBLIC_STATEMENT_KEYS = frozenset({"actions", "effect", "not_action", "not_resource", "resources"})
+PUBLIC_TRUST_KEYS = frozenset({"actions", "effect", "principals"})
 
 
 def public_fields(model: type[BaseModel]) -> tuple[str, ...]:

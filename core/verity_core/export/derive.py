@@ -44,9 +44,17 @@ def _dump(rows: list[Any]) -> list[dict[str, Any]]:
 
 
 def findings(result: ApplyResult) -> list[dict[str, Any]]:
+    simulated = {(r.control_id, r.scope_id) for r in result.results if r.source is Source.SIMULATED}
     return _dump(
         [
-            SnapshotFinding(code=f.code, severity=f.severity, subject=f.subject, message=f.message)
+            SnapshotFinding(
+                code=f.code,
+                severity=f.severity,
+                subject=f.subject,
+                message=f.message,
+                control_id=f.control_id,
+                simulated=(f.control_id, f.subject) in simulated,
+            )
             for f in result.findings
         ]
     )
