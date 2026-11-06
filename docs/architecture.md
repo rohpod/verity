@@ -429,6 +429,7 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
 | [0019](adr/0019-m5-rules-and-assessment.md) | M5 rules and assessment: automated-only guardrail, Art. 111(2) conditional edges, high-risk candidates, decisions as Evidence, Not met |
 | [0020](adr/0020-m5-review-fixes.md) | M5 review fixes: immutable decisions with `supersedes` and revocation, risk-tier expiry, unknown facts, severity from binding law, ended assessments |
 | [0021](adr/0021-m6-discovery.md) | M6 discovery: evidence written on change, summarised over the cap, one cleaning boundary, VC-060 for unused permissions, Candidate lifecycle |
+| [0022](adr/0022-m6-review-fixes.md) | M6 review fixes: concrete AI actions with proving events, an inconclusive VC-060 outcome, account digests, signal matching |
 
 ## L. Schema validation walkthrough
 
