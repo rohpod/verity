@@ -4,35 +4,16 @@ One session fixture builds twice. Needs network access to PyPI for the pydantic 
 not AWS."""
 
 import hashlib
-import importlib.util
 import re
 import subprocess
 import sys
 import textwrap
 import zipfile
 
-import pytest
 from estate_support import ROOT
 
 MB = 1024 * 1024
 FORBIDDEN_TOP = {"boto3", "botocore", "networkx", "yaml", "training"}
-
-
-def load_build_script():
-    spec = importlib.util.spec_from_file_location(
-        "build_lambdas", ROOT / "scripts/build_lambdas.py"
-    )
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-@pytest.fixture(scope="session")
-def builds(tmp_path_factory):
-    script = load_build_script()
-    first = script.build(tmp_path_factory.mktemp("build-a"))
-    second = script.build(tmp_path_factory.mktemp("build-b"))
-    return script, first, second
 
 
 def names(path) -> list[str]:
