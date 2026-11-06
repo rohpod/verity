@@ -14,9 +14,11 @@ locals {
   ]
 
   # The estate's apps. `uses_openai` adds OPENAI_BASE_URL, which comes from the Function URL.
+  # Memory sets the CPU share, and the two apps that load pydantic need more of it (ADR 0026).
   apps = {
     support-assistant = {
       description = "Answers customer support questions"
+      memory_size = 512
       tags        = { "ai:system-id" = "sys:support-assistant", project = "kestrel-demo" }
       uses_openai = false
       env = {
@@ -28,6 +30,7 @@ locals {
     }
     talent-screening = {
       description = "Scores job applicants with a small local model"
+      memory_size = 128
       tags        = {}
       uses_openai = false
       env = {
@@ -37,6 +40,7 @@ locals {
     }
     contract-insights = {
       description = "Summarises customer contracts for sales and legal"
+      memory_size = 512
       tags        = { "ai:system-id" = "sys:contract-insights", project = "kestrel-demo" }
       uses_openai = true
       env = {
@@ -46,12 +50,14 @@ locals {
     }
     shadow-summariser = {
       description = "Summarises documents for one team"
+      memory_size = 128
       tags        = {}
       uses_openai = true
       env         = {}
     }
     invoice-renderer = {
       description = "Renders invoices from a template"
+      memory_size = 128
       tags        = {}
       uses_openai = false
       env = {

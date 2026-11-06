@@ -43,7 +43,7 @@ resource "aws_lambda_function" "app" {
   runtime          = "python3.12"
   architectures    = ["arm64"]
   handler          = "app.handler"
-  memory_size      = 128
+  memory_size      = each.value.memory_size
   timeout          = 10
   filename         = "${var.build_dir}/${each.key}.zip"
   source_code_hash = try(filebase64sha256("${var.build_dir}/${each.key}.zip"), "")
@@ -104,7 +104,7 @@ resource "aws_lambda_function" "probe" {
   runtime          = "python3.12"
   architectures    = ["arm64"]
   handler          = "app.handler"
-  memory_size      = 128
+  memory_size      = 512
   timeout          = 10
   filename         = "${var.build_dir}/verity-probe.zip"
   source_code_hash = try(filebase64sha256("${var.build_dir}/verity-probe.zip"), "")

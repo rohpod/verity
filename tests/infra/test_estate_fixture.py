@@ -41,7 +41,7 @@ def test_description_memory_timeout_runtime_and_architecture_match(name):
     kind = "app" if name in LOCALS["apps"] else "mock"
     body = RESOURCES["aws_lambda_function"][kind]
     assert IN_MODULE[name]["description"] == fixture["Description"]
-    assert body["memory_size"] == fixture["MemorySize"]
+    assert IN_MODULE[name].get("memory_size", body["memory_size"]) == fixture["MemorySize"]
     assert body["timeout"] == fixture["Timeout"]
     assert body["runtime"] == fixture["Runtime"]
     assert body["architectures"] == fixture["Architectures"]
