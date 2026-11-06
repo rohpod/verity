@@ -23,6 +23,8 @@ LADDER = (
     AiLikelihood.POSSIBLE,
 )
 _TOKEN_SPLIT = re.compile(r"[^A-Za-z0-9]+")
+_CAMEL_LOWER_UPPER = re.compile(r"([a-z0-9])([A-Z])")
+_CAMEL_UPPER_RUN = re.compile(r"([A-Z]+)([A-Z][a-z])")
 
 
 @dataclass(frozen=True)
@@ -32,8 +34,11 @@ class Score:
 
 
 def tokens(text: str) -> list[str]:
-    """Whole words, lower case, split on anything that is not a letter or a digit."""
-    return [t for t in _TOKEN_SPLIT.split(text.lower()) if t]
+    """Whole words, lower case, split on anything that is not a letter or a digit and at
+    CamelCase boundaries: `OpenAiProxy` and `OpenAIProxy` both give open, ai, proxy."""
+    spaced = _CAMEL_LOWER_UPPER.sub(r"\1 \2", text)
+    spaced = _CAMEL_UPPER_RUN.sub(r"\1 \2", spaced)
+    return [t for t in _TOKEN_SPLIT.split(spaced.lower()) if t]
 
 
 def score(
@@ -48,8 +53,9 @@ def score(
 ) -> Score:
     """The last four arguments are facts found elsewhere: a manifest lists the function, its
     role grants an AI action, its system has usage records, CloudTrail shows its role calling AI.
-    A function tagged as a platform component scores none whatever else fires."""
-    if rules.platform_tag in tags:
+    A platform component, which has the platform tag and a name in `platform_functions`, scores
+    none whatever else fires. The tag alone does nothing (ADR 0022)."""
+    if rules.platform_tag in tags and function.name in rules.platform_functions:
         return Score(AiLikelihood.NONE, (PLATFORM_COMPONENT,))
 
     fired: dict[str, AiLikelihood] = {}

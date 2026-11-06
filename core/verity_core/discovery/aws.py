@@ -12,6 +12,7 @@ code download (architecture section D):
 Every item is cleaned inside the page loop, so a raw function never leaves it.
 """
 
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -28,12 +29,14 @@ from verity_core.discovery.boundary import (
     clean_table,
     clean_tags,
     clean_trail_event,
+    own_account,
 )
 from verity_core.discovery.collectors import REGION, Collected
 from verity_core.model.enums import Source
 
 MANIFEST_PATH = "/verity/manifests"
 SERVICE_ROLE_PATH = "/aws-service-role/"  # roles AWS owns: not part of the estate
+QUIET_LOGGERS = ("botocore", "boto3", "urllib3")
 TAGGED_TYPES = ["lambda:function", "dynamodb:table"]
 
 
@@ -84,11 +87,15 @@ class AwsCollector:
         self._region = region
 
     def collect(self) -> Collected:
+        # botocore logs whole responses at DEBUG, and ListFunctions holds env var values (D1).
+        for library in QUIET_LOGGERS:
+            logging.getLogger(library).setLevel(logging.WARNING)
         manifests = self._manifests()
+        roles = self._roles()  # before the tables: their ARNs take the account from a role
         return Collected(
             functions=self._functions(),
-            roles=self._roles(),
-            tables=self._tables(),
+            roles=roles,
+            tables=self._tables(own_account(roles)),
             manifests=tuple(m for m in manifests if m is not None),
             trail_events=self._trail_events(),
             tags_by_arn=self._tags(),
@@ -113,9 +120,9 @@ class AwsCollector:
             tags |= clean_tags(page["ResourceTagMappingList"])
         return tags
 
-    def _tables(self) -> tuple[CollectedTable, ...]:
+    def _tables(self, account: str) -> tuple[CollectedTable, ...]:
         return tuple(
-            clean_table(name, self._region)
+            clean_table(name, self._region, account)
             for page in self._pages(self.clients.dynamodb, "list_tables")
             for name in page["TableNames"]
         )

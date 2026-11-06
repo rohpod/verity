@@ -6,7 +6,6 @@ from verity_core.discovery.boundary import TrailEvent
 from verity_core.discovery.usage import (
     check_vc060,
     granted_ai_actions,
-    trail_action,
     trail_shows_ai,
     usage_shows_ai,
 )
@@ -16,105 +15,138 @@ from verity_core.model.usage import UsageRecord
 AI = SIGNALS.ai_actions
 SOURCES = SIGNALS.trail_event_sources
 WHEN = datetime(2026, 11, 1, tzinfo=UTC)
+INVOKE, STREAM = "bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"
 
 
-def event(role, name="Converse", source="bedrock.amazonaws.com") -> TrailEvent:
-    return TrailEvent(source, name, WHEN, role)
+def event(role, name="Converse", source="bedrock.amazonaws.com", kind="AwsApiCall") -> TrailEvent:
+    return TrailEvent(source, name, WHEN, role, kind)
 
 
-def test_a_grant_overlaps_an_ai_action_in_either_direction():
-    statements = [
-        allow("bedrock:Converse"),
-        allow("bedrock:*"),
-        allow("*"),
-        allow("BEDROCK:invokemodel"),
-        allow("sagemaker:InvokeEndpoint"),
-        allow("s3:GetObject"),
-        allow("bedrock:ListFoundationModels"),
-    ]
-    assert granted_ai_actions(AI, statements) == (
-        "*",
-        "BEDROCK:invokemodel",
-        "bedrock:*",
-        "bedrock:Converse",
-        "sagemaker:InvokeEndpoint",
-    )
+def granted(*statements):
+    return granted_ai_actions(AI, statements)
 
 
-def test_deny_and_negated_statements_do_not_grant():
-    statements = [allow("bedrock:Converse", effect="Deny"), allow("bedrock:Converse", negated=True)]
-    assert granted_ai_actions(AI, statements) == ()
+def test_a_pattern_grant_resolves_to_the_listed_actions_it_covers():
+    assert granted(allow("bedrock:InvokeModel")) == (INVOKE,)
+    assert granted(allow("BEDROCK:invokemodel")) == (INVOKE,)
+    assert granted(allow("bedrock:*Model")) == (INVOKE,)
+    assert granted(allow("bedrock:Invoke?odel")) == (INVOKE,)
+    assert granted(allow("bedrock:InvokeModel*")) == (INVOKE, STREAM)
+    assert len(granted(allow("*"))) == 8
+    assert len(granted(allow("bedrock:*"))) == 5
+    assert granted(allow("bedrock:Get*"), allow("s3:*"), allow("bedrock:Converse")) == ()
+
+
+def test_a_not_action_statement_grants_everything_it_does_not_exclude():
+    broad = allow(["iam:*", "organizations:*"], not_action=True)
+    assert len(granted(broad)) == 8
+    assert granted(allow(["bedrock:*", "sagemaker:*"], not_action=True)) == ()
+    assert granted(allow(["bedrock:InvokeModel"], not_action=True))[0] == "bedrock:InvokeAgent"
+
+
+def test_deny_never_grants_and_is_not_subtracted():
+    assert granted(allow("bedrock:InvokeModel", effect="Deny")) == ()
+    both = granted(allow("bedrock:InvokeModel"), allow("bedrock:InvokeModel", effect="Deny"))
+    assert both == (INVOKE,)
 
 
 def test_an_unexercised_grant_fails():
-    result = check_vc060(AI, [make_role("r", allow("bedrock:Converse"))], [], SOURCES)
-    assert (result.outcome, result.granted, result.unused) == (
-        "fail",
-        ("bedrock:Converse",),
-        ("bedrock:Converse",),
-    )
+    result = check_vc060(AI, [make_role("r", allow(INVOKE))], [], SOURCES)
+    assert (result.outcome, result.granted, result.unused) == ("fail", (INVOKE,), (INVOKE,))
 
 
-def test_a_matching_trail_event_for_the_same_role_passes():
-    roles = [make_role("r", allow("bedrock:Converse"))]
-    result = check_vc060(AI, roles, [event("r")], SOURCES)
-    assert (result.outcome, result.granted, result.unused) == ("pass", ("bedrock:Converse",), ())
+def test_converse_proves_invoke_model_and_converse_stream_proves_the_stream_action():
+    roles = [make_role("r", allow(INVOKE))]
+    assert check_vc060(AI, roles, [event("r", "Converse")], SOURCES).outcome == "pass"
+    assert check_vc060(AI, roles, [event("r", "InvokeModel")], SOURCES).outcome == "pass"
+    assert check_vc060(AI, roles, [event("r", "ConverseStream")], SOURCES).outcome == "fail"
+    roles = [make_role("r", allow(STREAM))]
+    assert check_vc060(AI, roles, [event("r", "ConverseStream")], SOURCES).outcome == "pass"
+    assert check_vc060(AI, roles, [event("r", "Converse")], SOURCES).outcome == "fail"
 
 
-def test_an_event_by_another_role_or_another_action_does_not_count():
-    roles = [make_role("r", allow("bedrock:Converse"))]
-    assert check_vc060(AI, roles, [event("other")], SOURCES).outcome == "fail"
-    assert check_vc060(AI, roles, [event("r", name="InvokeModel")], SOURCES).outcome == "fail"
-    assert (
-        check_vc060(AI, roles, [event("r", source="s3.amazonaws.com")], SOURCES).outcome == "fail"
-    )
+def test_an_event_by_another_role_service_or_a_service_event_does_not_count():
+    roles = [make_role("r", allow(INVOKE))]
+    for odd in (
+        event("other"),
+        event("r", source="s3.amazonaws.com"),
+        event("r", kind="AwsServiceEvent"),
+        event("r", name="ListFoundationModels"),
+    ):
+        assert check_vc060(AI, roles, [odd], SOURCES).outcome == "fail"
 
 
-def test_a_wildcard_grant_is_used_by_any_event_it_covers():
+def test_a_wildcard_grant_fails_while_a_covered_action_is_unused():
     roles = [make_role("r", allow("bedrock:*"))]
-    assert check_vc060(AI, roles, [event("r", name="InvokeModel")], SOURCES).outcome == "pass"
+    result = check_vc060(AI, roles, [event("r", "InvokeModel")], SOURCES)
+    assert result.outcome == "fail" and STREAM in result.unused and INVOKE not in result.unused
+
+
+def test_an_action_event_history_cannot_show_is_inconclusive_not_unused():
+    roles = [make_role("r", allow("sagemaker:InvokeEndpoint"))]
+    result = check_vc060(AI, roles, [], SOURCES)
+    assert (result.outcome, result.unverifiable, result.unused) == (
+        "inconclusive",
+        ("sagemaker:InvokeEndpoint",),
+        (),
+    )
+    both = [make_role("r", allow(["sagemaker:InvokeEndpoint", INVOKE]))]
+    assert check_vc060(AI, both, [], SOURCES).outcome == "fail"
+
+
+def test_a_role_the_crawler_cannot_see_makes_the_check_inconclusive():
+    roles = [make_role("r", allow("dynamodb:GetItem"))]
+    assert check_vc060(AI, roles, [], SOURCES).outcome == "pass"
+    assert check_vc060(AI, roles, [], SOURCES, roles_unseen=1).outcome == "inconclusive"
+    assert check_vc060(AI, [], [], SOURCES, roles_unseen=2).roles_unseen == 2
+
+
+def test_an_unseen_role_does_not_hide_a_failure():
+    roles = [make_role("r", allow(INVOKE))]
+    assert check_vc060(AI, roles, [], SOURCES, roles_unseen=1).outcome == "fail"
 
 
 def test_no_ai_grant_passes_with_nothing_granted():
     result = check_vc060(AI, [make_role("r", allow("dynamodb:GetItem"))], [], SOURCES)
-    assert (result.outcome, result.granted, result.unused, result.unparsed) == (
+    assert (result.outcome, result.granted, result.unused, result.unverifiable) == (
         "pass",
         (),
         (),
-        False,
+        (),
     )
 
 
-def test_a_not_action_allow_is_ignored_and_reported_as_unparsed():
-    role = make_role("r", allow("iam:*", negated=True))
+def test_a_broad_not_action_role_fails():
+    role = make_role("r", allow("iam:*", not_action=True))
     result = check_vc060(AI, [role], [], SOURCES)
-    assert (result.outcome, result.granted, result.unparsed) == ("pass", (), True)
+    assert result.outcome == "fail" and len(result.granted) == 8
 
 
 def test_several_roles_are_judged_each_by_its_own_events():
-    roles = [make_role("a", allow("bedrock:Converse")), make_role("b", allow("bedrock:Converse"))]
+    roles = [make_role("a", allow(INVOKE)), make_role("b", allow(INVOKE))]
     result = check_vc060(AI, roles, [event("a")], SOURCES)
-    assert result.unused == ("bedrock:Converse",)  # role b never used it
+    assert (result.outcome, result.unused) == ("fail", (INVOKE,))  # role b never used it
 
 
 def test_the_content_names_the_control_and_the_scope_the_assessor_matches_on():
-    result = check_vc060(AI, [make_role("r", allow("bedrock:Converse"))], [], SOURCES)
+    result = check_vc060(AI, [make_role("r", allow(INVOKE))], [], SOURCES)
     assert result.content("sys:support-assistant") == {
         "control": "ctl:VC-060",
         "scope": "sys:support-assistant",
         "outcome": "fail",
-        "granted": ["bedrock:Converse"],
-        "unused": ["bedrock:Converse"],
-        "unparsed": False,
+        "granted": [INVOKE],
+        "unused": [INVOKE],
+        "unverifiable": [],
+        "roles_unseen": 0,
     }
 
 
-def test_trail_actions_and_signals():
-    assert trail_action(event("r", name="InvokeModel")) == "bedrock:InvokeModel"
+def test_trail_signal():
     assert trail_shows_ai("r", [event("r")], SOURCES)
     assert not trail_shows_ai("other", [event("r")], SOURCES)
     assert not trail_shows_ai(None, [event(None)], SOURCES)
     assert not trail_shows_ai("r", [event("r", source="s3.amazonaws.com")], SOURCES)
+    assert not trail_shows_ai("r", [event("r", kind="AwsServiceEvent")], SOURCES)
 
 
 def test_usage_records_are_a_signal_but_never_part_of_the_vc060_check():
@@ -129,5 +161,5 @@ def test_usage_records_are_a_signal_but_never_part_of_the_vc060_check():
         source=Source.SIMULATED,
     )
     assert usage_shows_ai([record]) and not usage_shows_ai([])
-    roles = [make_role("r", allow("bedrock:Converse"))]
+    roles = [make_role("r", allow(INVOKE))]
     assert check_vc060(AI, roles, [], SOURCES).outcome == "fail"

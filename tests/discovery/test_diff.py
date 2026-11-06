@@ -62,7 +62,7 @@ def test_a_role_hash_ignores_statement_order_and_notices_a_change():
 
 
 def test_a_table_hash_covers_name_and_tags():
-    table = clean_table("verity-graph", "eu-north-1")
+    table = clean_table("verity-graph", "eu-north-1", "acct_0123abcd")
     assert config_hash(table_config(table, {})) != config_hash(table_config(table, {"k": "v"}))
 
 

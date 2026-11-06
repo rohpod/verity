@@ -14,6 +14,7 @@ FIXTURE = CONTENT / "fixtures" / "crawl" / "estate.json"
 CANARY = "VERITY-CANARY-7f3a"
 REGION = "eu-north-1"
 MOTO_ACCOUNT = "123456789012"
+ACCT = "acct_0123abcd"  # what a 12-digit account ID becomes at the boundary
 
 MANIFEST = "system: sys:talent-screening\nresources:\n  - {type: lambda, name: talent-screening}\n"
 
@@ -51,7 +52,11 @@ class StubCloudTrail:
 
 
 def trail_event(
-    role: str, name: str = "Converse", source: str = "bedrock.amazonaws.com", when=None
+    role: str,
+    name: str = "Converse",
+    source: str = "bedrock.amazonaws.com",
+    when=None,
+    event_type: str = "AwsApiCall",
 ):
     from datetime import UTC, datetime
 
@@ -63,7 +68,7 @@ def trail_event(
         "EventSource": source,
         "EventName": name,
         "EventTime": when or datetime(2026, 11, 1, tzinfo=UTC),
-        "CloudTrailEvent": json.dumps(detail),
+        "CloudTrailEvent": json.dumps(detail | {"eventType": event_type}),
     }
 
 
@@ -90,7 +95,9 @@ def populate_moto(*, tags=None) -> None:
         PolicyDocument=json.dumps(
             {
                 "Version": "2012-10-17",
-                "Statement": [{"Effect": "Allow", "Action": "bedrock:Converse", "Resource": "*"}],
+                "Statement": [
+                    {"Effect": "Allow", "Action": "bedrock:InvokeModel", "Resource": "*"}
+                ],
             }
         ),
     )
@@ -170,10 +177,10 @@ SIGNALS = load_content(CONTENT).signals
 def make_function(name, env=(), description="", role=None) -> CollectedFunction:
     return CollectedFunction(
         name=name,
-        arn=f"arn:aws:lambda:{REGION}:<account>:function:{name}",
+        arn=f"arn:aws:lambda:{REGION}:{ACCT}:function:{name}",
         runtime="python3.12",
         handler="app.handler",
-        role_arn=f"arn:aws:iam::<account>:role/{role or name + '-role'}",
+        role_arn=f"arn:aws:iam::{ACCT}:role/{role or name + '-role'}",
         architectures=("arm64",),
         memory_mb=128,
         timeout_s=10,
@@ -183,16 +190,18 @@ def make_function(name, env=(), description="", role=None) -> CollectedFunction:
     )
 
 
-def allow(actions, resources="*", effect="Allow", negated=False) -> Statement:
+def allow(
+    actions, resources="*", effect="Allow", not_action=False, not_resource=False
+) -> Statement:
     actions = (actions,) if isinstance(actions, str) else tuple(sorted(actions))
     resources = (resources,) if isinstance(resources, str) else tuple(sorted(resources))
-    return Statement(effect, actions, resources, negated)
+    return Statement(effect, actions, resources, not_action, not_resource)
 
 
 def make_role(name, *statements) -> CollectedRole:
     return CollectedRole(
         name=name,
-        arn=f"arn:aws:iam::<account>:role/{name}",
+        arn=f"arn:aws:iam::{ACCT}:role/{name}",
         trust=(),
         policies=(Policy("p", "inline", tuple(statements)),),
     )

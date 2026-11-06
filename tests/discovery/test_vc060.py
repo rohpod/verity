@@ -72,8 +72,8 @@ def test_an_unused_bedrock_grant_is_not_implemented_at_l3_and_a_high_finding(cra
     )
     assert row.method == "automated_test_fail"
     (evidence,) = vc060_evidence(crawled)
-    assert evidence.content["unused"] == ["bedrock:Converse"]
-    assert evidence.content["granted"] == ["bedrock:Converse"]
+    assert evidence.content["unused"] == ["bedrock:InvokeModel"]
+    assert evidence.content["granted"] == ["bedrock:InvokeModel"]
     assert evidence.source is Source.SIMULATED and row.source is Source.SIMULATED
     assert CANARY not in dump(crawled)  # nor anything the assessment stored
     high = [f for f in outcome.findings if f.code == "control_not_met" and f.subject == SYSTEM]
@@ -134,7 +134,7 @@ def test_a_matching_trail_event_passes_but_never_makes_a_requirement_satisfied(
     assert a82.state is not RequirementState.SATISFIED  # automated checks alone never make one
 
 
-def test_a_not_action_statement_is_ignored_and_reported(repo, clock, tmp_path):
+def test_a_not_action_role_is_a_broad_grant_and_fails(repo, clock, tmp_path):
     seeded(repo, clock, CONTENT_LOADED)
 
     def odd(raw):
@@ -148,7 +148,7 @@ def test_a_not_action_statement_is_ignored_and_reported(repo, clock, tmp_path):
 
     crawl_fixture(repo, clock, edited_fixture(tmp_path, odd), CONTENT_LOADED)
     (evidence,) = vc060_evidence(repo, "sys:talent-screening")
-    assert evidence.content["unparsed"] is True and evidence.content["outcome"] == "pass"
+    assert evidence.content["outcome"] == "fail" and len(evidence.content["granted"]) == 8
 
 
 def test_the_check_is_written_again_only_when_its_content_or_sources_change(repo, clock, tmp_path):
@@ -182,3 +182,33 @@ def test_a_change_to_the_function_alone_makes_the_check_fresh_again(repo, clock,
     outcome = assess(repo, clock)
     assert result(outcome).evidence_id == max(evidence, key=lambda e: e.collected_at).id
     assert result(outcome).status is ImplementationStatus.NOT_IMPLEMENTED
+
+
+def test_an_unseen_role_is_inconclusive_and_replaces_an_older_pass(repo, clock, tmp_path):
+    seeded(repo, clock, CONTENT_LOADED)
+    crawl_fixture(repo, clock, content=CONTENT_LOADED)
+    first = assess(repo, clock)
+    assert result(first, "sys:talent-screening").status is ImplementationStatus.IMPLEMENTED
+
+    def hide(raw):
+        raw["roles"] = [r for r in raw["roles"] if r["role"]["RoleName"] != "talent-screening-role"]
+
+    clock.advance(hours=1)
+    crawl_fixture(repo, clock, edited_fixture(tmp_path, hide), CONTENT_LOADED)
+    (_, latest) = sorted(vc060_evidence(repo, "sys:talent-screening"), key=lambda e: e.collected_at)
+    assert latest.content["outcome"] == "inconclusive" and latest.content["roles_unseen"] == 1
+    row = result(assess(repo, clock), "sys:talent-screening")
+    assert (row.status, row.level) == (
+        ImplementationStatus.NOT_ASSESSED,
+        AssuranceLevel.L0_INFERRED,
+    )
+
+
+def test_converse_in_cloudtrail_proves_the_seeded_invoke_model_grant(repo, clock, tmp_path):
+    seeded(repo, clock, CONTENT_LOADED)
+
+    def used(raw):
+        raw["trail_events"].append(trail_event_json("support-assistant-role", name="Converse"))
+
+    crawl_fixture(repo, clock, edited_fixture(tmp_path, used), CONTENT_LOADED)
+    assert result(assess(repo, clock)).status is ImplementationStatus.IMPLEMENTED

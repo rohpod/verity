@@ -241,7 +241,7 @@ def test_the_canary_is_nowhere_after_a_crawl(repo, clock, capsys, caplog):
     )
     assert CANARY not in everything
     assert "000000000000" not in everything
-    assert "<account>" in everything  # ARNs in evidence are kept, cleaned
+    assert "acct_" in everything  # ARNs in evidence are kept, cleaned
 
 
 def test_the_crawler_never_touches_the_seeded_systems(repo, clock):
@@ -302,7 +302,11 @@ def test_evidence_over_the_cap_is_summarised_and_never_refused(repo, clock, tmp_
 
     def huge(raw):
         actions = [f"s3:ExampleAction{i:04d}WithALongishName" for i in range(900)]
-        statement = {"Effect": "Allow", "Action": actions + ["bedrock:Converse"], "Resource": "*"}
+        statement = {
+            "Effect": "Allow",
+            "Action": actions + ["bedrock:InvokeModel"],
+            "Resource": "*",
+        }
         role_of(raw, "invoice-renderer")["inline_policies"].append(
             {
                 "PolicyName": "big",
@@ -318,7 +322,7 @@ def test_evidence_over_the_cap_is_summarised_and_never_refused(repo, clock, tmp_
     assert snapshot.content == {
         "truncated": True,
         "config_hash": stored.config_hash,
-        "ai_actions": ["bedrock:Converse"],
+        "ai_actions": ["bedrock:InvokeModel"],
         "statement_count": 2,
     }
 

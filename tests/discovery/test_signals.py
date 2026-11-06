@@ -121,3 +121,51 @@ def test_tokens_split_on_anything_that_is_not_a_letter_or_digit():
         "ml",
         "tool",
     ]
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "LEGAL_OPENAI_API_KEY",
+        "AWS_BEDROCK_REGION",
+        "APP_ANTHROPIC_TOKEN",
+        "CHATGPT_KEY",
+        "SUMMARY_MODEL_ID",
+    ],
+)
+def test_a_vendor_word_anywhere_in_an_env_name_scores_probable(name):
+    assert scored(make_function("x", env=[name])).likelihood is L.PROBABLE
+
+
+@pytest.mark.parametrize("name", ["COHERENT_MODE", "MISTRALLY", "HELP_ARTICLES_TABLE", "MODEL_DIR"])
+def test_a_vendor_word_inside_another_word_does_not_count(name):
+    assert scored(make_function("x", env=[name])).likelihood is L.NONE
+
+
+@pytest.mark.parametrize(
+    "name", ["ContractSummariserFn", "MyStack-OpenAiProxy-AB12", "gpt4-worker", "OpenAIProxy"]
+)
+def test_camel_case_and_numbered_names_score_possible(name):
+    assert scored(make_function(name)) == Score(L.POSSIBLE, ("name_ai_token",))
+
+
+@pytest.mark.parametrize("name", ["EmailSender", "RetainLogs", "MyStack-Mailer-AB12"])
+def test_camel_case_words_that_contain_ai_score_none(name):
+    assert scored(make_function(name)) == Score(L.NONE, ())
+
+
+def test_camel_case_tokens():
+    assert tokens("OpenAiProxy") == tokens("OpenAIProxy") == ["open", "ai", "proxy"]
+    assert tokens("ContractSummariserFn") == ["contract", "summariser", "fn"]
+    assert tokens("gpt4-worker") == ["gpt4", "worker"]
+
+
+def test_the_platform_tag_alone_does_not_hide_a_function():
+    shadow = make_function("shadow-summariser", env=["OPENAI_BASE_URL"])
+    result = scored(shadow, {"verity:component": "mock"})
+    assert result.likelihood is L.PROBABLE and "platform_component" not in result.signals
+
+
+def test_a_listed_name_without_the_tag_is_scored_normally():
+    result = scored(make_function("mock-openai", env=["OPENAI_BASE_URL"]))
+    assert result.likelihood is L.PROBABLE

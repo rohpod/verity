@@ -57,7 +57,7 @@ def test_a_moto_account_is_crawled_discovered_and_clean(repo, clock, capsys, cap
     )
     assert CANARY not in everything
     assert MOTO_ACCOUNT not in everything
-    assert "<account>" in everything
+    assert "acct_" in everything
 
 
 def test_cloudtrail_is_read_for_the_lookback_window(repo, clock):
@@ -73,3 +73,29 @@ def test_cloudtrail_is_read_for_the_lookback_window(repo, clock):
     levels = {n: (level.value, signals) for n, level, signals in report.functions}
     assert "trail_ai_event" in levels["shadow-summariser"][1]
     assert report.summary["trail_events"] == 1
+
+
+def test_a_cdk_style_role_name_with_the_account_crawls_and_the_number_is_nowhere(repo, clock):
+    import json
+
+    import boto3
+    from discovery_support import REGION, TRUST, zip_bytes
+
+    with moto_context(repo):
+        name = f"Stack-Fn-{MOTO_ACCOUNT}"
+        boto3.client("iam", region_name=REGION).create_role(
+            RoleName=name, AssumeRolePolicyDocument=json.dumps(TRUST)
+        )
+        boto3.client("lambda", region_name=REGION).create_function(
+            FunctionName=name,
+            Runtime="python3.12",
+            Role=f"arn:aws:iam::{MOTO_ACCOUNT}:role/{name}",
+            Handler="app.handler",
+            Code={"ZipFile": zip_bytes()},
+            Environment={"Variables": {f"KEY_{MOTO_ACCOUNT}": CANARY}},
+        )
+        seeded(repo, clock)
+        crawl(repo, MINI, aws_collector(clock), clock)
+    everything = dump(repo) + table_text(repo)
+    assert MOTO_ACCOUNT not in everything and CANARY not in everything
+    assert len(of_type(repo, NodeType.AWS_RESOURCE)) >= 2

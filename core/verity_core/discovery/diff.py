@@ -46,7 +46,8 @@ def _statement(statement: Statement) -> dict[str, Any]:
         "effect": statement.effect,
         "actions": list(statement.actions),
         "resources": list(statement.resources),
-        "negated": statement.negated,
+        "not_action": statement.not_action,
+        "not_resource": statement.not_resource,
     }
 
 
