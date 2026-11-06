@@ -1,6 +1,9 @@
 """Findings, derived on read and never stored (ADR 0019). Sorted: severity, then code, subject,
 message, so the same graph and `as_of` always give the same list.
 
+A missing piece of evidence is high only if it backs a requirement of a binding framework that is
+in force or conditional (ADR 0020). Everything else it backs is a standard Kestrel adopted.
+
 `risk_tier_unconfirmed` and `unknown_fact` come from the applicability engine, so the caller
 passes them in. Everything else is derived here from the graph, the control results and the
 requirement statuses.
@@ -16,14 +19,20 @@ from verity_core.assess.freshness import Freshness
 from verity_core.assess.requirements import RequirementStatus
 from verity_core.graph.loader import in_edges, node_record
 from verity_core.graph.traversals import Resolution
+from verity_core.model import ids
 from verity_core.model.edges import AppliesToEdge
 from verity_core.model.enums import EdgeType, ImplementationStatus
-from verity_core.model.nodes import AISystem
+from verity_core.model.nodes import AISystem, Framework
 from verity_core.rules.finding import Finding, Severity
 from verity_core.rules.status import ApplicabilityStatus, applicability_status
 
 _ORDER = {Severity.HIGH: 0, Severity.MEDIUM: 1, Severity.LOW: 2}
 _IN_SCOPE = (ApplicabilityStatus.IN_FORCE, ApplicabilityStatus.CONDITIONAL)
+
+
+def _binding(graph: nx.MultiDiGraph, requirement_id: str) -> bool:
+    framework = node_record(graph, ids.framework_id(requirement_id.split(":")[1]))
+    return isinstance(framework, Framework) and framework.binding
 
 
 def derive_findings(
@@ -49,8 +58,10 @@ def derive_findings(
                 )
             )
         if r.status is ImplementationStatus.NOT_ASSESSED:
+            # High only if binding law needs it now. A standard Kestrel adopted is medium.
             in_scope = any(
-                s.applicability in _IN_SCOPE for s in behind.get((r.control_id, r.scope_id), ())
+                s.applicability in _IN_SCOPE and _binding(graph, s.requirement_id)
+                for s in behind.get((r.control_id, r.scope_id), ())
             )
             found.append(
                 Finding(

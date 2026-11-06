@@ -176,6 +176,9 @@ class Framework(NodeBase):
     source_version: NonEmpty
     source_url: NonEmpty
     last_verified: date
+    # Law that binds Kestrel, as against a standard it chose to adopt. It sets how urgent a
+    # missing piece of evidence is (ADR 0020).
+    binding: bool
 
 
 class Policy(NodeBase):

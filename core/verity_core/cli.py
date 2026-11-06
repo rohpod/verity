@@ -11,7 +11,12 @@ from pathlib import Path
 import yaml
 from pydantic import ValidationError
 
-from verity_core.assess.apply import ApplyResult, apply_assessment, estimate_apply
+from verity_core.assess.apply import (
+    ApplyResult,
+    UnknownSystemError,
+    apply_assessment,
+    estimate_apply,
+)
 from verity_core.assess.requirements import RequirementState
 from verity_core.content.lint import lint
 from verity_core.content.loader import Content, ContentError, load_content
@@ -25,6 +30,7 @@ from verity_core.content.seed import (
 )
 from verity_core.graph.memory import InMemoryRepository
 from verity_core.model.enums import ImplementationStatus
+from verity_core.rules.status import ApplicabilityStatus
 
 OK, LINT_FAILED, UNREADABLE, REFUSED = 0, 1, 2, 3
 PROGRESS_EVERY = 25
@@ -94,7 +100,11 @@ def cmd_seed(args: argparse.Namespace) -> int:
 
     repo = DynamoDBRepository(args.tenant, _utc_now)
     print("seeding the real table, expect pauses while it throttles...", file=sys.stderr)
-    report = seed(repo, loaded, _utc_now, _print_progress)
+    try:
+        report = seed(repo, loaded, _utc_now, _print_progress)
+    except ContentError as exc:
+        print(f"refused, nothing was written: {exc}", file=sys.stderr)
+        return REFUSED
     print(
         f"nodes: {report.nodes_written} written, {report.nodes_unchanged} unchanged; "
         f"edges: {report.edges_written} written, {report.edges_unchanged} unchanged"
@@ -117,21 +127,41 @@ def _print_assessment(
     result: ApplyResult, as_of: datetime, *, verb: str, verbose: bool = False
 ) -> None:
     states = Counter(s.state for s in result.statuses)
+    simulated = Counter(s.state for s in result.statuses if s.simulated)
     print(f"as of {as_of.date()}: {len(result.results)} control assessments")
     print(
         "requirements: "
-        + ", ".join(f"{states[state]} {state.value}" for state in RequirementState if states[state])
+        + ", ".join(
+            f"{states[state]} {state.value}"
+            + (f" ({simulated[state]} on simulated sign-offs)" if simulated[state] else "")
+            for state in RequirementState
+            if states[state]
+        )
     )
-    if verbose:
-        for finding in result.findings:
-            line = f"{finding.severity.value:<6} {finding.code}  {finding.subject}"
-            print(f"  {line}  {finding.message}")
-    by_code = Counter((f.severity.value, f.code) for f in result.findings)
-    print(f"{len(result.findings)} finding(s)" + (":" if by_code else ""))
-    for (severity, code), n in sorted(
-        by_code.items(), key=lambda kv: (_SEVERITY[kv[0][0]], kv[0][1])
-    ):
-        print(f"  {severity:<6} {code}: {n}")
+    applicability = Counter(s.applicability for s in result.statuses if s.applicability)
+    print(
+        "applicability: "
+        + ", ".join(
+            f"{applicability[a]} {a.value}" for a in ApplicabilityStatus if applicability[a]
+        )
+    )
+    findings = result.findings
+    by_severity = Counter(f.severity.value for f in findings)
+    print(
+        f"{len(findings)} finding(s): "
+        + ", ".join(f"{by_severity[s]} {s}" for s in _SEVERITY if by_severity[s])
+    )
+    # High findings are always listed. The rest are counted by code, unless --verbose lists them.
+    shown = findings if verbose else [f for f in findings if f.severity.value == "high"]
+    for finding in shown:
+        line = f"{finding.severity.value:<6} {finding.code}  {finding.subject}"
+        print(f"  {line}  {finding.message}")
+    if not verbose:
+        rest = Counter((f.severity.value, f.code) for f in findings if f.severity.value != "high")
+        for (severity, code), n in sorted(
+            rest.items(), key=lambda kv: (_SEVERITY[kv[0][0]], kv[0][1])
+        ):
+            print(f"  {severity:<6} {code}: {n}")
     written = ", ".join(f"{n} {kind}" for kind, n in sorted(result.written.items())) or "nothing"
     print(f"{verb}: {written}")
 
@@ -150,9 +180,13 @@ def cmd_assess(args: argparse.Namespace) -> int:
         # Seeds a fresh in-memory graph, then assesses it. Nothing reaches AWS.
         repo = InMemoryRepository(args.tenant, _utc_now)
         seed(repo, loaded, _utc_now)
-        result = apply_assessment(
-            repo, loaded.rules, loaded.dates, as_of, _utc_now, system_id=args.system
-        )
+        try:
+            result = apply_assessment(
+                repo, loaded.rules, loaded.dates, as_of, _utc_now, system_id=args.system
+            )
+        except UnknownSystemError as exc:
+            print(f"refused: {exc}", file=sys.stderr)
+            return REFUSED
         _print_assessment(result, as_of, verb="stored in memory", verbose=args.verbose)
         print(
             "dry run only: nothing was written to AWS. Use --target dynamodb to assess the table."
@@ -174,9 +208,13 @@ def cmd_assess(args: argparse.Namespace) -> int:
     if not graph.nodes:
         print("the table is empty: run `verity seed --target dynamodb` first", file=sys.stderr)
         return REFUSED
-    plan = estimate_apply(
-        graph, loaded.rules, loaded.dates, as_of, _utc_now, args.tenant, system_id=args.system
-    )
+    try:
+        plan = estimate_apply(
+            graph, loaded.rules, loaded.dates, as_of, _utc_now, args.tenant, system_id=args.system
+        )
+    except UnknownSystemError as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return REFUSED
     new_nodes = plan.written["assessments"]
     records = plan.total_written
     units = TABLE_UNITS_PER_RECORD * records + INDEX_UNITS_PER_NODE * new_nodes
@@ -205,8 +243,11 @@ def cmd_attest(args: argparse.Namespace) -> int:
         "decided_on": today,
         "by": args.by,
         "valid_until": today + timedelta(days=365),
-        "simulated": False,
-        "statement": f"TODO: say what {args.by} attests about {args.control} for {args.scope}.",
+        "simulated": True,  # a scaffold is a demo sign-off until the owner says otherwise
+        "statement": (
+            "Simulated sign-off by a fictional person. "
+            f"TODO: say what {args.by} attests about {args.control} for {args.scope}."
+        ),
         "control": args.control,
         "scope": args.scope,
         "status": args.status,
@@ -223,7 +264,9 @@ def cmd_attest(args: argparse.Namespace) -> int:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
     print(f"wrote {path}")
-    print("Edit the statement, run `verity lint`, and open a pull request: the PR is the approval.")
+    print(
+        "Finish the statement, run `verity lint`, and open a pull request: the PR is the approval."
+    )
     return OK
 
 

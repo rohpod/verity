@@ -7,11 +7,15 @@ from assess_support import (
     LATER_VALID,
     PERSON,
     SYS,
+    TENANT,
+    applies,
     attestation,
     automated_result,
     control,
     evidence,
+    maps,
     resource_and_change,
+    status_of,
     technical,
     verification,
     world,
@@ -23,6 +27,7 @@ from verity_core.model.enums import (
     ImplementationStatus,
     Source,
 )
+from verity_core.model.evidence import Evidence
 
 S = ImplementationStatus
 L = AssuranceLevel
@@ -279,3 +284,79 @@ def test_the_assessor_refuses_a_naive_as_of_and_a_missing_control():
 def test_valid_until_in_the_far_future_is_fresh():
     ev = verification("VC-001", valid_until=LATER_VALID)
     assert assess(ORG_CTL, [ev]).freshness.value == "fresh"
+
+
+# --- decisions replaced or withdrawn (ADR 0020) ----------------------------------------------
+
+
+def revocation_of(*decision_ids, collected_at=EARLIER + timedelta(days=1), scope=SYS):
+    return Evidence.build(
+        subject=scope,
+        collector=PERSON,
+        collected_at=collected_at,
+        valid_until=LATER_VALID,
+        kind=EvidenceKind.ATTESTATION,
+        content={
+            "decision_id": "r1",
+            "decision_kind": "revocation",
+            "subject": scope,
+            "supersedes": list(decision_ids),
+        },
+        tenant=TENANT,
+        source=Source.SYNTHETIC,
+    )
+
+
+def test_a_superseding_decision_wins_whatever_the_ids_hash_to():
+    for n in range(50):  # same day, so the Evidence ID used to decide
+        old = verification("VC-001", decision_id="v1", valid_until=LATER_VALID + timedelta(hours=n))
+        new = verification(
+            "VC-001",
+            "not_implemented",
+            decision_id="v2",
+            supersedes=["v1"],
+            valid_until=LATER_VALID + timedelta(minutes=n),
+        )
+        r = assess(ORG_CTL, [old, new])
+        assert (r.status, r.level) == (S.NOT_IMPLEMENTED, L.L4_VERIFIED), n
+
+
+def test_the_superseding_decision_may_improve_a_verdict_too():
+    for n in range(20):
+        old = verification("VC-001", "not_implemented", decision_id="v1")
+        new = verification(
+            "VC-001",
+            decision_id="v2",
+            supersedes=["v1"],
+            valid_until=LATER_VALID + timedelta(minutes=n),
+        )
+        assert assess(ORG_CTL, [old, new]).status is S.IMPLEMENTED, n
+
+
+def test_a_revocation_takes_an_l4_sign_off_away():
+    ev = verification("VC-001", decision_id="v1")
+    assert assess(ORG_CTL, [ev]).level is L.L4_VERIFIED
+    r = assess(ORG_CTL, [ev, revocation_of("v1")])
+    assert (r.status, r.level, r.method) == (S.NOT_ASSESSED, L.L0_INFERRED, "no_evidence")
+
+
+def test_a_revocation_does_not_count_before_it_was_made():
+    ev = verification("VC-001", decision_id="v1")
+    gone = revocation_of("v1", collected_at=AS_OF - timedelta(days=1))
+    assert assess(ORG_CTL, [ev, gone], as_of=AS_OF - timedelta(days=2)).level is L.L4_VERIFIED
+    assert assess(ORG_CTL, [ev, gone], as_of=AS_OF).level is L.L0_INFERRED
+
+
+def test_a_revocation_is_not_itself_an_assessment():
+    r = assess(ORG_CTL, [revocation_of("v0")])
+    assert r.method == "no_evidence"
+
+
+def test_a_requirement_falls_back_when_its_only_sign_off_is_revoked():
+    ev = verification("VC-001", decision_id="v1")
+    kwargs = {"controls": ORG_CTL, "requirements": ["a"], "mappings": [maps("a", "VC-001")]}
+    kwargs["applications"] = [applies("a")]
+    graph = world(evidence_items=[ev], **kwargs)
+    assert status_of(graph, "a").state.value == "satisfied"
+    graph = world(evidence_items=[ev, revocation_of("v1")], **kwargs)
+    assert status_of(graph, "a").state.value == "not_met"

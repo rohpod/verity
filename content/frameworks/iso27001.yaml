@@ -8,6 +8,7 @@ framework:
   source_url: https://www.iso.org/standard/27001
   source_version: ISO/IEC 27001:2022 with Amd 1:2024
   last_verified: 2026-11-05
+  binding: false
   copyrighted: true
 requirements:
 - id: '4.1'

@@ -10,7 +10,7 @@ confirms or rejects it, and the latest one wins. Rules apply to unconfirmed cand
 
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from enum import StrEnum
 
 import networkx as nx
@@ -21,6 +21,7 @@ from verity_core.model.edges import AppliesToEdge
 from verity_core.model.enums import AppliesCondition, EdgeType, NodeType, Role, Source
 from verity_core.model.evidence import Evidence
 from verity_core.model.nodes import AISystem, Organisation
+from verity_core.rules.decisions import superseded_decision_ids
 from verity_core.rules.finding import Finding, Severity
 
 HELD_ROLES = (Role.PROVIDER, Role.DEPLOYER)
@@ -36,6 +37,8 @@ class RiskTier(StrEnum):
 class _Tier:
     tier: RiskTier
     detail: str  # what the reason sentence says about it
+    decided: bool = False  # a decision in force at `as_of` settled it
+    expired: Evidence | None = None  # the latest decision that has run out, if none is in force
 
     @property
     def applies(self) -> bool:
@@ -43,30 +46,52 @@ class _Tier:
 
 
 def applicable_edges(
-    graph: nx.MultiDiGraph, rules: ApplicabilityFile, dates: Iterable[ObligationDate]
+    graph: nx.MultiDiGraph,
+    rules: ApplicabilityFile,
+    dates: Iterable[ObligationDate],
+    as_of: datetime,
 ) -> tuple[list[AppliesToEdge], list[Finding]]:
+    """Which edges exist depends on `as_of` through the decisions in force then (ADR 0020)."""
+    if as_of.tzinfo is None:
+        raise ValueError("as_of must be timezone-aware")
     date_of = {d.id: d.date for d in dates}
     systems = _records(graph, AISystem)
     organisation = next(iter(_records(graph, Organisation)), None)
-    tiers = {s.id: _tier(graph, s, rules.annex_iii_domains) for s in systems}
+    tiers = {s.id: _tier(graph, s, rules.annex_iii_domains, as_of) for s in systems}
 
     findings: dict[tuple[str, str, str], Finding] = {}
+
+    def unknown(system: AISystem, fact: str, severity: Severity = Severity.MEDIUM) -> None:
+        findings[("unknown_fact", system.id, fact)] = Finding(
+            "unknown_fact",
+            severity,
+            system.id,
+            f"{system.name} has no value for {fact}, which a rule needs.",
+        )
+
     for system in systems:
-        if tiers[system.id].tier is RiskTier.CANDIDATE:
+        tier = tiers[system.id]
+        if tier.expired is not None:
+            severity = Severity.HIGH if tier.applies else Severity.MEDIUM
+            findings[("risk_tier_expired", system.id, "")] = Finding(
+                "risk_tier_expired",
+                severity,
+                system.id,
+                f"The risk tier decision {tier.expired.content['decision_id']} for {system.name} "
+                f"expired on {tier.expired.valid_until.date()}, so a person must decide again.",
+            )
+        elif tier.tier is RiskTier.CANDIDATE:
             findings[("risk_tier_unconfirmed", system.id, "")] = Finding(
                 "risk_tier_unconfirmed",
                 Severity.HIGH,
                 system.id,
                 f"{system.name} is an Annex III candidate and no person has decided its risk tier.",
             )
-
-    def unknown(system: AISystem, fact: str) -> None:
-        findings[("unknown_fact", system.id, fact)] = Finding(
-            "unknown_fact",
-            Severity.MEDIUM,
-            system.id,
-            f"{system.name} has no value for {fact}, which a rule needs.",
-        )
+        # Nothing can be derived without these (ADR 0020). Unknown is not "does not apply".
+        if not system.roles:
+            unknown(system, "roles", Severity.HIGH)
+        if not system.use_domains and not tier.decided:
+            unknown(system, "use_domains", Severity.HIGH)
 
     edges: dict[tuple, AppliesToEdge] = {}
 
@@ -133,22 +158,40 @@ def _requirements(graph: nx.MultiDiGraph, rule: ApplicabilityRule) -> list[str]:
     ]
 
 
-def _tier(graph: nx.MultiDiGraph, system: AISystem, annex_iii: dict[str, str]) -> _Tier:
-    decisions = [node_record(graph, e.src) for e in in_edges(graph, system.id, EdgeType.ABOUT)]
+def _tier(
+    graph: nx.MultiDiGraph, system: AISystem, annex_iii: dict[str, str], as_of: datetime
+) -> _Tier:
+    about = [node_record(graph, e.src) for e in in_edges(graph, system.id, EdgeType.ABOUT)]
+    about = [d for d in about if isinstance(d, Evidence)]
+    superseded = superseded_decision_ids(about, as_of)
     decided = [
         d
-        for d in decisions
-        if isinstance(d, Evidence) and (d.content or {}).get("decision_kind") == "risk_tier"
+        for d in about
+        if (d.content or {}).get("decision_kind") == "risk_tier"
+        and d.content["decision_id"] not in superseded
+        and d.collected_at <= as_of
     ]
-    if decided:
-        latest = max(decided, key=lambda d: (d.collected_at, d.id))
+    latest = max(decided, key=lambda d: (d.collected_at, d.id), default=None)
+    in_force = [d for d in decided if as_of <= d.valid_until]
+    if in_force:  # the latest decision in force wins, and one that ran out is not heard
+        latest = max(in_force, key=lambda d: (d.collected_at, d.id))
         if latest.content["tier"] == "high_risk":
             return _Tier(
                 RiskTier.CONFIRMED,
                 f"confirmed high-risk by decision {latest.content['decision_id']}",
+                decided=True,
             )
-        return _Tier(RiskTier.NOT_HIGH_RISK, "")
+        return _Tier(RiskTier.NOT_HIGH_RISK, "", decided=True)
     listed = sorted(d for d in system.use_domains if d in annex_iii)
+    if latest is not None:  # every decision has expired: the cautious reading returns (ADR 0020)
+        was_high = latest.content["tier"] == "high_risk"
+        ran_out = f"its decision {latest.content['decision_id']} has expired"
+        if listed or was_high:
+            where = f" ({annex_iii[listed[0]]})" if listed else ""
+            return _Tier(
+                RiskTier.CANDIDATE, f"a high-risk candidate{where}, {ran_out}", expired=latest
+            )
+        return _Tier(RiskTier.NOT_HIGH_RISK, "", expired=latest)
     if listed:
         return _Tier(
             RiskTier.CANDIDATE, f"a high-risk candidate ({annex_iii[listed[0]]}), not yet decided"

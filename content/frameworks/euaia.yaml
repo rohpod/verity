@@ -7,6 +7,7 @@ framework:
   source_url: https://eur-lex.europa.eu/eli/reg/2024/1689/oj
   source_version: 2024/1689 as amended by 2026/1744
   last_verified: 2026-11-05
+  binding: true
 requirements:
 - id: art4
   ref: Art. 4

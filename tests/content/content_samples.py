@@ -24,6 +24,7 @@ def good_files() -> dict[str, dict]:
                 "source_url": "https://eur-lex.example.org/eu-ai-act",
                 "source_version": EU_VERSION,
                 "last_verified": VERIFIED,
+                "binding": True,
             },
             "requirements": [
                 {
@@ -66,6 +67,7 @@ def good_files() -> dict[str, dict]:
                 "source_url": "https://www.iso.example.org/42001",
                 "source_version": "ISO/IEC 42001:2023",
                 "last_verified": VERIFIED,
+                "binding": False,
                 "copyrighted": True,
             },
             "requirements": [

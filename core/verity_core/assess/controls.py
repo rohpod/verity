@@ -23,6 +23,7 @@ from verity_core.model.enums import (
     Source,
 )
 from verity_core.model.nodes import Control, Evidence
+from verity_core.rules.decisions import superseded_decision_ids
 
 PERSON = "person:"
 
@@ -58,7 +59,11 @@ class ControlAssessor:
         self.as_of = as_of
         self._stale = stale_evidence_ids(graph, as_of)
         self._evidence: dict[tuple[str, str], list[Evidence]] = {}
-        for ev in evidence_in_graph(graph):
+        found = evidence_in_graph(graph)
+        superseded = superseded_decision_ids(found, as_of)  # ADR 0020
+        for ev in found:
+            if (ev.content or {}).get("decision_id") in superseded:
+                continue
             key = (ev.content or {}).get("control"), (ev.content or {}).get("scope")
             if isinstance(key[0], str) and isinstance(key[1], str):
                 self._evidence.setdefault(key, []).append(ev)

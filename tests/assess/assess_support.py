@@ -169,6 +169,7 @@ def world(
     extra_nodes=(),
     extra_edges=(),
     framework="euaia",
+    binding=True,
 ):
     """An organisation, one system `sys:s` using the given models, and what the test adds.
 
@@ -185,6 +186,7 @@ def world(
             source_version="test",
             source_url="https://example.invalid/f",
             last_verified=date(2026, 11, 5),
+            binding=binding,
             **COMMON,
         ),
         Provider(

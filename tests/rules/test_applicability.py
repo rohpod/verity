@@ -10,11 +10,13 @@ from rules_support import (
     date_of,
     decision,
     edges_to,
+    revocation,
     run,
     system,
 )
 from verity_core.model.edges import AppliesToEdge
 from verity_core.model.enums import AppliesCondition, Role, Source
+from verity_core.model.nodes import AISystem
 from verity_core.rules.finding import Severity
 from verity_core.rules.status import ApplicabilityStatus, applicability_status
 
@@ -97,7 +99,13 @@ def test_disclosure_is_not_for_a_deployer_only():
 
 
 def test_disclosure_does_not_apply_when_nobody_interacts_and_raises_nothing():
-    s = system("batch", roles=[P], interacts_with_people=False, generates_synthetic_content=False)
+    s = system(
+        "batch",
+        roles=[P],
+        use_domains=["infrastructure"],
+        interacts_with_people=False,
+        generates_synthetic_content=False,
+    )
     edges, findings = run(s)
     assert ("art50-1", P) not in edges_to(edges, s.id)
     assert codes(findings, s.id) == []
@@ -119,6 +127,7 @@ def marking(placed):
     s = system(
         "gen",
         roles=[P],
+        use_domains=["customer_support"],
         interacts_with_people=False,
         generates_synthetic_content=True,
         first_placed_on_market=placed,
@@ -159,7 +168,13 @@ def test_marking_with_unknown_synthetic_content_does_not_fire():
 
 
 def test_marking_does_not_apply_when_nothing_is_generated():
-    s = system("gen", roles=[P], interacts_with_people=False, generates_synthetic_content=False)
+    s = system(
+        "gen",
+        roles=[P],
+        use_domains=["customer_support"],
+        interacts_with_people=False,
+        generates_synthetic_content=False,
+    )
     edges, findings = run(s)
     assert ("art50-2", P) not in edges_to(edges, s.id)
     assert findings == []
@@ -232,6 +247,189 @@ def test_the_latest_decision_wins():
         ),
     )
     assert chapter_iii(edges, s)
+
+
+def test_a_superseding_decision_wins_whatever_the_ids_hash_to():
+    for n in range(30):  # the Evidence ID used to break a same-day tie
+        s = hr(f"hr{n}")
+        old = decision(s.id, "high_risk", date(2026, 11, 5), "old")
+        new = decision(s.id, "not_high_risk", date(2026, 11, 5), f"new{n}", supersedes=["old"])
+        edges, _ = run(s, decisions=(old, new))
+        assert chapter_iii(edges, s) == set(), n
+        new = decision(s.id, "high_risk", date(2026, 11, 5), f"new{n}", supersedes=["old"])
+        old = decision(s.id, "not_high_risk", date(2026, 11, 5), "old")
+        edges, _ = run(s, decisions=(old, new))
+        assert chapter_iii(edges, s), n
+
+
+def test_a_revocation_returns_the_system_to_its_facts_with_a_finding():
+    s = hr()
+    revoked = revocation(s.id, date(2026, 11, 6), ["d"])
+    edges, findings = run(s, decisions=(confirmed(s), revoked))
+    assert chapter_iii(edges, s)  # still an Annex III candidate, so the rules still apply
+    assert "risk_tier_unconfirmed" in codes(findings, s.id)
+
+
+def test_a_revocation_of_a_decision_on_a_system_outside_annex_iii_removes_the_duties():
+    s = hr(use_domains=["customer_support"])
+    revoked = revocation(s.id, date(2026, 11, 6), ["d"])
+    edges, findings = run(s, decisions=(confirmed(s), revoked))
+    assert chapter_iii(edges, s) == set()
+    assert codes(findings, s.id) == []
+
+
+def test_a_revocation_does_not_count_before_it_was_made():
+    s = hr(use_domains=["customer_support"])
+    revoked = revocation(s.id, date(2026, 11, 20), ["d"])
+    edges, _ = run(s, decisions=(confirmed(s), revoked), as_of=datetime(2026, 11, 19, tzinfo=UTC))
+    assert chapter_iii(edges, s)
+    edges, _ = run(s, decisions=(confirmed(s), revoked), as_of=datetime(2026, 11, 20, tzinfo=UTC))
+    assert chapter_iii(edges, s) == set()
+
+
+def test_a_naive_as_of_is_refused():
+    with pytest.raises(ValueError, match="timezone-aware"):
+        run(hr(), as_of=datetime(2026, 11, 10))
+
+
+# --- decisions run out (ADR 0020) ----------------------------------------------------------
+
+
+def expired_on(s, tier, day=date(2026, 11, 5)):
+    """A decision made on `day` that stops being valid at the end of 2026-12-01."""
+    d = decision(s.id, tier, day, "old")
+    return d.model_copy(update={"valid_until": datetime(2026, 12, 1, 23, 59, 59, tzinfo=UTC)})
+
+
+AFTER_EXPIRY = datetime(2026, 12, 2, tzinfo=UTC)
+LAST_DAY = datetime(2026, 12, 1, 12, tzinfo=UTC)
+
+
+def tier_findings(findings, s):
+    return [(f.code, f.severity) for f in findings if f.subject == s.id]
+
+
+def test_a_decision_still_counts_on_the_last_day_it_is_valid():
+    s = hr(use_domains=["customer_support"], first_placed_on_market=LONG_AGO)
+    edges, findings = run(s, decisions=(expired_on(s, "high_risk"),), as_of=LAST_DAY)
+    assert chapter_iii(edges, s)
+    assert tier_findings(findings, s) == []
+
+
+def test_an_expired_decision_on_an_annex_iii_system_returns_it_to_a_candidate():
+    for tier in ("high_risk", "not_high_risk"):
+        s = hr(first_placed_on_market=LONG_AGO)
+        edges, findings = run(s, decisions=(expired_on(s, tier),), as_of=AFTER_EXPIRY)
+        assert chapter_iii(edges, s), tier
+        assert tier_findings(findings, s) == [("risk_tier_expired", Severity.HIGH)], tier
+
+
+def test_an_expired_high_risk_decision_outside_annex_iii_returns_it_to_a_candidate():
+    s = hr(use_domains=["customer_support"], first_placed_on_market=LONG_AGO)
+    edges, findings = run(s, decisions=(expired_on(s, "high_risk"),), as_of=AFTER_EXPIRY)
+    assert chapter_iii(edges, s)
+    assert tier_findings(findings, s) == [("risk_tier_expired", Severity.HIGH)]
+
+
+def test_an_expired_not_high_risk_decision_outside_annex_iii_stays_out_with_a_medium_finding():
+    s = hr(use_domains=["customer_support"], first_placed_on_market=LONG_AGO)
+    edges, findings = run(s, decisions=(expired_on(s, "not_high_risk"),), as_of=AFTER_EXPIRY)
+    assert chapter_iii(edges, s) == set()
+    assert tier_findings(findings, s) == [("risk_tier_expired", Severity.MEDIUM)]
+
+
+def test_an_expired_decision_does_not_also_raise_risk_tier_unconfirmed():
+    s = hr(first_placed_on_market=LONG_AGO)
+    _, findings = run(s, decisions=(expired_on(s, "high_risk"),), as_of=AFTER_EXPIRY)
+    assert "risk_tier_unconfirmed" not in codes(findings, s.id)
+
+
+def test_a_newer_decision_in_force_beats_an_expired_one():
+    s = hr(first_placed_on_market=LONG_AGO)
+    fresh = decision(s.id, "not_high_risk", date(2026, 12, 1), "fresh")
+    edges, findings = run(s, decisions=(expired_on(s, "high_risk"), fresh), as_of=AFTER_EXPIRY)
+    assert chapter_iii(edges, s) == set()
+    assert tier_findings(findings, s) == []
+
+
+def test_an_older_decision_in_force_is_used_when_the_newest_has_expired():
+    s = hr(first_placed_on_market=LONG_AGO)
+    old = decision(s.id, "high_risk", date(2026, 11, 1), "old")
+    newest = expired_on(s, "not_high_risk", date(2026, 11, 6))
+    edges, _ = run(s, decisions=(old, newest), as_of=AFTER_EXPIRY)
+    assert chapter_iii(edges, s)
+
+
+def test_a_decision_is_ignored_at_an_as_of_before_it_was_made():
+    s = hr(use_domains=["customer_support"], first_placed_on_market=LONG_AGO)
+    d = decision(s.id, "high_risk", date(2026, 11, 5))
+    edges, _ = run(s, decisions=(d,), as_of=datetime(2026, 11, 4, 23, 59, tzinfo=UTC))
+    assert chapter_iii(edges, s) == set()
+    edges, _ = run(s, decisions=(d,), as_of=datetime(2026, 11, 5, tzinfo=UTC))
+    assert chapter_iii(edges, s)
+
+
+def test_an_assessment_before_the_decision_sees_a_candidate_again():
+    s = hr(first_placed_on_market=LONG_AGO)
+    d = decision(s.id, "not_high_risk", date(2026, 11, 5))
+    _, findings = run(s, decisions=(d,), as_of=datetime(2026, 11, 4, tzinfo=UTC))
+    assert "risk_tier_unconfirmed" in codes(findings, s.id)
+
+
+# --- unknown roles and domains are findings, not silence (ADR 0020) -------------------------
+
+
+def test_a_system_with_no_roles_raises_a_high_unknown_fact_and_gets_no_obligations():
+    s = system("bare", use_domains=["employment"], interacts_with_people=True)
+    edges, findings = run(s)
+    assert not [e for e in edges if e.dst == s.id]
+    found = [f for f in findings if f.subject == s.id and f.code == "unknown_fact"]
+    assert [(f.severity, "roles" in f.message) for f in found] == [(Severity.HIGH, True)]
+
+
+def bare(**facts):
+    """A provider with no use_domains."""
+    return system(
+        "bare",
+        roles=[P],
+        interacts_with_people=False,
+        generates_synthetic_content=False,
+        first_placed_on_market=LONG_AGO,
+        **facts,
+    )
+
+
+def test_a_system_with_no_use_domains_raises_a_high_unknown_fact():
+    s = bare()
+    _, findings = run(s)
+    (finding,) = [f for f in findings if f.subject == s.id]
+    assert (finding.code, finding.severity) == ("unknown_fact", Severity.HIGH)
+    assert "use_domains" in finding.message
+
+
+def test_no_use_domains_is_not_a_finding_while_a_decision_is_in_force():
+    s = bare()
+    for tier in ("high_risk", "not_high_risk"):
+        _, findings = run(s, decisions=(decision(s.id, tier, date(2026, 11, 5)),))
+        assert codes(findings, s.id) == [], tier
+
+
+def test_no_use_domains_is_a_finding_once_the_decision_has_expired():
+    s = bare()
+    _, findings = run(s, decisions=(expired_on(s, "not_high_risk"),), as_of=AFTER_EXPIRY)
+    assert set(codes(findings, s.id)) == {"unknown_fact", "risk_tier_expired"}
+
+
+def test_empty_use_domains_never_make_a_system_high_risk():
+    s = system("bare", roles=[P, D], interacts_with_people=False, generates_synthetic_content=False)
+    edges, _ = run(s)
+    assert chapter_iii(edges, s) == set()
+
+
+def test_every_system_in_the_real_estate_states_its_roles_and_domains():
+    systems = [n for n in CONTENT.estate if isinstance(n, AISystem)]
+    assert systems
+    assert not [s.id for s in systems if not (s.roles and s.use_domains)]
 
 
 def test_another_systems_decision_does_not_count():

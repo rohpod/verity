@@ -180,3 +180,73 @@ def test_a_second_run_writes_nothing_on_both_repositories(repo, clock, tmp_path)
     assert second.total_written == 0
     assert second.unchanged_assessments == len(second.results)
     assert check_integrity(repo.load_graph()) == []
+
+
+# --- assessments no longer produced are ended, and come back (ADR 0020) ------------------------
+
+
+def without_disclosure(small):
+    """The same rules minus Art. 50(1), so its controls are no longer reached."""
+    kept = [r for r in small.rules.rules if r.id != "disclosure"]
+    return small.rules.model_copy(update={"rules": kept})
+
+
+def ca_ids(result):
+    return {ids.ca_id(r.control_id, r.scope_id) for r in result.results}
+
+
+def open_edges_of(repo, node_id):
+    return repo.neighbors(node_id, Direction.OUT) + repo.neighbors(node_id, Direction.IN)
+
+
+def test_an_assessment_the_run_no_longer_produces_is_ended_and_comes_back(repo, clock, tmp_path):
+    small = small_tree(tmp_path)
+    seed(repo, small, clock)
+    clock.now += timedelta(minutes=5)
+    first = apply_assessment(repo, small.rules, small.dates, AS_OF, clock)
+
+    clock.now += timedelta(minutes=5)
+    narrower = apply_assessment(repo, without_disclosure(small), small.dates, AS_OF, clock)
+    orphans = ca_ids(first) - ca_ids(narrower)
+    assert orphans  # otherwise this test proves nothing
+    assert narrower.written["assessments_ended"] == len(orphans)
+    for node_id in orphans:
+        assert repo.get_node(node_id).valid_to is not None
+        assert open_edges_of(repo, node_id) == []
+    graph = repo.load_graph()
+    assert not orphans & set(graph.nodes)
+    assert check_integrity(graph) == []
+
+    clock.now += timedelta(minutes=5)
+    again = apply_assessment(repo, without_disclosure(small), small.dates, AS_OF, clock)
+    assert again.total_written == 0  # ending is not repeated
+
+    clock.now += timedelta(minutes=5)
+    back = apply_assessment(repo, small.rules, small.dates, AS_OF, clock)
+    assert ca_ids(back) == ca_ids(first)
+    for node_id in orphans:
+        assert repo.get_node(node_id).valid_to is None
+        assert open_edges_of(repo, node_id)
+    assert check_integrity(repo.load_graph()) == []
+
+    clock.now += timedelta(minutes=5)
+    assert apply_assessment(repo, small.rules, small.dates, AS_OF, clock).total_written == 0
+
+
+def test_with_a_system_only_assessments_scoped_to_it_are_ended(repo, clock, tmp_path):
+    small = small_tree(tmp_path)
+    seed(repo, small, clock)
+    clock.now += timedelta(minutes=5)
+    first = apply_assessment(repo, small.rules, small.dates, AS_OF, clock)
+    clock.now += timedelta(minutes=5)
+    narrower = apply_assessment(
+        repo, without_disclosure(small), small.dates, AS_OF, clock, system_id="sys:faq-bot"
+    )
+    gone = ca_ids(first) - ca_ids(narrower)
+    scoped_to_it = {
+        ids.ca_id(r.control_id, r.scope_id) for r in first.results if r.scope_id == "sys:faq-bot"
+    }
+    assert gone & scoped_to_it
+    for node_id in gone:
+        ended = repo.get_node(node_id).valid_to is not None
+        assert ended == (node_id in scoped_to_it), node_id

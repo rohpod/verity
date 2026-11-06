@@ -32,6 +32,7 @@ from verity_core.model.enums import (
     EdgeType,
     EvidenceKind,
     ScopeLevel,
+    Source,
     StrmType,
     Sufficiency,
 )
@@ -400,3 +401,42 @@ def test_the_requirement_applies_in_two_roles_and_is_judged_once():
         evidence_items=[verification("VC-001")],
     )
     assert status_of(graph, "a1").state is R.SATISFIED
+
+
+# --- a result that rests on a simulated sign-off says so (ADR 0020, CLAUDE.md honesty rules) ---
+
+
+def test_a_requirement_met_on_a_simulated_sign_off_is_flagged():
+    items = [verification("VC-001", source=Source.SIMULATED)]
+    s = one([control("VC-001")], [maps("art1", "VC-001")], items)
+    assert (s.state, s.simulated) == (R.SATISFIED, True)
+
+
+def test_a_requirement_met_on_a_real_sign_off_is_not_flagged():
+    s = one([control("VC-001")], [maps("art1", "VC-001")], [verification("VC-001")])
+    assert (s.state, s.simulated) == (R.SATISFIED, False)
+
+
+def test_a_partly_addressed_requirement_is_flagged_when_the_met_control_is_simulated():
+    controls = [control("VC-001"), control("VC-002")]
+    mappings = [maps("art1", "VC-001"), maps("art1", "VC-002")]
+    items = [verification("VC-001", source=Source.SIMULATED)]
+    s = one(controls, mappings, items)
+    assert (s.state, s.simulated) == (R.PARTIALLY_ADDRESSED, True)
+
+
+def test_a_simulated_control_that_is_not_met_does_not_flag_the_requirement():
+    items = [verification("VC-001", "not_implemented", source=Source.SIMULATED)]
+    s = one([control("VC-001")], [maps("art1", "VC-001")], items)
+    assert (s.state, s.simulated) == (R.NOT_MET, False)
+
+
+def test_a_parent_is_flagged_when_an_addressed_child_is():
+    graph = parent_world([verification("VC-001", source=Source.SIMULATED)])
+    assert status_of(graph, "art9").simulated is True
+    graph = parent_world([verification("VC-001")])
+    assert status_of(graph, "art9").simulated is False
+
+
+def test_requirements_nothing_was_met_for_are_never_flagged():
+    assert status_of(parent_world(), "art9").simulated is False

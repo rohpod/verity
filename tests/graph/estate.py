@@ -293,6 +293,7 @@ def load_estate(repo) -> None:
             source_version="test fixture",
             source_url="https://example.invalid/test-fixture",
             last_verified=date(2026, 11, 5),
+            binding=True,
             **COMMON,
         ),
         Framework(
@@ -301,6 +302,7 @@ def load_estate(repo) -> None:
             source_version="test fixture",
             source_url="https://example.invalid/test-fixture",
             last_verified=date(2026, 11, 5),
+            binding=False,
             **COMMON,
         ),
         _requirement("euaia", "art4", "Art. 4"),

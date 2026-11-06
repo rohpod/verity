@@ -1,3 +1,4 @@
+import shutil
 import sys
 from pathlib import Path
 
@@ -115,6 +116,8 @@ def test_assess_defaults_to_a_dry_run_that_never_builds_the_real_repository(caps
     out = capsys.readouterr().out
     assert "dry run only" in out
     assert "high   no_evidence" in out
+    assert "1 satisfied (1 on simulated sign-offs)" in out
+    assert "applicability: " in out
     assert fake_table == []
 
 
@@ -128,6 +131,12 @@ def test_assess_can_be_limited_to_one_system(capsys):
     args = ["assess", "--content", REAL_CONTENT, "--as-of", "2026-11-05", "--system"]
     assert cli.run([*args, "sys:talent-screening"]) == cli.OK
     assert "no_owner" not in capsys.readouterr().out
+
+
+def test_assess_refuses_an_unknown_system_without_a_traceback(capsys):
+    args = ["assess", "--content", REAL_CONTENT, "--as-of", "2026-11-05", "--system", "sys:nope"]
+    assert cli.run(args) == cli.REFUSED
+    assert "'sys:nope' is not a system" in capsys.readouterr().err
 
 
 def test_assess_without_rules_cannot_run(tmp_path, capsys):
@@ -176,8 +185,20 @@ def test_attest_scaffolds_a_decision_file_and_refuses_to_overwrite(tmp_path, cap
     (path,) = (tmp_path / "decisions").glob("*.yaml")
     text = path.read_text()
     assert "kind: attestation" in text and "status: partially_implemented" in text
+    assert "simulated: true" in text
+    assert "Simulated sign-off by a fictional person." in text
     assert cli.run(args) == cli.REFUSED
     assert "already exists" in capsys.readouterr().err
+
+
+def test_an_unedited_attest_scaffold_fails_lint(tmp_path, capsys):
+    shutil.copytree(REAL_CONTENT, tmp_path / "content")
+    shutil.copytree(Path(REAL_CONTENT).parent / "evidence", tmp_path / "evidence")
+    content = str(tmp_path / "content")
+    args = ["attest", "VC-002", "org:kestrel", "--by", "person:l-ivanova", "--content", content]
+    assert cli.run(args) == cli.OK
+    assert cli.run(["lint", "--content", content]) == cli.LINT_FAILED
+    assert "decision_todo" in capsys.readouterr().err
 
 
 def test_attest_refuses_an_invalid_control(tmp_path, capsys):

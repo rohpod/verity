@@ -7,7 +7,7 @@ not that the mapping is right, so the owner still reads the mappings (ADR 0017).
 
 import re
 from collections import Counter
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from urllib.parse import urlparse
 
@@ -23,6 +23,7 @@ from verity_core.model.enums import (
     Sufficiency,
     VerifiedAgainst,
 )
+from verity_core.model.evidence import Evidence
 from verity_core.model.nodes import Control, Model, Organisation, Person, Provider
 
 EU_FRAMEWORK = "euaia"
@@ -38,7 +39,9 @@ _QUOTES = ('"', "“", "”")
 _SHALL = re.compile(r"\bshall\b", re.IGNORECASE)
 _YEAR = re.compile(r"\b(?:19|20)\d\d\b")
 _ACCOUNT_ID = re.compile(r"(?<!\d)\d{12}(?!\d)")
-_SHA256 = re.compile(r"^[0-9a-f]{64}$")  # a digest is not text, and can hold 12 digits by chance
+# A digest or an Evidence ID is not text, and can hold 12 digits in a row by chance.
+_HASH_LIKE = re.compile(r"^(?:[0-9a-f]{64}|ev:[0-9a-f]{32})$")
+_TODO = re.compile(r"\bTODO\b")
 # Real AI vendors and products. Only a simulated provider or model may carry such a name, and
 # then only with its provenance saying so (CLAUDE.md, honesty rules). A small list, not a
 # complete one: it catches the likely slips, and the owner reads the estate files.
@@ -239,6 +242,8 @@ def _decisions(content: Content) -> Iterator[LintIssue]:
     estate = {n.id for n in content.estate}
     people = {n.id for n in content.estate if isinstance(n, Person)}
     controls = {c.id: c for c in content.controls if isinstance(c, Control)}
+    by_id = {ev.content["decision_id"]: ev for ev in content.decisions}
+    yield from _conflicts(content.decisions)
     for ev in content.decisions:
         subject = f"{ev.content['decision_id']}"
         if ev.collector not in people:
@@ -255,11 +260,53 @@ def _decisions(content: Content) -> Iterator[LintIssue]:
                     subject,
                     f"{control.id} is assessed at {control.scope_level} level",
                 )
+        yield from _supersession(ev, by_id)
+        if _TODO.search(ev.content["statement"]):
+            yield LintIssue("decision_todo", subject, "the statement still has a TODO to finish")
         if ev.source is Source.SIMULATED and "simulated sign-off" not in (
             ev.content["statement"].lower()
         ):
             yield LintIssue(
                 "simulated_not_labelled", subject, "statement must say 'simulated sign-off'"
+            )
+
+
+def _supersession(ev: Evidence, by_id: dict[str, Evidence]) -> Iterator[LintIssue]:
+    """A decision may replace only an existing decision about the same node, made no later than
+    itself, and not one that replaces it back (ADR 0020)."""
+    me = ev.content["decision_id"]
+    for target_id in ev.content.get("supersedes", ()):
+        target = by_id.get(target_id)
+        if target is None:
+            yield LintIssue("decision_unknown_supersedes", me, f"{target_id!r} does not exist")
+            continue
+        problem = None
+        if target_id == me or me in target.content.get("supersedes", ()):
+            problem = "decisions cannot replace each other"
+        elif target.subject != ev.subject:
+            problem = f"{target_id!r} is about {target.subject!r}, not {ev.subject!r}"
+        elif ev.collected_at < target.collected_at:
+            problem = f"{target_id!r} was decided later"
+        if problem:
+            yield LintIssue("decision_supersedes_mismatch", me, problem)
+
+
+def _conflicts(decisions: Sequence[Evidence]) -> Iterator[LintIssue]:
+    """Two decisions in force with the same kind, subject, control and day would tie, and the
+    Evidence ID would pick the winner. A revocation competes with nothing."""
+    named = {t for ev in decisions for t in ev.content.get("supersedes", ())}
+    groups: dict[tuple, list[str]] = {}
+    for ev in decisions:
+        kind = ev.content["decision_kind"]
+        if kind == "revocation" or ev.content["decision_id"] in named:
+            continue
+        key = (kind, ev.subject, ev.content.get("control"), ev.collected_at)
+        groups.setdefault(key, []).append(ev.content["decision_id"])
+    for found in groups.values():
+        if len(found) > 1:
+            ids_ = ", ".join(sorted(found))
+            yield LintIssue(
+                "decision_conflict", ids_, "decided on the same day: one must supersede the other"
             )
 
 
@@ -288,7 +335,7 @@ def _strings(content: Content) -> Iterator[tuple[str, str]]:
 
     def walk(subject: str, value: object) -> Iterator[tuple[str, str]]:
         if isinstance(value, str):
-            if not _SHA256.fullmatch(value):
+            if not _HASH_LIKE.fullmatch(value):
                 yield subject, value
         elif isinstance(value, dict):
             for item in value.values():
