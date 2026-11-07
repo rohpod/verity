@@ -115,8 +115,8 @@ function Neighbourhood({ index }: { index: SnapshotIndex }) {
   return (
     <Card>
       <div className="mb-2 flex flex-wrap items-center gap-3 text-sm">
-        <label>Start from{" "}
-          <select value={start} onChange={(e) => setParams({ node: e.target.value })} className="max-w-[18rem] border border-[var(--border)] bg-transparent">
+        <label className="max-w-full">Start from{" "}
+          <select value={start} onChange={(e) => setParams({ node: e.target.value })} className="max-w-full border border-[var(--border)] bg-transparent">
             {options.map((id) => <option key={id} value={id}>{id}</option>)}
           </select>
         </label>
