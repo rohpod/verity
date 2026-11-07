@@ -92,7 +92,7 @@ locals {
       }]
       model-and-data = [
         {
-          # The seeded finding of ADR 0022. The boundary makes this grant ineffective.
+          # The seeded finding of ADR 0022. IAM's simulator shows the boundary denies this call.
           Effect   = "Allow"
           Action   = ["bedrock:InvokeModel"]
           Resource = "arn:aws:bedrock:eu-north-1::foundation-model/*"

@@ -460,6 +460,7 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
 | [0032](adr/0032-m8-scheduled-run.md) | M8 scheduled run: L15 passed on a one-off cron, the credit read waits 24 hours after the latest one-off change |
 | [0033](adr/0033-m9-live-snapshot.md) | M9 live snapshot: first live export measured and reviewed, and what it was built without |
 | [0034](adr/0034-m11-close-decisions.md) | M11 close decisions: what is deferred, what is dropped, the final snapshot and the teardown plan; the Pages check |
+| [0035](adr/0035-m11-final-review.md) | M11 final review: security, ADRs against the code, EU AI Act dates re-checked, the register confirmed |
 
 ## L. Schema validation walkthrough
 

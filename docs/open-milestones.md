@@ -8,7 +8,7 @@ _2026-11-06, after PR 61 merged. A milestone is ✅ only when every validation c
 
 **Update, 2026-11-07, Pages.** The Pages deploy ran, and the live site was checked at desktop and phone width. The first check found the Graph page 399 px wide at 390 px, which PR 73 fixed. The re-check passed, so **M10 is ✅** ([ADR 0034](adr/0034-m11-close-decisions.md)). M11's decisions are recorded in ADR 0034, and Opus does the final review before M11 is marked done.
 
-M3, M8, M9 and M10 are closed. Nothing on this page is waiting on a deploy or an export. What is left is the optional credit read, and M11's final review.
+M3, M8, M9 and M10 are closed. Nothing on this page is waiting on a deploy or an export. M11 is ✅ once its final review PR merges ([ADR 0035](adr/0035-m11-final-review.md)). What is left for the owner is the optional credit read, and the teardown.
 
 | Milestone | What is left | Waiting on | Earliest close |
 |---|---|---|---|
