@@ -2,7 +2,7 @@
 
 _Written 2026-11-06 at about 20:00 UTC, with `main` at PR 65. Work from top to bottom and tick items as they finish. Background: [why M3, M8 and M9 are open](open-milestones.md) and the [M10 and M11 plan](m10-m11-plan.md)._
 
-**Where things stand.** M0, M1, M2 and M4 to M7 are ✅. M3, M8, M9 and M10 are 🔄, and M11 is ⬜. All the code for M9 and M10 is merged except one test fix (A2). Nothing moves until L15 is applied: the schedule is `DISABLED`, so waiting alone achieves nothing.
+**Where things stand (2026-11-07).** M0, M1, M2 and M4 to M7 are ✅. M3, M8, M9 and M10 are 🔄, and M11 is ⬜. All the code for M9 and M10 is merged, including the test fix (A2). L15 is done: the schedule is `ENABLED`, and the 07:30 UTC run passed ([ADR 0032](adr/0032-m8-scheduled-run.md)). Next is the owner's credit read (D1), at or after 10:12 UTC on 2026-11-08.
 
 **The path:** L15 → first scheduled run → credit read (closes M3 and M8) → live snapshot (closes M9) → Pages check (closes M10) → M11.
 
@@ -10,8 +10,8 @@ _Written 2026-11-06 at about 20:00 UTC, with `main` at PR 65. Work from top to b
 
 | When | What | If missed |
 |---|---|---|
-| 03:00 UTC (08:30 IST), daily | The scheduled crawl. L15 must be applied before this for that day's run. Never run an assess across this time | The first run moves to the next day |
-| About 29 Nov 2026 | Evidence from 2026-11-06 starts expiring if the schedule is still off, and goes stale around 6 Dec | Controls lose their fresh evidence |
+| 03:00 UTC (08:30 IST), daily | The scheduled crawl, as configured. It has not run at this time yet: the only scheduled run so far was at 07:30 UTC under a temporary cron. Never run an assess across this time | Two writers at once ([ADR 0014](adr/0014-m2-measurements-and-evidence-cap.md)): wait and repeat the assess |
+| About 29 Nov 2026 | Evidence from 2026-11-06 would start expiring if the schedule were off, and goes stale around 6 Dec. The schedule is on, so crawls renew it. Confirm it is still `ENABLED` | Controls lose their fresh evidence |
 | 2 Dec 2026 | `euaia-art50-2-legacy` and `euaia-art5-new` take effect, so a later snapshot can differ | Nothing breaks: review the difference |
 | 15 Mar 2027 | Start the final snapshot | Less buffer |
 | **1 Apr 2027** | **Hard deadline** for the last live snapshot | |
@@ -19,16 +19,16 @@ _Written 2026-11-06 at about 20:00 UTC, with `main` at PR 65. Work from top to b
 
 ## A. Before L15
 
-- [ ] **A1. Merge Sonnet's `docs/m11-prep` PR**, once it is open and CI passes. It holds docs only.
-- [ ] **A2. Fix `web/src/test/build.test.ts`, which blocks the snapshot PR.** It throws if `web/public/data` exists, which is where the live snapshot goes. Reproduced: with a snapshot in place, `npm test` gave 1 failed and 92 passed, while every other web check passed. Give the test a temporary `publicDir` so it never touches the repo folder. It must still fail with `copyPublicDir: true`. This changes no Lambda zip.
-- [ ] **A3. Check the credit history in Billing.** Record why credits went from $100 to $120. The cause is unconfirmed.
-- [ ] **A4. Hold code changes** in `core/`, `sdk/`, `apps/` and `mocks/` until the snapshot is published. They can change the zips and put `main` ahead of what is deployed. This includes the `credential_process` fix (M11 step 2) if it touches a file in a zip.
+- [x] **A1. Merge Sonnet's `docs/m11-prep` PR**, once it is open and CI passes. It holds docs only. (Merged, PR 66.)
+- [x] **A2. Fix `web/src/test/build.test.ts`, which blocks the snapshot PR.** It throws if `web/public/data` exists, which is where the live snapshot goes. Reproduced: with a snapshot in place, `npm test` gave 1 failed and 92 passed, while every other web check passed. Give the test a temporary `publicDir` so it never touches the repo folder. It must still fail with `copyPublicDir: true`. This changes no Lambda zip. (Done, PR 68.)
+- [x] **A3. Check the credit history in Billing.** Record why credits went from $100 to $120. The cause is unconfirmed. On 2026-11-07 the owner reported $0 spent and that the $100 figure may have been stated by mistake. That is the owner's report, not confirmed from Billing records. The baseline stays $120.
+- [ ] **A4. Hold code changes** in `core/`, `sdk/`, `apps/`, `mocks/`, `crawler/` and `content/rules/ai_signals.yaml` until the snapshot is published. They can change the zips and put `main` ahead of what is deployed. This includes the `credential_process` fix (M11 step 2) if it touches a file in a zip.
 
 ## B. L15: enable the schedule (AWS change, needs approval)
 
 Run from the main checkout, because the OpenTofu state is there. Nobody else may be using that checkout.
 
-- [ ] **B1. Get a clean tree and a fresh build:**
+- [x] **B1. Get a clean tree and a fresh build:**
   ```sh
   git switch main && git pull --ff-only
   git status            # must be clean
@@ -36,23 +36,25 @@ Run from the main checkout, because the OpenTofu state is there. Nobody else may
   uv run python scripts/build_lambdas.py
   cd infra && tofu plan -var schedule_state=ENABLED
   ```
-- [ ] **B2. Check the plan.** Expected: 0 to add, 4 to change, 0 to destroy: `verity-crawl-daily`, `verity-crawler`, `support-assistant` and `contract-insights`. The two apps change only because PR 65 added 5 lines to `graph/dynamodb/client.py`, which both zips bundle. Anything else is a stop.
-- [ ] **B3. Give the approval, then apply:**
+  Deviation: the tree was not clean on 2026-11-07. The cron in `infra/modules/estate/scheduler.tf` was a local, uncommitted edit (see ADR 0032, decision 2). It touches no zip.
+- [x] **B2. Check the plan.** Expected: 0 to add, 4 to change, 0 to destroy: `verity-crawl-daily`, `verity-crawler`, `support-assistant` and `contract-insights`. The two apps change only because PR 65 added 5 lines to `graph/dynamodb/client.py`, which both zips bundle. Anything else is a stop.
+- [x] **B3. Give the approval, then apply:**
   ```sh
   tofu apply -var schedule_state=ENABLED
   ```
   Always pass the variable, because a plain `tofu apply` sets the schedule back to `DISABLED`. Cost: $0, inside Always Free (ADR 0025). Undo the schedule by applying with `schedule_state=DISABLED`.
-- [ ] **B4. Recommended, needs its own approval: invoke `support-assistant` and `contract-insights` once each** (runbook L5, with the events in `tests/build/test_zip_handlers.py`). They have new code that has not run on AWS. Both must return. It adds about 2 small usage items and only calls the mocks.
+- [x] **B4. Recommended, needs its own approval: invoke `support-assistant` and `contract-insights` once each** (runbook L5, with the events in `tests/build/test_zip_handlers.py`). They have new code that has not run on AWS. Both must return. It adds about 2 small usage items and only calls the mocks. Done at 10:11 UTC on 2026-11-07: both returned 200, mock only.
+- [x] **B5. Put the cron back.** Applied at 10:10:40 UTC on 2026-11-07 from `main`, with `-var schedule_state=ENABLED`. The plan was 0 add, 1 change, 0 destroy, changing only `schedule_expression`, and AWS then showed `ENABLED`, `cron(0 3 * * ? *)`, UTC.
 
 ## C. First scheduled run
 
-- [ ] **C1. After 03:00 UTC, confirm exactly one new run with `finished_at` set**, read from the table or the crawler's logs.
-- [ ] **C2. Note what it wrote.** Expected: three ChangeEvents, one per updated function, with new evidence for each. Other results are a reason to stop and check.
+- [x] **C1. After 03:00 UTC, confirm exactly one new run with `finished_at` set**, read from the table or the crawler's logs. The run was at 07:30 UTC under the temporary cron.
+- [x] **C2. Note what it wrote.** Expected: three ChangeEvents, one per updated function, with new evidence for each. Other results are a reason to stop and check. Done: `resources_changed` was 3, with AFFECTS edges to `verity-crawler`, `support-assistant` and `contract-insights`.
 
 ## D. Close M3 and M8
 
-- [ ] **D1. Read credits in the Billing console, at least 24 hours after the run in C1.** Never use `aws ce`, which charges per request. Compare with **$120**.
-- [ ] **D2. Record L15 and L17 in a new ADR** (the next free number), including why three functions changed.
+- [ ] **D1. Read credits in the Billing console, at or after 10:12 UTC (15:42 IST) on 2026-11-08.** That is 24 hours after the latest of the 07:30 UTC run, the cron revert and B4 ([ADR 0032](adr/0032-m8-scheduled-run.md) decision 3). Daily crawls do not restart the wait. Never use `aws ce`, which charges per request. Compare with **$120**. An earlier look, such as the owner's at about 10:20 UTC on 2026-11-07, is not this read.
+- [ ] **D2. Record L15 and L17.** ADR 0032 holds L15 as Proposed. Add the L17 result to it and set it to Accepted. It already says why three functions changed.
 - [ ] **D3. Mark M3 and M8 ✅** in Stage 4 and `docs/open-milestones.md`. Do this through a PR.
 
 ## E. Create the live snapshot (closes M9)

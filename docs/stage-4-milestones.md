@@ -50,6 +50,7 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/) · [why M3, M8 and M9 ar
 | D32 | M9 export: listed public fields, rebuilt hashes for redacted Evidence, an independent fail-closed scanner, a generated contract. See [ADR 0029](adr/0029-m9-snapshot-export.md) |
 | D33 | M9 redaction review: scan before writing, listed Evidence content and tags, a stricter scanner, a header that names what is not real. See [ADR 0030](adr/0030-m9-redaction-review.md) |
 | D34 | M10 dashboard: one data path, no governance derived in the UI, a build that cannot carry a fixture. See [ADR 0031](adr/0031-m10-dashboard.md) |
+| D35 | M8 scheduled run: L15 passed on a one-off cron that was reverted, and the L17 credit read comes at least 24 hours after the latest one-off change. See [ADR 0032](adr/0032-m8-scheduled-run.md) |
 
 ## Milestones
 
@@ -167,7 +168,7 @@ Open for M8: nothing here has run on AWS. The arm64 `pydantic_core` has never be
 
 ## M8 live results (2026-11-06)
 
-PR C ran the runbook against the real account. Full values are in [ADR 0027](adr/0027-m8-live-results.md). Opus reviewed it ([ADR 0028](adr/0028-m8-review.md)). M8 stays 🔄 until the scheduled run and the credit read pass.
+PR C ran the runbook against the real account. Full values are in [ADR 0027](adr/0027-m8-live-results.md). Opus reviewed it ([ADR 0028](adr/0028-m8-review.md)). The scheduled run passed on 2026-11-07 ([ADR 0032](adr/0032-m8-scheduled-run.md)). M8 stays 🔄 until the credit read passes.
 
 | Criterion | Result |
 |---|---|
@@ -177,8 +178,8 @@ PR C ran the runbook against the real account. Full values are in [ADR 0027](adr
 | CloudTrail shows no Bedrock use | 7 `List*` events by `resource-explorer-2`, no invocation |
 | Second crawl idempotent | Yes: writes only the run |
 | Destroying the estate then applying rebuilds it cleanly | Yes: same code hashes, table and budget untouched, crawl wrote only the run. 29 high still derived from the live table, in memory ([ADR 0028](adr/0028-m8-review.md)) |
-| Credits unchanged | **Not yet read** (owner, 24 hours after the first scheduled run) |
-| Scheduled run | **Not yet checked**: the schedule is `DISABLED` after the rebuild |
+| Credits unchanged | **Not yet read** (owner, at or after 10:12 UTC on 2026-11-08, which is 24 hours after the latest one-off change; [ADR 0032](adr/0032-m8-scheduled-run.md) decision 3) |
+| Scheduled run | **Passed** on 2026-11-07: a real cron run at 07:30 UTC under a temporary cron, `finished_at` set, 3 ChangeEvents. The cron was then reverted to `cron(0 3 * * ? *)`, which has not run yet ([ADR 0032](adr/0032-m8-scheduled-run.md)) |
 
 ## Notes for later milestones
 
@@ -186,7 +187,7 @@ Found while building and reviewing M1. Each is open until the named milestone cl
 
 | Milestone | Note |
 |---|---|
-| M3 | Last open criterion: the owner re-reads credits in the Billing console at least 24 hours after the last live write (2026-11-05). M3 stays 🔄 until they match. The checks moto could not do are done ([ADR 0016](adr/0016-m3-live-results.md)) |
+| M3 | Last open criterion: the owner re-reads credits in the Billing console at or after 10:12 UTC on 2026-11-08, 24 hours after the latest one-off change ([ADR 0032](adr/0032-m8-scheduled-run.md)). M3 stays 🔄 until they match. The checks moto could not do are done ([ADR 0016](adr/0016-m3-live-results.md)) |
 | M8 | `load_graph` reads every `U#` usage record in the table and discards it. Demo usage volume is small, so measure the scan on the real table. If usage grows large, load without a scan: list nodes through the type index and read each node's partition **Closed by [ADR 0028](adr/0028-m8-review.md).** |
 | M8 | Read `DiscoveryRun.summary.largest_evidence_bytes` from the first live crawl. Evidence over the 16 KB cap is summarised, never refused ([ADR 0021](adr/0021-m6-discovery.md)); decide whether the cap should rise **Closed by [ADR 0027](adr/0027-m8-live-results.md).** |
 | M8 | Build `crawler/handler.py` and the live path of `verity crawl`. The CLI refuses it until then **Closed by [ADR 0027](adr/0027-m8-live-results.md).** |
@@ -205,7 +206,7 @@ Found while building and reviewing M1. Each is open until the named milestone cl
 | M8 | Tag the mocks and the crawler `verity:component`, or `mock-openai` becomes a shadow-AI candidate **Closed by [ADR 0027](adr/0027-m8-live-results.md).** |
 | M8 | Publish the manifests to SSM under `/verity/manifests/` **Closed by [ADR 0027](adr/0027-m8-live-results.md).** |
 | After M8 | Decide whether to add Bedrock's 8 other `Invoke*` actions, such as `InvokeDataAutomation`, to `ai_signals.yaml` ([ADR 0025](adr/0025-m8-deploy-and-crawl.md)) |
-| After M8 | Make `trail_shows_ai` check the event's name as `_proves` does, so a `List*` call from a function's role is not `confirmed_usage` ([ADR 0028](adr/0028-m8-review.md)) **Closed:** it now uses `_proves`. The deployed crawler changes at the next apply |
+| After M8 | Make `trail_shows_ai` check the event's name as `_proves` does, so a `List*` call from a function's role is not `confirmed_usage` ([ADR 0028](adr/0028-m8-review.md)) **Closed:** it now uses `_proves`, and the fix deployed on 2026-11-07 ([ADR 0032](adr/0032-m8-scheduled-run.md)) |
 | After M8 | Stop `credential_process` running on every call for the operator's commands, and correct the CLI's "while it throttles" message ([ADR 0028](adr/0028-m8-review.md)) |
 | M10 | Word the boundary note as what IAM's simulator shows, with no live call tried. Never say the grant "is ineffective" as a fact ([ADR 0028](adr/0028-m8-review.md)) |
 | M8 | Confirm the real crawler's function name matches `platform_functions`, and that the demo role grants `bedrock:InvokeModel` **Closed by [ADR 0027](adr/0027-m8-live-results.md).** |
@@ -245,7 +246,7 @@ _Drafted by Sonnet from [the M10 and M11 plan](m10-m11-plan.md), step 1. It cove
 | E7 | `python3.12` on arm64 (architecture §B ❓) | [Stage 4](stage-4-milestones.md) | closed | Stage 4 "Findings from read-only checks" records it as closed | draft: Opus to confirm |
 | E8 | `aws login` flow (architecture §J ❓) | Stage 4 | closed | Stage 4 "Findings from read-only checks" records it as closed | draft: Opus to confirm |
 | E9 | Whether Free plan accounts may use EventBridge Scheduler, SSM and IAM ("Still unverified") | [ADR 0025](adr/0025-m8-deploy-and-crawl.md) consequences | closed | [ADR 0027](adr/0027-m8-live-results.md), L4: the Free plan accepted IAM, Scheduler and SSM | draft: Opus to confirm |
-| N1 | M3: owner's credit read at least 24 h after the last live write | [Stage 4 notes](stage-4-milestones.md#notes-for-later-milestones) | open: waiting on Track A | Needs the L15 first scheduled run and the owner's Billing read ([open milestones](open-milestones.md)). Not an M11 decision | draft: Opus to confirm |
+| N1 | M3: owner's credit read at least 24 h after the latest one-off change | [Stage 4 notes](stage-4-milestones.md#notes-for-later-milestones) | open: waiting on the owner's read | L15 passed on 2026-11-07. Needs the owner's Billing read at or after 10:12 UTC on 2026-11-08 ([ADR 0032](adr/0032-m8-scheduled-run.md), [open milestones](open-milestones.md)). Not an M11 decision | draft: Opus to confirm |
 | N2 | M8: `load_graph` scans every `U#` record | [Stage 4 notes](stage-4-milestones.md#notes-for-later-milestones) | closed | Marked closed in the notes by [ADR 0028](adr/0028-m8-review.md) | draft: Opus to confirm |
 | N3 | M8: Read `largest_evidence_bytes` from the first live crawl; decide the 16 KB cap | [Stage 4 notes](stage-4-milestones.md#notes-for-later-milestones) | closed | Marked closed in the notes by [ADR 0027](adr/0027-m8-live-results.md) | draft: Opus to confirm |
 | N4 | M8: Build `crawler/handler.py` and the live path of `verity crawl` | [Stage 4 notes](stage-4-milestones.md#notes-for-later-milestones) | closed | Marked closed in the notes by [ADR 0027](adr/0027-m8-live-results.md) | draft: Opus to confirm |
@@ -266,7 +267,7 @@ _Drafted by Sonnet from [the M10 and M11 plan](m10-m11-plan.md), step 1. It cove
 | N19 | M8: Confirm the crawler's name matches `platform_functions`, and the demo role's `bedrock:InvokeModel` | [Stage 4 notes](stage-4-milestones.md#notes-for-later-milestones) | closed | Marked closed in the notes by [ADR 0027](adr/0027-m8-live-results.md) | draft: Opus to confirm |
 | N20 | M8: First `assess --target dynamodb` write estimate | [Stage 4 notes](stage-4-milestones.md#notes-for-later-milestones) | closed | Marked closed in the notes by [ADR 0027](adr/0027-m8-live-results.md) | draft: Opus to confirm |
 | N21 | After M8: Bedrock's 8 other `Invoke*` actions in `ai_signals.yaml` | [Stage 4 notes](stage-4-milestones.md#notes-for-later-milestones), [ADR 0025](adr/0025-m8-deploy-and-crawl.md) | open: Opus decides (step 3) | Not decided here | draft: Opus to confirm |
-| N22 | After M8: `trail_shows_ai` checks the event name as `_proves` does | [Stage 4 notes](stage-4-milestones.md#notes-for-later-milestones), [ADR 0028](adr/0028-m8-review.md) | closed in code; deploys at L15 | Marked closed in the notes. The deployed crawler changes at the next apply (Track A), so it is not live until then | draft: Opus to confirm |
+| N22 | After M8: `trail_shows_ai` checks the event name as `_proves` does | [Stage 4 notes](stage-4-milestones.md#notes-for-later-milestones), [ADR 0028](adr/0028-m8-review.md) | closed; deployed on 2026-11-07 | Marked closed in the notes. The fix went out with the L15 apply, and the 07:30 UTC run used it ([ADR 0032](adr/0032-m8-scheduled-run.md)) | draft: Opus to confirm |
 | N23 | After M8: `credential_process` on every operator call, and the CLI's "while it throttles" message | [Stage 4 notes](stage-4-milestones.md#notes-for-later-milestones), ADR 0028 | open: Sonnet, step 2 | Not started in this PR. See the files report in the PR description | draft: Opus to confirm |
 | N24 | M10: word the boundary note as what IAM's simulator shows; never say the grant "is ineffective" | [Stage 4 notes](stage-4-milestones.md#notes-for-later-milestones) | closed | `BOUNDARY_NOTE` in `web/src/lib/wording.ts` ([ADR 0031](adr/0031-m10-dashboard.md) "UI duties"), tested in `web/src/test/duties.test.tsx`, shown in the System profile and, since PR 65, the Controls detail | draft: Opus to confirm |
 | N25 | Before a re-seed: time the Evidence read that `verity seed` does | [Stage 4 notes](stage-4-milestones.md#notes-for-later-milestones), [ADR 0020](adr/0020-m5-review-fixes.md) | partly measured | ADR 0027 decision 3 measured a first seed (about 11 minutes). A re-seed has not been measured | draft: Opus to confirm |

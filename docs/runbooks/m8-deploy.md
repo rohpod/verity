@@ -25,7 +25,7 @@ Prices (read 2026-11-06, ADR 0025): Lambda, including Function URLs, is inside t
 | L14 | Check CloudTrail | `aws cloudtrail lookup-events --lookup-attributes AttributeKey=EventSource,AttributeValue=bedrock.amazonaws.com` | No `Invoke*` or `Converse*` events. Resource Explorer's own `List*` calls appear (7, dated 2026-11-05) and are not use (ADR 0027, ADR 0028) | n/a |
 | L15 | APPROVE: enable the schedule | `tofu apply -var schedule_state=ENABLED` | Next day: one run, `finished_at` set. Run this after L16 and leave it `ENABLED`: a plain `tofu apply` sets it back to `DISABLED` (ADR 0028) | Apply with `DISABLED` |
 | L16 | APPROVE each: rebuild test | `tofu destroy -target=module.estate`, then `tofu apply`, then a crawl | Table and budget untouched. Same zip hashes. High findings hold | n/a |
-| L17 | **Owner** reads credits at least 24 hours after the last write, which is the first scheduled run once L15 is on (ADR 0028) | Billing console | Unchanged | n/a |
+| L17 | **Owner** reads credits at least 24 hours after the latest one-off change (the 07:30 UTC run, the cron revert and B4), so at or after 10:12 UTC on 2026-11-08. Daily crawls do not restart the wait (ADR 0032, decision 3) | Billing console | Unchanged | n/a |
 
 ## Expected classifications (L11)
 Taken from `verity crawl --local`.
