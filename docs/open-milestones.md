@@ -4,17 +4,20 @@ _2026-11-06, after PR 61 merged. A milestone is ✅ only when every validation c
 
 **Update, 2026-11-07.** L15 is done: the schedule is `ENABLED`, and a real scheduled run finished at 07:30 UTC with 3 ChangeEvents ([ADR 0032](adr/0032-m8-scheduled-run.md)). The cron was a one-off `cron(30 7 * * ? *)` for that run and has been put back to `cron(0 3 * * ? *)`, which has not run yet. **M3 and M8 are closed (✅)** on the owner's report that credits were unchanged, taken before the 24-hour mark and accepted as an exception ([ADR 0032](adr/0032-m8-scheduled-run.md) decision 5). They reopen if a later read shows less than $120. M9 stays 🔄 until the owner merges its PR, and M10 stays 🔄.
 
-**Update, 2026-11-07, later.** The first live snapshot passed its scan and the Opus review ([ADR 0033](adr/0033-m9-live-snapshot.md)). It was built without checking a run on the 03:00 UTC cron and without a credit read after the 24-hour mark, by the owner's decision. **M9 is ✅ once its PR merges.**
+**Update, 2026-11-07, later.** The first live snapshot passed its scan and the Opus review ([ADR 0033](adr/0033-m9-live-snapshot.md)). It was built without checking a run on the 03:00 UTC cron and without a credit read after the 24-hour mark, by the owner's decision. **M9 is ✅** (PR 72 merged).
 
-The work is mostly done, and nothing here is a known failure. M10 is waiting on something that has not happened yet: a Pages deploy.
+**Update, 2026-11-07, Pages.** The Pages deploy ran, and the live site was checked at desktop and phone width. The first check found the Graph page 399 px wide at 390 px, which PR 73 fixed. The re-check passed, so **M10 is ✅** ([ADR 0034](adr/0034-m11-close-decisions.md)). M11's decisions are recorded in ADR 0034, and Opus does the final review before M11 is marked done.
+
+M3, M8, M9 and M10 are closed. Nothing on this page is waiting on a deploy or an export. What is left is the optional credit read, and M11's final review.
 
 | Milestone | What is left | Waiting on | Earliest close |
 |---|---|---|---|
 | M3 | ✅ on 2026-11-07 by the owner's exception. A full L17 read has not been taken | A read at or after 10:12 UTC on 2026-11-08 ([ADR 0032](adr/0032-m8-scheduled-run.md) decision 5) | Closed. Reopens if credits are below $120 |
 | M8 | ✅ on 2026-11-07 by the same exception. L15 passed. No run on the 03:00 UTC cron has been checked | The same read | Closed. Reopens if credits are below $120 |
-| M9 | Only the merge: the live export and the Opus review passed ([ADR 0033](adr/0033-m9-live-snapshot.md)) | The owner merging the snapshot PR | On merge |
+| M9 | ✅ on 2026-11-07: the live export, the scan and the Opus review passed, and PR 72 merged ([ADR 0033](adr/0033-m9-live-snapshot.md)) | Nothing | Closed |
+| M10 | ✅ on 2026-11-07: the Pages deploy ran and the live site passed at 1280 px and 390 px, after the PR 73 fix ([ADR 0034](adr/0034-m11-close-decisions.md)) | Nothing | Closed |
 
-The order is fixed: **L15 → first scheduled run → credit read (closes M3 and M8) → live snapshot (closes M9)**. M10's Pages URL then needs that snapshot. L15, the first scheduled run and the credit report are done, so the live snapshot is next.
+The order is fixed: **L15 → first scheduled run → credit read (closes M3 and M8) → live snapshot (closes M9)**. M10's Pages URL then needs that snapshot. All of these are done.
 
 ## M3: account baseline (✅)
 
@@ -64,7 +67,7 @@ Closed on 2026-11-07. L15 passed, and the credit criterion rests on the owner's 
 - CloudTrail event history cannot show SageMaker's invoke calls, so L14 says nothing about SageMaker either way.
 - The apps, the simulator and the probe were not run again after L16. They run from identical code.
 
-## M9: snapshot export (✅ on merge)
+## M9: snapshot export (✅)
 
 PRs 59 to 61 built the export and passed its redaction review. The first live export ran on 2026-11-07 ([ADR 0033](adr/0033-m9-live-snapshot.md)).
 
@@ -86,7 +89,7 @@ PRs 59 to 61 built the export and passed its redaction review. The first live ex
 
 **Known limit that does not block closing:** the listed fields and scan rules cannot prove that nothing sensitive exists beyond them. Free text from reviewed YAML is only scanned. That is why the Opus review is the last check (ADR 0030).
 
-## M10: dashboard (🔄)
+## M10: dashboard (✅)
 
 Built in one PR ([ADR 0031](adr/0031-m10-dashboard.md)): the six screens, the System profile, the audit trail and `stale_by_change` in TypeScript with parity tests, the development-only fixture flow, Playwright at 390 px, CI for `web/`, and `.github/workflows/pages.yml`. Everything so far runs against the recorded fixture and a generated mini snapshot.
 
@@ -96,6 +99,6 @@ Built in one PR ([ADR 0031](adr/0031-m10-dashboard.md)): the six screens, the Sy
 | `snapshot.json` is the only data source | Passed: a test fails on any other `fetch` or snapshot import, and the page's Content-Security-Policy allows only its own origin. A Playwright run against the production build under `/verity/` fails on any console error, CSP violation or off-origin request |
 | Every view shows provenance and the timestamp | **Gap found in review, now fixed:** the timestamp was on every route, but the Graph explorer's lists (neighbourhood, Impact, Stale) showed no provenance badge, so synthetic records there were unlabelled, and `routes.test.tsx` exempted `/graph` from the badge check. They now show a badge for each record, at phone width too, and only `/about` (which shows no records) is exempt. The boundary note for VC-060 on `support-assistant` was also missing from the Controls detail and is now shown there. Checked on the fixture and the mini snapshot only |
 | Works at phone width | Passed: Playwright at 390 px and at desktop width, on the dev server and on the production build |
-| Pages URL works | **Open:** the workflow skips while `web/public/data/snapshot.json` is missing. The deploy path is untested until the reviewed live snapshot PR (M9) merges |
+| Pages URL works | **Passed** on 2026-11-07, after one fix. The first check at 390 px found the Graph page 399 px wide, because the live snapshot has long node ids (PR 73). The re-check passed: every route at 1280 px and 390 px has 0 overflow, shows `data source: live` with `Snapshot as of 2026-11-07 12:20:39 UTC`, no fixture banner, and no console or off-origin errors. Details in [ADR 0034](adr/0034-m11-close-decisions.md) |
 
-**To close:** after the M9 snapshot PR merges, open the Pages URL at desktop and phone width, check every route and the live timestamp, and confirm no fixture banner shows. Then mark M10 ✅.
+**Closed 2026-11-07.** The deploy job ran and passed for PR 72 and for the fix in PR 73, and the live site was checked as above.

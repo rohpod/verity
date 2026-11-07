@@ -11,9 +11,9 @@ M10 can start now, because it builds against the fixture. It cannot close until 
 | A | L15, first scheduled run, credit read: closes M3 and M8 | Owner, with approval per step | L15 and the first scheduled run are done (2026-11-07, [ADR 0032](adr/0032-m8-scheduled-run.md)). The owner reported credits unchanged on 2026-11-07, before the 24-hour mark, and closed M3 and M8 on that report (ADR 0032, decision 5). The schedule is on, so crawls renew evidence that would have started expiring around 29 Nov |
 | B | M9 PR C code: live export and commit SHA lookup | Sonnet | Nothing |
 | C | M10 PRs A to E | Sonnet | Nothing |
-| D | M9 live run and snapshot PR: closes M9 | Opus ran and reviewed it, owner merges | Tracks A and B. Done on 2026-11-07 except the merge ([ADR 0033](adr/0033-m9-live-snapshot.md)) |
-| E | M10 close: Pages URL works | Sonnet | Tracks C and D |
-| F | M11 | Opus, with Sonnet steps below | M8, M9 and M10 ✅ |
+| D | M9 live run and snapshot PR: closes M9 | Opus ran and reviewed it, owner merges | Tracks A and B. Done and merged on 2026-11-07 (PR 72, [ADR 0033](adr/0033-m9-live-snapshot.md)) |
+| E | M10 close: Pages URL works | Sonnet | Tracks C and D. Done on 2026-11-07 after one phone-width fix (PR 73, [ADR 0034](adr/0034-m11-close-decisions.md)) |
+| F | M11 | Opus, with Sonnet steps below | M8, M9 and M10 ✅. Steps 2 to 4 and 7 are handled, step 2 only in part (the CLI message is fixed, the `credential_process` fix is deferred); decisions are in [ADR 0034](adr/0034-m11-close-decisions.md); Opus does the final review |
 
 One branch at a time, as CLAUDE.md requires. Do Track B first: it is small, and it keeps the critical path clear.
 

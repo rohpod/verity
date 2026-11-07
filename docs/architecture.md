@@ -389,7 +389,7 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
     - **`--local`**: crawls the recorded fixture and assesses it in memory, reading nothing from AWS, and writes `data_source: fixture`. It runs no git, so every `commit_sha` is null.
     - **Both**: the snapshot carries the findings, requirement statuses, control results, obligations, provider impact, crosswalk and `decision_commits` (the commit that introduced each decision file, looked up from git history), and is written only if the independent scan is clean. Output over 2 MiB is refused ([ADR 0029](adr/0029-m9-snapshot-export.md), [ADR 0030](adr/0030-m9-redaction-review.md)).
     - **`--check`**: scans a file and validates it against the snapshot models. `--require-live` also refuses a fixture; CI uses it on every `web/public/data/*.json`, and the Pages workflow uses it on the exact bytes it publishes.
-    - **Status:** the live path is tested with `moto` and a throwaway git repository only. It has not been run against the real table, and no live snapshot has been scanned or reviewed.
+    - **Status:** run once against the real table on 2026-11-07: 0 scan hits, and the file was reviewed against the real values before it was published ([ADR 0033](adr/0033-m9-live-snapshot.md)). It is also tested with `moto` and a throwaway git repository.
 - **Crawler Lambda (M8):** event `{ "mode": "full" | "incremental" }`, triggered by the schedule or a manual invoke. Only `full` is built ([ADR 0021](adr/0021-m6-discovery.md)).
 - **Snapshot contract:** `web/generated/snapshot.schema.json` is generated from the pydantic models, and `web/generated/snapshot.ts` from that schema (`uv run python scripts/generate_snapshot_contract.py`), so the frontend and backend cannot drift. CI regenerates both and fails on a difference ([ADR 0029](adr/0029-m9-snapshot-export.md)).
 - **Governance as code:** human decisions live as reviewed YAML under `content/decisions/` (§G). The approving pull request is the approval record. Risk treatment decisions are deferred ([ADR 0019](adr/0019-m5-rules-and-assessment.md)). See [ADR 0008](adr/0008-governance-as-code.md).
@@ -408,7 +408,7 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
   6. Graph explorer, with an "impact of…" mode
 - Every view shows provenance badges and the snapshot timestamp.
 - **How it is built (M10, [ADR 0031](adr/0031-m10-dashboard.md)):** one loader fetches `${BASE_URL}data/snapshot.json`, and a Content-Security-Policy with `connect-src 'self'` enforces it. The UI derives no governance result: it joins, filters and counts what the snapshot holds. Only audit trails and `stale_by_change` follow edges in TypeScript, and each is tested against Python. A fixture is served by a development-only Vite plugin and a build holds no snapshot.
-- **Hosting:** `.github/workflows/pages.yml` runs on pushes to `main` that touch `web/` or `core/`. It skips with a notice while `web/public/data/snapshot.json` is missing. Otherwise it builds, copies the snapshot in, runs `verity export --check --require-live` on the exact bytes to publish, and deploys. `pages: write` and `id-token: write` are on the deploy job only. No secrets, no AWS credentials. Pages is set to `build_type: workflow`. The deploy path is proved only when a live snapshot exists (M10 closes then).
+- **Hosting:** `.github/workflows/pages.yml` runs on pushes to `main` that touch `web/` or `core/`. It skips with a notice while `web/public/data/snapshot.json` is missing. Otherwise it builds, copies the snapshot in, runs `verity export --check --require-live` on the exact bytes to publish, and deploys. `pages: write` and `id-token: write` are on the deploy job only. No secrets, no AWS credentials. Pages is set to `build_type: workflow`. The deploy ran on 2026-11-07 with the live snapshot, and the site was checked at desktop and phone width ([ADR 0034](adr/0034-m11-close-decisions.md)).
 
 **Security:**
 
@@ -459,6 +459,7 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
 | [0031](adr/0031-m10-dashboard.md) | M10 dashboard: one data path, no governance derived in the UI, a build that cannot carry a fixture |
 | [0032](adr/0032-m8-scheduled-run.md) | M8 scheduled run: L15 passed on a one-off cron, the credit read waits 24 hours after the latest one-off change |
 | [0033](adr/0033-m9-live-snapshot.md) | M9 live snapshot: first live export measured and reviewed, and what it was built without |
+| [0034](adr/0034-m11-close-decisions.md) | M11 close decisions: what is deferred, what is dropped, the final snapshot and the teardown plan; the Pages check |
 
 ## L. Schema validation walkthrough
 

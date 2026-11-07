@@ -1,8 +1,8 @@
 # Runbook: M11 final snapshot
 
-The last public snapshot of the live estate (step 8 of the [M10 and M11 plan](../m10-m11-plan.md)). **Start by 15 Mar 2027, for a hard deadline of 1 Apr 2027.** The Free plan ends on 4 May 2027.
+**For an optional refresh only.** The snapshot from PR 72 (`as_of` 2026-11-07T12:20:39.767Z) is the final one unless the owner asks for a refresh ([ADR 0034](../adr/0034-m11-close-decisions.md) decision 11). This is the runbook for that refresh, step 8 of the [M10 and M11 plan](../m10-m11-plan.md). If one is made, **start by 15 Mar 2027, for a hard deadline of 1 Apr 2027.** The Free plan ends on 4 May 2027.
 
-**Status: drafted before it could be tested.** Written by Sonnet on 2026-11-07, when M3, M8 and M9 were still open. It has since been partly tested: the first live export ran on 2026-11-07 ([ADR 0033](../adr/0033-m9-live-snapshot.md)), one scheduled crawl has happened ([ADR 0032](../adr/0032-m8-scheduled-run.md)), and Pages has not deployed yet. Every command and expectation below comes from merged documents and code, not from a live result. Anything marked **(unverified)** needs checking on the first real run, and Opus should re-read this runbook against whatever M8 and M9 actually showed before it is used.
+**Status: tested once.** Written by Sonnet on 2026-11-07, before the first live run. Since then the first live export ran and was reviewed ([ADR 0033](../adr/0033-m9-live-snapshot.md)), one scheduled crawl has happened ([ADR 0032](../adr/0032-m8-scheduled-run.md)), and the Pages deploy ran and the live site was checked ([ADR 0034](../adr/0034-m11-close-decisions.md)). Steps still marked **(unverified)** have not been run. Opus should re-read this runbook against those results before a refresh.
 
 Every step marked **APPROVE** needs the owner's yes for that step, at that moment, with what it does, the verified price and how to undo it. Approval of one step never covers the next. Stop at the first surprise and record every measured value as you go.
 
@@ -37,7 +37,7 @@ All of these must be true. If one is not, stop.
 | S11 | Check the build with the file in place | `npm ci --ignore-scripts --prefix web`, `npm run build --prefix web`, `npm run check:dist --prefix web` | The build passes and `dist/` has no snapshot of its own ( `copyPublicDir` is off). The Pages workflow adds the file and scans those exact bytes | n/a |
 | S12 | **Opus** reviews the redaction | See "Review before commit". A commit to a public repository cannot be taken back | Written sign-off in the PR | Do not merge |
 | S13 | Open the PR | Template, Conventional Commit (`chore(data): publish the final snapshot`), no attribution lines. Switch back to `main` and ask the owner to merge | The owner reviews and merges on GitHub. Never merge it yourself | Close the PR |
-| S14 | Watch the Pages workflow | GitHub Actions, workflow `Pages` | The build job scans with `--require-live`, then the deploy job runs. This is the first real deploy **(unverified)** | Revert the merge |
+| S14 | Watch the Pages workflow | GitHub Actions, workflow `Pages` | The build job scans with `--require-live`, then the deploy job runs. The first real deploy ran on 2026-11-07 and passed (runs 42373401481 and 42376760265) | Revert the merge |
 | S15 | Check the Pages URL | Desktop and phone width, every route, a deep link, the timestamp | The timestamp is the new `as_of`. No fixture banner. `header.simulated_components` is reachable | n/a |
 | S16 | **Owner** reads credits at least 24 hours after the latest one-off change; daily crawls do not restart the wait ([ADR 0032](../adr/0032-m8-scheduled-run.md), decision 3) | Billing console | Unchanged ([ADR 0015](../adr/0015-account-baseline.md): credits can lag) | n/a |
 | S17 | Record the results | A new ADR. Accepted ADRs are not edited | Measured times, sizes, the diff summary and anything surprising | n/a |
@@ -78,12 +78,11 @@ Stop and tell the owner to switch to Opus if: any scan hit; a refusal this runbo
 
 ## After this runbook
 
-Teardown is **not** part of it, and no decision is made here. The plan records Opus's recommendation, which the owner decides: keep the estate until the final snapshot is live and checked on Pages, then run `tofu destroy` in the second half of April 2027, before the plan ends on 4 May 2027. That permanently deletes the table, and the Pages snapshot becomes the only record. The plan must never be upgraded. The decision goes in an ADR and in the README.
+Teardown is **not** part of it. It is decided in [ADR 0034](../adr/0034-m11-close-decisions.md) decision 12: keep the estate until after submission, then run `tofu destroy` in the second half of April 2027, before the plan ends on 4 May 2027. That permanently deletes the table, and the published snapshot becomes the only record. The plan must never be upgraded. The destroy needs the owner's approval then.
 
 ## Not known yet
 
-- How long the assess takes after the `credential_process` fix, and whether that fix has landed.
+- How long the assess takes after a `credential_process` fix. The fix is deferred ([ADR 0034](../adr/0034-m11-close-decisions.md) decision 9), so expect a slow assess (29 minutes for 4 records in ADR 0033).
 - The command to read the newest `DiscoveryRun` (S4).
-- Whether the Pages deploy job works (S14); the workflow has only ever skipped.
 - The first live file was 1,344,918 bytes (ADR 0033); check a later one against the 1.5 MiB estimate.
-- What the 2 Dec 2026 date changes do to the file. The three ChangeEvents expected from L15 happened on 2026-11-07 ([ADR 0032](../adr/0032-m8-scheduled-run.md)); their first appearance in a live export is still untested.
+- What the 2 Dec 2026 date changes do to the file. The three ChangeEvents from L15 happened on 2026-11-07 ([ADR 0032](../adr/0032-m8-scheduled-run.md)) and appeared in the live export with their hashes withheld ([ADR 0033](../adr/0033-m9-live-snapshot.md)).

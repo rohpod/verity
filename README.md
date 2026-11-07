@@ -9,7 +9,7 @@ Verity is an open-source portfolio project exploring what an *AI-specific* GRC p
 - maps systems to **ISO/IEC 42001, ISO/IEC 27001, the EU AI Act and the NIST AI RMF** through a typed crosswalk (NIST IR 8477 set-theory relationships), backed by a **knowledge graph**;
 - separates *mapped*, *implemented*, *evidenced*, *tested* and *verified*, so a single configuration check never turns an obligation green.
 
-> **Status:** Stage 4. The local graph core (M1), its DynamoDB repository (M2), the AWS account baseline (M3: the `verity-graph` table and a cost budget, tested live) the governance content with `verity seed` (M4, not yet seeded to AWS) the rules with `verity assess` and `verity attest` (M5, run locally) and the discovery pipeline with `verity crawl --local` (M6, tested on `moto` and a recorded fixture; nothing reads AWS yet) are built. The demo estate code (M7: two mocks, the `verity_ai` adapters, five apps, a local talent model and deterministic zips) is written and tested with `moto` and fakes. The estate and crawler are deployed to the Free plan account and the table holds a first live crawl (M8), and M3 and M8 are closed: a scheduled run finished on 2026-11-07, and credits were reported unchanged ([ADR 0032](docs/adr/0032-m8-scheduled-run.md)). The snapshot export (M9) is built, tested on `moto` and the recorded fixture, and has not been run on the live table. The dashboard (M10) is built and reads only `snapshot.json`; it is not published, because no live snapshot exists yet, so there is no demo link. See [`docs/stage-4-milestones.md`](docs/stage-4-milestones.md).
+> **Status:** Stage 4, with M0 to M10 done and M11 (the stage close) in review. The graph core and its DynamoDB repository (M1, M2), the account baseline (M3), the governance content and `verity seed` (M4), the rules with `verity assess` and `verity attest` (M5), the discovery pipeline (M6) and the demo estate (M7) are built. The estate and crawler are deployed to the Free plan account (M8), where a scheduled crawl run finished on 2026-11-07 and credits were reported unchanged ([ADR 0032](docs/adr/0032-m8-scheduled-run.md)). A snapshot of the live graph was exported, scanned and reviewed (M9, [ADR 0033](docs/adr/0033-m9-live-snapshot.md)), and the dashboard (M10) reads only that file and is published at **<https://rohpod.github.io/verity/>**. M11's decisions are in [ADR 0034](docs/adr/0034-m11-close-decisions.md). See [`docs/stage-4-milestones.md`](docs/stage-4-milestones.md).
 
 ## Real vs simulated
 
@@ -25,14 +25,14 @@ Verity is built under a strict **zero-cost, AWS-only** constraint, so some thing
 | Usage records | Labelled **simulated**: they record calls to the mocks, and only for third-party models |
 | Company "Kestrel Cloud Ltd", its people and ~25 extra AI systems | **Fictional / synthetic** |
 | Human sign-offs and decisions (L4 attestations, the DPA document, two risk tiers) | **Simulated**: made by fictional people, marked `simulated: true`, and shown as *simulated sign-off* |
-| Public demo | **Planned: a static snapshot** of the live graph with the account ID redacted. The export and the dashboard are built and tested on a recorded fixture, but no live snapshot has been exported or reviewed, and nothing is published |
+| Public demo | **Real data, redacted:** a static snapshot of the live graph (`as_of` 2026-11-07T12:20:39Z, `data_source: live`) is published at <https://rohpod.github.io/verity/> on GitHub Pages, the one place outside AWS. The account ID and Function URLs are redacted, the file passed an independent scan and a review against the real values ([ADR 0033](docs/adr/0033-m9-live-snapshot.md)), and every page lists what in it is not real |
 
 ## Documentation
 - [Stage 1: Product discovery](docs/stage-1-discovery.md)
 - [Stage 2: Feasibility & zero-cost verification](docs/stage-2-feasibility.md)
 - [Architecture](docs/architecture.md)
 - [Stage 4: Milestone plan](docs/stage-4-milestones.md)
-- [Why M3, M8 and M9 are open](docs/open-milestones.md)
+- [Milestone status: M3, M8, M9 and M10](docs/open-milestones.md)
 - [M10 and M11 plan](docs/m10-m11-plan.md)
 - [Architecture Decision Records](docs/adr/)
 
