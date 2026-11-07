@@ -1,16 +1,18 @@
-# Why M3, M8 and M9 are not complete
+# Milestone status: M3, M8, M9 and M10
 
 _2026-11-06, after PR 61 merged. A milestone is ✅ only when every validation criterion in [Stage 4](stage-4-milestones.md) has passed. This page is a status record: when a milestone closes, update its row in Stage 4 and its section here._
 
-**Update, 2026-11-07.** L15 is done: the schedule is `ENABLED`, and a real scheduled run finished at 07:30 UTC with 3 ChangeEvents ([ADR 0032](adr/0032-m8-scheduled-run.md)). The cron was a one-off `cron(30 7 * * ? *)` for that run and has been put back to `cron(0 3 * * ? *)`, which has not run yet. **M3 and M8 are closed (✅)** on the owner's report that credits were unchanged, taken before the 24-hour mark and accepted as an exception ([ADR 0032](adr/0032-m8-scheduled-run.md) decision 5). They reopen if a later read shows less than $120. M9 and M10 stay 🔄.
+**Update, 2026-11-07.** L15 is done: the schedule is `ENABLED`, and a real scheduled run finished at 07:30 UTC with 3 ChangeEvents ([ADR 0032](adr/0032-m8-scheduled-run.md)). The cron was a one-off `cron(30 7 * * ? *)` for that run and has been put back to `cron(0 3 * * ? *)`, which has not run yet. **M3 and M8 are closed (✅)** on the owner's report that credits were unchanged, taken before the 24-hour mark and accepted as an exception ([ADR 0032](adr/0032-m8-scheduled-run.md) decision 5). They reopen if a later read shows less than $120. M9 stays 🔄 until the owner merges its PR, and M10 stays 🔄.
 
-The work is mostly done, and nothing here is a known failure. M9 and M10 are waiting on something that has not happened yet: a live export.
+**Update, 2026-11-07, later.** The first live snapshot passed its scan and the Opus review ([ADR 0033](adr/0033-m9-live-snapshot.md)). It was built without checking a run on the 03:00 UTC cron and without a credit read after the 24-hour mark, by the owner's decision. **M9 is ✅ once its PR merges.**
+
+The work is mostly done, and nothing here is a known failure. M10 is waiting on something that has not happened yet: a Pages deploy.
 
 | Milestone | What is left | Waiting on | Earliest close |
 |---|---|---|---|
-| M3 | Nothing: ✅ on 2026-11-07 | Closed on the owner's early credit report ([ADR 0032](adr/0032-m8-scheduled-run.md)) | Done |
-| M8 | Nothing: ✅ on 2026-11-07. L15 passed and credits were reported unchanged | Closed on the same early report | Done |
-| M9 | Two pieces of code, then a live export, Opus review and a merged snapshot | The code is merged. M8 is closed, so the live run can start with approval | After the live export, Opus review and a merged snapshot |
+| M3 | ✅ on 2026-11-07 by the owner's exception. A full L17 read has not been taken | A read at or after 10:12 UTC on 2026-11-08 ([ADR 0032](adr/0032-m8-scheduled-run.md) decision 5) | Closed. Reopens if credits are below $120 |
+| M8 | ✅ on 2026-11-07 by the same exception. L15 passed. No run on the 03:00 UTC cron has been checked | The same read | Closed. Reopens if credits are below $120 |
+| M9 | Only the merge: the live export and the Opus review passed ([ADR 0033](adr/0033-m9-live-snapshot.md)) | The owner merging the snapshot PR | On merge |
 
 The order is fixed: **L15 → first scheduled run → credit read (closes M3 and M8) → live snapshot (closes M9)**. M10's Pages URL then needs that snapshot. L15, the first scheduled run and the credit report are done, so the live snapshot is next.
 
@@ -26,7 +28,7 @@ The order is fixed: **L15 → first scheduled run → credit read (closes M3 and
 
 ## M8: deploy and first live crawl (✅)
 
-Stage 4 showed ⬜ until this page was added, which understated it: everything except two criteria passed on 2026-11-06, and it is now 🔄.
+Closed on 2026-11-07. L15 passed, and the credit criterion rests on the owner's early report ([ADR 0032](adr/0032-m8-scheduled-run.md) decision 5).
 
 | Criterion | State | Source |
 |---|---|---|
@@ -62,22 +64,22 @@ Stage 4 showed ⬜ until this page was added, which understated it: everything e
 - CloudTrail event history cannot show SageMaker's invoke calls, so L14 says nothing about SageMaker either way.
 - The apps, the simulator and the probe were not run again after L16. They run from identical code.
 
-## M9: snapshot export (🔄)
+## M9: snapshot export (✅ on merge)
 
-Stage 4 also showed ⬜ here. PRs 59 to 61 built the export and passed its redaction review, so it is now 🔄. Every result so far comes from the recorded fixture and hand-built graphs. The criterion is about **live data**, and no live snapshot exists.
+PRs 59 to 61 built the export and passed its redaction review. The first live export ran on 2026-11-07 ([ADR 0033](adr/0033-m9-live-snapshot.md)).
 
 | Criterion | State |
 |---|---|
-| Scans of a snapshot from live data find no account ID, Function URL host, env value or email | **Open:** a live export is not built, and `verity export` without `--local` is refused |
-| Schema validates | Passed on the fixture, not yet on live data |
-| Every record has provenance, and the file has its `as_of` | Passed on the fixture, not yet on live data |
+| Scans of a snapshot from live data find no account ID, Function URL host, env value or email | **Passed:** 0 scan hits, and the Opus review compared the file with the real values |
+| Schema validates | Passed on live data |
+| Every record has provenance, and the file has its `as_of` | Passed on live data: `as_of` 2026-11-07T12:20:39.767Z |
 
-**Code for PR C, written and tested with moto and a throwaway git repo, never run against the real table:**
+**Code for PR C, proved on the real table on 2026-11-07:**
 1. **The live export path.** Read through `GraphRepository.load_graph()`, write `data_source: live`, and use now as `as_of`, not the start of the day, or the stale check refuses a good graph ([ADR 0030](adr/0030-m9-redaction-review.md)).
 2. **The decision commit SHA lookup** (ADR 0029, decision 9). The snapshot gains `decision_commits` (`commit_sha` is null in a fixture export), a live export refuses if a decision has no commit, and the scanner exempts only a 40-hex value under the key `commit_sha`.
 
-**Steps that wait for M8 to close:**
-3. With approval, run `verity assess --target dynamodb`, because export refuses a stale graph. It took 41 minutes last time, slowed by credential refreshes (ADR 0028).
+**Steps, all done except the merge:**
+3. With approval, run `verity assess --target dynamodb`, because export refuses a stale graph. It took 29 minutes for 4 records (ADR 0033).
 4. Export, and scan the first live file before doing anything else with it.
 5. Opus reviews the redaction, because a commit to a public repository cannot be taken back.
 6. The owner confirms and merges a PR that adds `web/public/data/snapshot.json`. Mark M9 ✅.

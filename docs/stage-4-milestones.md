@@ -51,6 +51,7 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/) · [why M3, M8 and M9 ar
 | D33 | M9 redaction review: scan before writing, listed Evidence content and tags, a stricter scanner, a header that names what is not real. See [ADR 0030](adr/0030-m9-redaction-review.md) |
 | D34 | M10 dashboard: one data path, no governance derived in the UI, a build that cannot carry a fixture. See [ADR 0031](adr/0031-m10-dashboard.md) |
 | D35 | M8 scheduled run: L15 passed on a one-off cron that was reverted, and the L17 credit read comes at least 24 hours after the latest one-off change. See [ADR 0032](adr/0032-m8-scheduled-run.md) |
+| D36 | M9 live snapshot: first live export measured and reviewed, built without a 03:00 UTC run or a late credit read, by the owner's decision. See [ADR 0033](adr/0033-m9-live-snapshot.md) |
 
 ## Milestones
 
@@ -61,16 +62,16 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/) · [why M3, M8 and M9 ar
 | M1 | Graph core: models, IDs, `GraphRepository`, `InMemoryRepository`, NetworkX loader, traversals | Opus, then Sonnet | no | ✅ |
 | M2 | `DynamoDBRepository` (moto), shared contract suite | Sonnet | no | ✅ |
 | **AWS baseline** | | | | |
-| M3 | Account baseline: non-root admin with MFA, region eu-north-1, `infra/` root, $0.01 budget, `verity-graph` | Opus (IAM), Sonnet | **yes, approval first** | ✅ |
+| M3 | Account baseline: non-root admin with MFA, region eu-north-1, `infra/` root, $0.01 budget, `verity-graph` | Opus (IAM), Sonnet | **yes, approval first** | ✅ (exception, [ADR 0032](adr/0032-m8-scheduled-run.md)) |
 | **Governance logic (local)** | | | | |
 | M4 | Content: hub controls, ~35 requirements, STRM mappings, Kestrel org, synthetic systems, `verity seed` | Sonnet builds the loader, linter, CLI and org data; Opus writes the regulatory content | no | ✅ |
 | M5 | Rules and assessment: applicability, status, assurance, satisfaction, `verity assess`, `verity attest` | Opus, then Sonnet | no | ✅ |
 | M6 | Discovery pipeline (8 stages), `ai_signals.yaml`, `verity crawl --local` | Sonnet | no | ✅ |
 | M7 | Demo estate code: mocks, `verity_ai` with SigV4 hook, 5 apps, local talent model | Sonnet | no | ✅ |
 | **Live** | | | | |
-| M8 | Deploy and first live crawl: Lambda modules, schedule, SSM manifests, guardrails | Opus (IAM), Sonnet | **yes, approval per apply** | ✅ |
+| M8 | Deploy and first live crawl: Lambda modules, schedule, SSM manifests, guardrails | Opus (IAM), Sonnet | **yes, approval per apply** | ✅ (exception, [ADR 0032](adr/0032-m8-scheduled-run.md)) |
 | **Public demo** | | | | |
-| M9 | Snapshot export, redaction, schema, generated TS types | Sonnet; Opus reviews redaction | no | 🔄 |
+| M9 | Snapshot export, redaction, schema, generated TS types | Sonnet; Opus reviews redaction | no | ✅ on merge ([ADR 0033](adr/0033-m9-live-snapshot.md)) |
 | M10 | Dashboard in three slices, GitHub Pages | Sonnet | no | 🔄 |
 | M11 | Stage close: security review, ADR review, final snapshot by 1 Apr 2027, teardown decision | Opus | teardown/refresh only | ⬜ |
 
@@ -272,9 +273,9 @@ _Drafted by Sonnet from [the M10 and M11 plan](m10-m11-plan.md), step 1. It cove
 | N24 | M10: word the boundary note as what IAM's simulator shows; never say the grant "is ineffective" | [Stage 4 notes](stage-4-milestones.md#notes-for-later-milestones) | closed | `BOUNDARY_NOTE` in `web/src/lib/wording.ts` ([ADR 0031](adr/0031-m10-dashboard.md) "UI duties"), tested in `web/src/test/duties.test.tsx`, shown in the System profile and, since PR 65, the Controls detail | draft: Opus to confirm |
 | N25 | Before a re-seed: time the Evidence read that `verity seed` does | [Stage 4 notes](stage-4-milestones.md#notes-for-later-milestones), [ADR 0020](adr/0020-m5-review-fixes.md) | partly measured | ADR 0027 decision 3 measured a first seed (about 11 minutes). A re-seed has not been measured | draft: Opus to confirm |
 | N26 | Before a re-seed: re-seeding removes nothing, so a deleted mapping stays open | [Stage 4 notes](stage-4-milestones.md#notes-for-later-milestones) | open: Opus decides (step 3) | Not decided here | draft: Opus to confirm |
-| N27 | M9: replace `acct_` digests with ordinals on export | [Stage 4 notes](stage-4-milestones.md#notes-for-later-milestones), [ADR 0029](adr/0029-m9-snapshot-export.md) | built; waiting on live proof | Superseded in scope by ADR 0029 and [0030](adr/0030-m9-redaction-review.md) (hashes are rebuilt too). Proved on the fixture and hand-built graphs only. Closes with the reviewed live snapshot | draft: Opus to confirm |
-| N28 | M9: look up a decision's commit SHA at export | [Stage 4 notes](stage-4-milestones.md#notes-for-later-milestones) | built; waiting on live proof | Built in PR 63, tested with `moto` and a throwaway git repository. Not run on the real table | draft: Opus to confirm |
-| N29 | M9 PR C: now as `as_of`, an exemption for the SHA, and scan the first live file first | [Stage 4 notes](stage-4-milestones.md#notes-for-later-milestones), ADR 0030 | built; waiting on live proof | The first two are built in PR 63. The scan of the first live file has not happened | draft: Opus to confirm |
+| N27 | M9: replace `acct_` digests with ordinals on export | [Stage 4 notes](stage-4-milestones.md#notes-for-later-milestones), [ADR 0029](adr/0029-m9-snapshot-export.md) | closed | Proved on live data on 2026-11-07: 0 scan hits and the Opus review ([ADR 0033](adr/0033-m9-live-snapshot.md)) | draft: Opus to confirm |
+| N28 | M9: look up a decision's commit SHA at export | [Stage 4 notes](stage-4-milestones.md#notes-for-later-milestones) | closed | Proved on live data on 2026-11-07: 0 scan hits and the Opus review ([ADR 0033](adr/0033-m9-live-snapshot.md)) | draft: Opus to confirm |
+| N29 | M9 PR C: now as `as_of`, an exemption for the SHA, and scan the first live file first | [Stage 4 notes](stage-4-milestones.md#notes-for-later-milestones), ADR 0030 | closed | Proved on live data on 2026-11-07: 0 scan hits and the Opus review ([ADR 0033](adr/0033-m9-live-snapshot.md)) | draft: Opus to confirm |
 | N30 | Standing: edge writes do not re-check their nodes, so one writer at a time; never run a seed and a crawl together | [Stage 4 notes](stage-4-milestones.md#notes-for-later-milestones), [ADR 0014](adr/0014-m2-measurements-and-evidence-cap.md) | standing | Not closeable. Carried into [the final snapshot runbook](runbooks/m11-final-snapshot.md), including the daily schedule once it is enabled | draft: Opus to confirm |
 | N31 | M11: risk treatment decisions (ADR 0008): build them or drop them | [Stage 4 notes](stage-4-milestones.md#notes-for-later-milestones), [ADR 0008](adr/0008-governance-as-code.md) | open: Opus decides (step 3) | Not decided here | draft: Opus to confirm |
 | N32 | M11: three obligation dates read by no rule (`euaia-omnibus-in-force`, `euaia-art5-new`, `euaia-high-risk-annex-i`) | [Stage 4 notes](stage-4-milestones.md#notes-for-later-milestones) | open: Opus decides (step 3) | Regulatory. Not decided here | draft: Opus to confirm |
