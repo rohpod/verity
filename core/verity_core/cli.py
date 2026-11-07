@@ -38,6 +38,11 @@ from verity_core.rules.status import ApplicabilityStatus
 
 OK, LINT_FAILED, UNREADABLE, REFUSED, FAILED = 0, 1, 2, 3, 4
 PROGRESS_EVERY = 25
+# ADR 0028: the slowness of live runs came from credential refreshes, not from throttling.
+LIVE_TIME_NOTE = (
+    "A live run can take several times longer than the estimate: with `aws login` credentials "
+    "each call can start a credential refresh."
+)
 _SEVERITY = {"high": 0, "medium": 1, "low": 2}
 
 
@@ -103,7 +108,7 @@ def cmd_seed(args: argparse.Namespace) -> int:
     from verity_core.graph.dynamodb.repository import DynamoDBRepository
 
     repo = DynamoDBRepository(args.tenant, _utc_now)
-    print("seeding the real table, expect pauses while it throttles...", file=sys.stderr)
+    print(f"seeding the real table. {LIVE_TIME_NOTE}", file=sys.stderr)
     try:
         report = seed(repo, loaded, _utc_now, _print_progress)
     except ContentError as exc:
@@ -228,6 +233,7 @@ def cmd_assess(args: argparse.Namespace) -> int:
         f"estimated writes: {records} records ({new_nodes} assessments), about {units} write units "
         "on the table. A second run writes nothing."
     )
+    print(LIVE_TIME_NOTE, file=sys.stderr)
     if not (args.yes or _confirmed("assess")):
         print("not confirmed: nothing was written", file=sys.stderr)
         return REFUSED

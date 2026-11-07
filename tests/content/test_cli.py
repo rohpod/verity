@@ -79,6 +79,8 @@ def test_the_real_target_seeds_with_yes_and_reports_progress(tmp_path, capsys, f
     assert "nodes: 35 written, 0 unchanged; edges: 35 written, 0 unchanged" in captured.out
     assert "  nodes: 35/35" in captured.err
     assert "  edges: 35/35" in captured.err
+    assert "throttl" not in captured.err
+    assert "credential refresh" in captured.err
     assert fake_table == ["kestrel"]
 
 
