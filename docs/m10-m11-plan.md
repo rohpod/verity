@@ -11,7 +11,7 @@ M10 can start now, because it builds against the fixture. It cannot close until 
 | A | L15, first scheduled run, credit read: closes M3 and M8 | Owner, with approval per step | L15 and the first scheduled run are done (2026-11-07, [ADR 0032](adr/0032-m8-scheduled-run.md)). The owner reported credits unchanged on 2026-11-07, before the 24-hour mark, and closed M3 and M8 on that report (ADR 0032, decision 5). The schedule is on, so crawls renew evidence that would have started expiring around 29 Nov |
 | B | M9 PR C code: live export and commit SHA lookup | Sonnet | Nothing |
 | C | M10 PRs A to E | Sonnet | Nothing |
-| D | M9 live run and snapshot PR: closes M9 | Sonnet runs it, Opus reviews, owner merges | Tracks A and B |
+| D | M9 live run and snapshot PR: closes M9 | Opus ran and reviewed it, owner merges | Tracks A and B. Done on 2026-11-07 except the merge ([ADR 0033](adr/0033-m9-live-snapshot.md)) |
 | E | M10 close: Pages URL works | Sonnet | Tracks C and D |
 | F | M11 | Opus, with Sonnet steps below | M8, M9 and M10 ✅ |
 

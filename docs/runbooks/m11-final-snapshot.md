@@ -2,7 +2,7 @@
 
 The last public snapshot of the live estate (step 8 of the [M10 and M11 plan](../m10-m11-plan.md)). **Start by 15 Mar 2027, for a hard deadline of 1 Apr 2027.** The Free plan ends on 4 May 2027.
 
-**Status: drafted before it could be tested.** Written by Sonnet on 2026-11-07, when M3, M8 and M9 were still open. The live export has never run, no scheduled crawl has happened, and Pages has never deployed. Every command and expectation below comes from merged documents and code, not from a live result. Anything marked **(unverified)** needs checking on the first real run, and Opus should re-read this runbook against whatever M8 and M9 actually showed before it is used.
+**Status: drafted before it could be tested.** Written by Sonnet on 2026-11-07, when M3, M8 and M9 were still open. It has since been partly tested: the first live export ran on 2026-11-07 ([ADR 0033](../adr/0033-m9-live-snapshot.md)), one scheduled crawl has happened ([ADR 0032](../adr/0032-m8-scheduled-run.md)), and Pages has not deployed yet. Every command and expectation below comes from merged documents and code, not from a live result. Anything marked **(unverified)** needs checking on the first real run, and Opus should re-read this runbook against whatever M8 and M9 actually showed before it is used.
 
 Every step marked **APPROVE** needs the owner's yes for that step, at that moment, with what it does, the verified price and how to undo it. Approval of one step never covers the next. Stop at the first surprise and record every measured value as you go.
 
@@ -29,7 +29,7 @@ All of these must be true. If one is not, stop.
 | S3 | Check the schedule is still on | `aws scheduler get-schedule --name verity-crawl-daily` (the schedule is in the `default` group) | `State` is `ENABLED`. A plain `tofu apply` resets it to `DISABLED` ([ADR 0028](../adr/0028-m8-review.md)). If it is `DISABLED`: stop. Turning it on is an APPROVE step, `cd infra && tofu apply -var schedule_state=ENABLED`, after a `tofu plan` the owner has read in full | Apply with `DISABLED` |
 | S4 | Decide whether a crawl is needed | Crawler evidence lasts 30 days and is renewed about every 22 days, and only a crawl renews it (plan). Look at the date of the newest `DiscoveryRun` **(unverified: no command is written for this yet)** | Evidence younger than about 22 days: skip S5. Otherwise run S5 | n/a |
 | S5 | APPROVE: crawl now, if S4 says so | `uv run verity crawl` (invokes the deployed crawler once; it reads the account and writes the graph) | Counts printed, `crawl wrote:` line. Not between 02:50 and 03:10 UTC. The crawl took 17 to 22 s in M8 | n/a (the records are the point) |
-| S6 | APPROVE: assess | `uv run verity assess --target dynamodb` | Required after any crawl that wrote evidence, or the export refuses a stale graph. It took 41 minutes in M8, slowed by credential refreshes ([ADR 0028](../adr/0028-m8-review.md)). It may be faster if the `credential_process` fix has landed **(unverified)**. Do not start a second one | n/a |
+| S6 | APPROVE: assess | `uv run verity assess --target dynamodb` | Required after any crawl that wrote evidence, or the export refuses a stale graph. It took 41 minutes in M8 and 29 minutes for 4 records in M9 ([ADR 0033](../adr/0033-m9-live-snapshot.md)), so plan on its time whatever the estimate says. It may be faster if the `credential_process` fix has landed **(unverified)**. Do not start a second one | n/a |
 | S7 | Export | `uv run verity export --out .build/snapshot.json` | `data source: live graph, read-only`, counts, `redaction:` line, `scan: clean`. Under 2 MiB (about 1.5 MiB is the estimate, ADR 0030). `.build/` is ignored by git. For a refusal, see "What a refusal means" | Delete `.build/snapshot.json` |
 | S8 | Scan the file again, on its own | `uv run verity export --check .build/snapshot.json --require-live` | `0 scan hit(s)`, and it is a live file. The scan is read-only | n/a |
 | S9 | Compare with the last published snapshot | `git diff --no-index --stat web/public/data/snapshot.json .build/snapshot.json` | Differences are explained by: new crawl evidence, evidence that aged, new ChangeEvents, and the date changes below. Anything else goes to Opus | n/a |
@@ -82,9 +82,8 @@ Teardown is **not** part of it, and no decision is made here. The plan records O
 
 ## Not known yet
 
-- Whether a live export passes at all, and what the first live scan reports.
 - How long the assess takes after the `credential_process` fix, and whether that fix has landed.
 - The command to read the newest `DiscoveryRun` (S4).
 - Whether the Pages deploy job works (S14); the workflow has only ever skipped.
-- The live file's real size, against the 1.5 MiB estimate.
+- The first live file was 1,344,918 bytes (ADR 0033); check a later one against the 1.5 MiB estimate.
 - What the 2 Dec 2026 date changes do to the file. The three ChangeEvents expected from L15 happened on 2026-11-07 ([ADR 0032](../adr/0032-m8-scheduled-run.md)); their first appearance in a live export is still untested.

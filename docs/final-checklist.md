@@ -2,7 +2,7 @@
 
 _Written 2026-11-06 at about 20:00 UTC, with `main` at PR 65. Work from top to bottom and tick items as they finish. Background: [why M3, M8 and M9 are open](open-milestones.md) and the [M10 and M11 plan](m10-m11-plan.md)._
 
-**Where things stand (2026-11-07).** M0, M1, M2 and M4 to M7 are ✅. M3 and M8 are ✅ (closed on the owner's early credit report, ADR 0032 decision 5). M9 and M10 are 🔄, and M11 is ⬜. All the code for M9 and M10 is merged, including the test fix (A2). L15 is done: the schedule is `ENABLED`, and the 07:30 UTC run passed ([ADR 0032](adr/0032-m8-scheduled-run.md)). Next is the live snapshot (section E).
+**Where things stand (2026-11-07).** M0, M1, M2 and M4 to M7 are ✅. M3 and M8 are ✅ (closed on the owner's early credit report, ADR 0032 decision 5). M9 is ✅ once its snapshot PR merges, M10 is 🔄, and M11 is ⬜. All the code for M9 and M10 is merged, including the test fix (A2). L15 is done: the schedule is `ENABLED`, and the 07:30 UTC run passed ([ADR 0032](adr/0032-m8-scheduled-run.md)). The live snapshot passed its scan and review ([ADR 0033](adr/0033-m9-live-snapshot.md)). Next is the merge (E6) and the Pages check (section F).
 
 **The path:** L15 → first scheduled run → credit read (closes M3 and M8) → live snapshot (closes M9) → Pages check (closes M10) → M11.
 
@@ -61,27 +61,27 @@ Run from the main checkout, because the OpenTofu state is there. Nobody else may
 
 Needs A2 merged and M8 ✅. A dry run on 2026-11-06 worked: read-only, clean scan, about 32 seconds. That file was a rehearsal and was deleted.
 
-- [ ] **E1. Prepare:**
+- [x] **E1. Prepare:**
   ```sh
   git switch main && git pull --ff-only
   git status            # must be clean
   export AWS_PROFILE=verity
   aws login
   ```
-- [ ] **E2. Give the approval, then assess.** This writes to AWS. It took 41 minutes last time, so start well clear of 03:00 UTC:
+- [x] **E2. Give the approval, then assess.** This writes to AWS. It took 41 minutes last time, so start well clear of 03:00 UTC:
   ```sh
   uv run verity assess --target dynamodb
   ```
-  Type the confirmation word and do not use `--yes`. Expect about 29 high findings. A different count is a stop.
-- [ ] **E3. Export and scan.** This only reads from AWS:
+  Type the confirmation word and do not use `--yes`. Expect about 29 high findings. A different count is a stop. On 2026-11-07 the owner waived `--yes` for this one run: 29 high, 4 records, 29 minutes (ADR 0033).
+- [x] **E3. Export and scan.** This only reads from AWS:
   ```sh
   git switch -c feat/m9-live-snapshot
   uv run verity export --out web/public/data/snapshot.json
   uv run verity export --check web/public/data/snapshot.json --require-live
   ```
   Expect 0 scan hits. A stale-graph refusal means repeat E2. A scan hit is a stop.
-- [ ] **E4. Do not commit yet. Switch to Opus** (`/model opus`) and ask it to review the redaction in `web/public/data/snapshot.json`. Point it at the ChangeEvents, which have never appeared in a live export.
-- [ ] **E5. Commit only that file and open a PR:**
+- [x] **E4. Do not commit yet. Switch to Opus** (`/model opus`) and ask it to review the redaction in `web/public/data/snapshot.json`. Point it at the ChangeEvents, which have never appeared in a live export.
+- [x] **E5. Commit the file and open a PR:** the owner asked for one PR, so the docs for this step are in it as a separate commit.
   ```sh
   git add web/public/data/snapshot.json
   git commit -m "feat(web): publish the first live snapshot"
