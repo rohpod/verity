@@ -2,29 +2,29 @@
 
 _2026-11-06, after PR 61 merged. A milestone is ✅ only when every validation criterion in [Stage 4](stage-4-milestones.md) has passed. This page is a status record: when a milestone closes, update its row in Stage 4 and its section here._
 
-**Update, 2026-11-07.** L15 is done: the schedule is `ENABLED`, and a real scheduled run finished at 07:30 UTC with 3 ChangeEvents ([ADR 0032](adr/0032-m8-scheduled-run.md)). The cron was a one-off `cron(30 7 * * ? *)` for that run and has been put back to `cron(0 3 * * ? *)`, which has not run yet. What is left for M3 and M8 is the owner's credit read at or after 10:12 UTC on 2026-11-08. M3, M8, M9 and M10 stay 🔄.
+**Update, 2026-11-07.** L15 is done: the schedule is `ENABLED`, and a real scheduled run finished at 07:30 UTC with 3 ChangeEvents ([ADR 0032](adr/0032-m8-scheduled-run.md)). The cron was a one-off `cron(30 7 * * ? *)` for that run and has been put back to `cron(0 3 * * ? *)`, which has not run yet. **M3 and M8 are closed (✅)** on the owner's report that credits were unchanged, taken before the 24-hour mark and accepted as an exception ([ADR 0032](adr/0032-m8-scheduled-run.md) decision 5). They reopen if a later read shows less than $120. M9 and M10 stay 🔄.
 
-The work is mostly done, and nothing here is a known failure. Each milestone is waiting on something that has not happened yet: 24 hours passing, or a live export.
+The work is mostly done, and nothing here is a known failure. M9 and M10 are waiting on something that has not happened yet: a live export.
 
 | Milestone | What is left | Waiting on | Earliest close |
 |---|---|---|---|
-| M3 | One credit read | 24 hours after the latest one-off change on 7 Nov ([ADR 0032](adr/0032-m8-scheduled-run.md)) | 8 Nov 2026, at or after 10:12 UTC |
-| M8 | A credit read (L17). The scheduled run (L15) passed on 7 Nov | The owner's read | The same credit read |
-| M9 | Two pieces of code, then a live export, Opus review and a merged snapshot | The code can start now. The live run waits for M8 | After M8 closes |
+| M3 | Nothing: ✅ on 2026-11-07 | Closed on the owner's early credit report ([ADR 0032](adr/0032-m8-scheduled-run.md)) | Done |
+| M8 | Nothing: ✅ on 2026-11-07. L15 passed and credits were reported unchanged | Closed on the same early report | Done |
+| M9 | Two pieces of code, then a live export, Opus review and a merged snapshot | The code is merged. M8 is closed, so the live run can start with approval | After the live export, Opus review and a merged snapshot |
 
-The order is fixed: **L15 → first scheduled run → credit read (closes M3 and M8) → live snapshot (closes M9)**. M10's Pages URL then needs that snapshot. L15 and the first scheduled run are done. Nothing moves until the credit read at or after 10:12 UTC on 8 Nov.
+The order is fixed: **L15 → first scheduled run → credit read (closes M3 and M8) → live snapshot (closes M9)**. M10's Pages URL then needs that snapshot. L15, the first scheduled run and the credit report are done, so the live snapshot is next.
 
-## M3: account baseline (🔄)
+## M3: account baseline (✅)
 
-**Criterion still open:** "credits unchanged". Everything else passed on 2026-11-05 ([ADR 0016](adr/0016-m3-live-results.md)).
+**Closed 2026-11-07.** The last criterion, "credits unchanged", rests on the owner's report that no credit changed and nothing was deducted, against $120. It was given before the 24-hour mark, so it is an exception ([ADR 0032](adr/0032-m8-scheduled-run.md) decision 5), and M3 reopens if a later read shows less. Everything else passed on 2026-11-05 ([ADR 0016](adr/0016-m3-live-results.md)).
 
-**Why it is still open.** Credits can lag, so the check waits at least 24 hours after the last write ([ADR 0015](adr/0015-account-baseline.md)). M8 kept writing to the account before that read was taken, so the read moved. [ADR 0028](adr/0028-m8-review.md) decision 4 lets M8's credit read close M3 as well. With a daily schedule there is always a recent write, so the rule is now 24 hours after the latest one-off change: the 07:30 UTC run, the cron revert and the B4 invokes. That is 10:12 UTC on 2026-11-08 ([ADR 0032](adr/0032-m8-scheduled-run.md) decision 3).
+**Why it was open.** Credits can lag, so the check waits at least 24 hours after the last write ([ADR 0015](adr/0015-account-baseline.md)). M8 kept writing to the account before that read was taken, so the read moved. [ADR 0028](adr/0028-m8-review.md) decision 4 lets M8's credit read close M3 as well. With a daily schedule there is always a recent write, so the rule is now 24 hours after the latest one-off change: the 07:30 UTC run, the cron revert and the B4 invokes. That is 10:12 UTC on 2026-11-08 ([ADR 0032](adr/0032-m8-scheduled-run.md) decision 3).
 
 **Which baseline to use.** The records hold two numbers: $100 in the 2026-11-05 findings and $120 before M8 ([ADR 0027](adr/0027-m8-live-results.md)). Nothing records why they differ. A rise is not a charge, and onboarding activities can add credits, but that cause is **unconfirmed**. On 2026-11-07 the owner reported $0 spent and that the $100 figure may have been stated by mistake. That is the owner's report and is **not confirmed from Billing records**. Keep **$120** as the baseline, and compare the read with it.
 
-**To close:** the owner's credit read matches the baseline. Mark M3 ✅.
+**Closed by:** the owner's report, as above. A read at or after 10:12 UTC on 2026-11-08 would make it a full check and is recommended.
 
-## M8: deploy and first live crawl (🔄)
+## M8: deploy and first live crawl (✅)
 
 Stage 4 showed ⬜ until this page was added, which understated it: everything except two criteria passed on 2026-11-06, and it is now 🔄.
 
@@ -37,11 +37,11 @@ Stage 4 showed ⬜ until this page was added, which understated it: everything e
 | Second crawl is idempotent | Passed | ADR 0027, L13 |
 | Destroying the estate then applying rebuilds it cleanly | Passed | ADR 0027, L16; ADR 0028 |
 | A scheduled run (L15) | **Passed** on 2026-11-07 | A real cron run at 07:30 UTC, `finished_at` set, 3 ChangeEvents ([ADR 0032](adr/0032-m8-scheduled-run.md)) |
-| Credits unchanged (L17) | **Open** | Not yet read. The owner's early observation at about 10:20 UTC on 7 Nov (no money deducted) is not the L17 read |
+| Credits unchanged (L17) | **Passed on the owner's early report** | Reported unchanged on 7 Nov, before the 24-hour mark ([ADR 0032](adr/0032-m8-scheduled-run.md) decision 5). Reopen if a later read shows less |
 
 **Why L15 was open, and how it closed.** L15 was enabled once, and then the L16 rebuild reset the schedule to `DISABLED`. It was applied again at 07:08:38 UTC on 2026-11-07 with a one-off `cron(30 7 * * ? *)`, a local edit that was never committed. The 07:30 UTC run was a real scheduled run: CloudTrail shows the Scheduler service assuming `verity-crawl-scheduler-role`. The cron was reverted at 10:10:40 UTC. The schedule is configured for 03:00 UTC, and that cron has not run yet ([ADR 0032](adr/0032-m8-scheduled-run.md)).
 
-**Why L17 is open.** The read must come at least 24 hours after the latest of the 07:30 UTC run, the cron revert and the B4 invokes, so at or after 10:12 UTC on 2026-11-08. Daily crawls do not restart that wait ([ADR 0032](adr/0032-m8-scheduled-run.md) decision 3).
+**How L17 closed.** The full read would be at least 24 hours after the latest of the 07:30 UTC run, the cron revert and the B4 invokes, so at or after 10:12 UTC on 2026-11-08 ([ADR 0032](adr/0032-m8-scheduled-run.md) decision 3). The owner chose to close on an earlier report of no change, and decision 5 records that.
 
 **To close:**
 1. **Done 2026-11-07.** L15 was applied with `-var schedule_state=ENABLED`. Plain `tofu apply` sets the schedule back to `DISABLED`, so always pass the variable.
@@ -51,7 +51,7 @@ Stage 4 showed ⬜ until this page was added, which understated it: everything e
 
    Anything beyond that would have been a stop. In particular `talent-screening`, `shadow-summariser`, `invoice-renderer`, `mock-bedrock` and `mock-openai` bundle none of the changed files, so their code hashes must not move. `verity-probe`'s zip also bundles `client.py`, but the probe is destroyed (`enable_probe = false`), so it is not in the plan and the crawler never sees it. This list comes from reading `build_lambdas.py` and git history, not from a plan or a live table: the `tofu plan` output decides.
 3. **Done.** Exactly one new run, `run:20261107T073045.159088Z`, with `finished_at` set.
-4. **Open.** The owner reads the credits at or after 10:12 UTC on 2026-11-08. Add the result to [ADR 0032](adr/0032-m8-scheduled-run.md) and mark M8 ✅.
+4. **Done, early.** The owner reported credits unchanged on 2026-11-07, recorded in [ADR 0032](adr/0032-m8-scheduled-run.md) decision 5. M8 is ✅.
 
 **The new code changed the data.** The first scheduled run recorded **three** ChangeEvents, with AFFECTS edges to `verity-crawler`, `support-assistant` and `contract-insights`, and `resources_changed` was 3. The old and new snapshots differ only in `code_sha256` and `config_hash`. That is why [ADR 0029](adr/0029-m9-snapshot-export.md) decision 13 holds the snapshot until M8 closes. `verity assess --target dynamodb` is still needed before the export.
 

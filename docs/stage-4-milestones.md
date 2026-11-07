@@ -61,14 +61,14 @@ Inputs: [architecture](architecture.md) · [ADRs](adr/) · [why M3, M8 and M9 ar
 | M1 | Graph core: models, IDs, `GraphRepository`, `InMemoryRepository`, NetworkX loader, traversals | Opus, then Sonnet | no | ✅ |
 | M2 | `DynamoDBRepository` (moto), shared contract suite | Sonnet | no | ✅ |
 | **AWS baseline** | | | | |
-| M3 | Account baseline: non-root admin with MFA, region eu-north-1, `infra/` root, $0.01 budget, `verity-graph` | Opus (IAM), Sonnet | **yes, approval first** | 🔄 |
+| M3 | Account baseline: non-root admin with MFA, region eu-north-1, `infra/` root, $0.01 budget, `verity-graph` | Opus (IAM), Sonnet | **yes, approval first** | ✅ |
 | **Governance logic (local)** | | | | |
 | M4 | Content: hub controls, ~35 requirements, STRM mappings, Kestrel org, synthetic systems, `verity seed` | Sonnet builds the loader, linter, CLI and org data; Opus writes the regulatory content | no | ✅ |
 | M5 | Rules and assessment: applicability, status, assurance, satisfaction, `verity assess`, `verity attest` | Opus, then Sonnet | no | ✅ |
 | M6 | Discovery pipeline (8 stages), `ai_signals.yaml`, `verity crawl --local` | Sonnet | no | ✅ |
 | M7 | Demo estate code: mocks, `verity_ai` with SigV4 hook, 5 apps, local talent model | Sonnet | no | ✅ |
 | **Live** | | | | |
-| M8 | Deploy and first live crawl: Lambda modules, schedule, SSM manifests, guardrails | Opus (IAM), Sonnet | **yes, approval per apply** | 🔄 |
+| M8 | Deploy and first live crawl: Lambda modules, schedule, SSM manifests, guardrails | Opus (IAM), Sonnet | **yes, approval per apply** | ✅ |
 | **Public demo** | | | | |
 | M9 | Snapshot export, redaction, schema, generated TS types | Sonnet; Opus reviews redaction | no | 🔄 |
 | M10 | Dashboard in three slices, GitHub Pages | Sonnet | no | 🔄 |
@@ -168,7 +168,7 @@ Open for M8: nothing here has run on AWS. The arm64 `pydantic_core` has never be
 
 ## M8 live results (2026-11-06)
 
-PR C ran the runbook against the real account. Full values are in [ADR 0027](adr/0027-m8-live-results.md). Opus reviewed it ([ADR 0028](adr/0028-m8-review.md)). The scheduled run passed on 2026-11-07 ([ADR 0032](adr/0032-m8-scheduled-run.md)). M8 stays 🔄 until the credit read passes.
+PR C ran the runbook against the real account. Full values are in [ADR 0027](adr/0027-m8-live-results.md). Opus reviewed it ([ADR 0028](adr/0028-m8-review.md)). The scheduled run passed on 2026-11-07, and M8 was closed that day on the owner's report that credits were unchanged ([ADR 0032](adr/0032-m8-scheduled-run.md), decision 5).
 
 | Criterion | Result |
 |---|---|
@@ -178,7 +178,7 @@ PR C ran the runbook against the real account. Full values are in [ADR 0027](adr
 | CloudTrail shows no Bedrock use | 7 `List*` events by `resource-explorer-2`, no invocation |
 | Second crawl idempotent | Yes: writes only the run |
 | Destroying the estate then applying rebuilds it cleanly | Yes: same code hashes, table and budget untouched, crawl wrote only the run. 29 high still derived from the live table, in memory ([ADR 0028](adr/0028-m8-review.md)) |
-| Credits unchanged | **Not yet read** (owner, at or after 10:12 UTC on 2026-11-08, which is 24 hours after the latest one-off change; [ADR 0032](adr/0032-m8-scheduled-run.md) decision 3) |
+| Credits unchanged | **Owner reported unchanged** on 2026-11-07 at about 11:05 UTC, against $120. This is an early report, under 24 hours after the latest one-off change, accepted by the owner as an exception ([ADR 0032](adr/0032-m8-scheduled-run.md) decision 5). Reopen if a later read shows less |
 | Scheduled run | **Passed** on 2026-11-07: a real cron run at 07:30 UTC under a temporary cron, `finished_at` set, 3 ChangeEvents. The cron was then reverted to `cron(0 3 * * ? *)`, which has not run yet ([ADR 0032](adr/0032-m8-scheduled-run.md)) |
 
 ## Notes for later milestones
@@ -187,7 +187,7 @@ Found while building and reviewing M1. Each is open until the named milestone cl
 
 | Milestone | Note |
 |---|---|
-| M3 | Last open criterion: the owner re-reads credits in the Billing console at or after 10:12 UTC on 2026-11-08, 24 hours after the latest one-off change ([ADR 0032](adr/0032-m8-scheduled-run.md)). M3 stays 🔄 until they match. The checks moto could not do are done ([ADR 0016](adr/0016-m3-live-results.md)) |
+| M3 | **Closed 2026-11-07** on the owner's report that credits were unchanged against $120: an early report, accepted as an exception ([ADR 0032](adr/0032-m8-scheduled-run.md) decision 5). Reopen if a later read shows less. The checks moto could not do are done ([ADR 0016](adr/0016-m3-live-results.md)) |
 | M8 | `load_graph` reads every `U#` usage record in the table and discards it. Demo usage volume is small, so measure the scan on the real table. If usage grows large, load without a scan: list nodes through the type index and read each node's partition **Closed by [ADR 0028](adr/0028-m8-review.md).** |
 | M8 | Read `DiscoveryRun.summary.largest_evidence_bytes` from the first live crawl. Evidence over the 16 KB cap is summarised, never refused ([ADR 0021](adr/0021-m6-discovery.md)); decide whether the cap should rise **Closed by [ADR 0027](adr/0027-m8-live-results.md).** |
 | M8 | Build `crawler/handler.py` and the live path of `verity crawl`. The CLI refuses it until then **Closed by [ADR 0027](adr/0027-m8-live-results.md).** |
@@ -246,7 +246,7 @@ _Drafted by Sonnet from [the M10 and M11 plan](m10-m11-plan.md), step 1. It cove
 | E7 | `python3.12` on arm64 (architecture §B ❓) | [Stage 4](stage-4-milestones.md) | closed | Stage 4 "Findings from read-only checks" records it as closed | draft: Opus to confirm |
 | E8 | `aws login` flow (architecture §J ❓) | Stage 4 | closed | Stage 4 "Findings from read-only checks" records it as closed | draft: Opus to confirm |
 | E9 | Whether Free plan accounts may use EventBridge Scheduler, SSM and IAM ("Still unverified") | [ADR 0025](adr/0025-m8-deploy-and-crawl.md) consequences | closed | [ADR 0027](adr/0027-m8-live-results.md), L4: the Free plan accepted IAM, Scheduler and SSM | draft: Opus to confirm |
-| N1 | M3: owner's credit read at least 24 h after the latest one-off change | [Stage 4 notes](stage-4-milestones.md#notes-for-later-milestones) | open: waiting on the owner's read | L15 passed on 2026-11-07. Needs the owner's Billing read at or after 10:12 UTC on 2026-11-08 ([ADR 0032](adr/0032-m8-scheduled-run.md), [open milestones](open-milestones.md)). Not an M11 decision | draft: Opus to confirm |
+| N1 | M3: owner's credit read (reported unchanged early, on 2026-11-07) | [Stage 4 notes](stage-4-milestones.md#notes-for-later-milestones) | closed on the owner's report | L15 passed on 2026-11-07, and the owner reported credits unchanged the same day, before the 24-hour mark ([ADR 0032](adr/0032-m8-scheduled-run.md) decision 5). Reopen if a later read shows less. Not an M11 decision | draft: Opus to confirm |
 | N2 | M8: `load_graph` scans every `U#` record | [Stage 4 notes](stage-4-milestones.md#notes-for-later-milestones) | closed | Marked closed in the notes by [ADR 0028](adr/0028-m8-review.md) | draft: Opus to confirm |
 | N3 | M8: Read `largest_evidence_bytes` from the first live crawl; decide the 16 KB cap | [Stage 4 notes](stage-4-milestones.md#notes-for-later-milestones) | closed | Marked closed in the notes by [ADR 0027](adr/0027-m8-live-results.md) | draft: Opus to confirm |
 | N4 | M8: Build `crawler/handler.py` and the live path of `verity crawl` | [Stage 4 notes](stage-4-milestones.md#notes-for-later-milestones) | closed | Marked closed in the notes by [ADR 0027](adr/0027-m8-live-results.md) | draft: Opus to confirm |

@@ -2,7 +2,7 @@
 
 _Written 2026-11-06 at about 20:00 UTC, with `main` at PR 65. Work from top to bottom and tick items as they finish. Background: [why M3, M8 and M9 are open](open-milestones.md) and the [M10 and M11 plan](m10-m11-plan.md)._
 
-**Where things stand (2026-11-07).** M0, M1, M2 and M4 to M7 are ✅. M3, M8, M9 and M10 are 🔄, and M11 is ⬜. All the code for M9 and M10 is merged, including the test fix (A2). L15 is done: the schedule is `ENABLED`, and the 07:30 UTC run passed ([ADR 0032](adr/0032-m8-scheduled-run.md)). Next is the owner's credit read (D1), at or after 10:12 UTC on 2026-11-08.
+**Where things stand (2026-11-07).** M0, M1, M2 and M4 to M7 are ✅. M3 and M8 are ✅ (closed on the owner's early credit report, ADR 0032 decision 5). M9 and M10 are 🔄, and M11 is ⬜. All the code for M9 and M10 is merged, including the test fix (A2). L15 is done: the schedule is `ENABLED`, and the 07:30 UTC run passed ([ADR 0032](adr/0032-m8-scheduled-run.md)). Next is the live snapshot (section E).
 
 **The path:** L15 → first scheduled run → credit read (closes M3 and M8) → live snapshot (closes M9) → Pages check (closes M10) → M11.
 
@@ -53,9 +53,9 @@ Run from the main checkout, because the OpenTofu state is there. Nobody else may
 
 ## D. Close M3 and M8
 
-- [ ] **D1. Read credits in the Billing console, at or after 10:12 UTC (15:42 IST) on 2026-11-08.** That is 24 hours after the latest of the 07:30 UTC run, the cron revert and B4 ([ADR 0032](adr/0032-m8-scheduled-run.md) decision 3). Daily crawls do not restart the wait. Never use `aws ce`, which charges per request. Compare with **$120**. An earlier look, such as the owner's at about 10:20 UTC on 2026-11-07, is not this read.
-- [ ] **D2. Record L15 and L17.** ADR 0032 holds L15 as Proposed. Add the L17 result to it and set it to Accepted. It already says why three functions changed.
-- [ ] **D3. Mark M3 and M8 ✅** in Stage 4 and `docs/open-milestones.md`. Do this through a PR.
+- [x] **D1. Credits compared with $120.** The owner reported on 2026-11-07, at about 11:05 UTC, that no credit changed. That is **before** the 24-hour mark of 10:12 UTC on 2026-11-08 ([ADR 0032](adr/0032-m8-scheduled-run.md) decision 3), so it is recorded as an owner-accepted exception (decision 5). A read at or after that time is recommended and would make it a full L17. Never use `aws ce`, which charges per request.
+- [x] **D2. Record L15 and L17.** ADR 0032 is Accepted, with the early report and the exception in decision 5.
+- [x] **D3. Mark M3 and M8 ✅** in Stage 4 and `docs/open-milestones.md`. Done through this PR.
 
 ## E. Create the live snapshot (closes M9)
 
