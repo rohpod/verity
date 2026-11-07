@@ -56,6 +56,29 @@ test("the graph is a canvas at desktop width and a list at phone width", async (
   await expect(page.getByRole("img", { name: /Graph of the chosen node/ })).toHaveCount(0);
 });
 
+test.describe("a long option in a Graph selector does not widen the page at phone width", () => {
+  // The live snapshot has 240 start nodes with ids up to 47 characters, and a select takes the
+  // width of its widest option. The fixture has shorter ids, so the option is added here. The
+  // stale view is left out: the fixture holds no ChangeEvent, so that view has no selector.
+  test.use({ viewport: { width: 390, height: 844 } });
+  for (const route of ["/#/graph?node=sys:support-assistant", "/#/graph?mode=impact&subject=prov:mock-bedrock"]) {
+    test(`${route}`, async ({ page }) => {
+      await page.goto(route);
+      await expect(page.getByTestId("snapshot-time")).toBeVisible();
+      await page.waitForLoadState("networkidle");
+      await page.evaluate(() => {
+        // The first select is the node, subject or change chooser. "Hops" never holds long ids.
+        const select = document.querySelector("main select") as HTMLSelectElement;
+        const option = document.createElement("option");
+        option.value = option.textContent = "cand:shadow-summariser-a-very-long-identifier-0123456789";
+        select.append(option);
+        select.selectedIndex = select.options.length - 1;
+      });
+      await noSidewaysScroll(page);
+    });
+  }
+});
+
 test("the page makes no request outside its own origin", async ({ page }) => {
   const foreign: string[] = [];
   page.on("request", (request) => {
