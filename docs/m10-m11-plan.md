@@ -8,7 +8,7 @@ M10 can start now, because it builds against the fixture. It cannot close until 
 
 | Track | Work | Lead | Blocked by |
 |---|---|---|---|
-| A | L15, first scheduled run, credit read: closes M3 and M8 | Owner, with approval per step | Nothing. Evidence starts expiring around 29 Nov |
+| A | L15, first scheduled run, credit read: closes M3 and M8 | Owner, with approval per step | L15 and the first scheduled run are done (2026-11-07, [ADR 0032](adr/0032-m8-scheduled-run.md)). The credit read is due at or after 10:12 UTC on 2026-11-08. The schedule is on, so crawls renew evidence that would have started expiring around 29 Nov |
 | B | M9 PR C code: live export and commit SHA lookup | Sonnet | Nothing |
 | C | M10 PRs A to E | Sonnet | Nothing |
 | D | M9 live run and snapshot PR: closes M9 | Sonnet runs it, Opus reviews, owner merges | Tracks A and B |

@@ -457,6 +457,7 @@ _Later:_ a per-control hash chain, where each Evidence node stores the previous 
 | [0029](adr/0029-m9-snapshot-export.md) | M9 export: listed public fields, rebuilt hashes for redacted Evidence, an independent fail-closed scanner, a generated contract |
 | [0030](adr/0030-m9-redaction-review.md) | M9 redaction review: scan before writing, listed Evidence content and tags, a stricter scanner, a header that names what is not real |
 | [0031](adr/0031-m10-dashboard.md) | M10 dashboard: one data path, no governance derived in the UI, a build that cannot carry a fixture |
+| [0032](adr/0032-m8-scheduled-run.md) | M8 scheduled run: L15 passed on a one-off cron, the credit read waits 24 hours after the latest one-off change |
 
 ## L. Schema validation walkthrough
 

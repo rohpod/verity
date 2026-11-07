@@ -26,7 +26,7 @@ All of these must be true. If one is not, stop.
 | S0 | Check the window and the tree | `date`, then `git switch main`, `git pull --ff-only`, `git status` | On or before 15 Mar 2027 to start, and never after 1 Apr 2027. Empty `git status` | n/a |
 | S1 | **Opus:** re-verify the dates | Read `content/rules/obligation_dates.yaml`: each date's `source_url` and `last_verified`. The law may have changed since | Unchanged, or a PR by Opus that updates them first. Dates are data, never hard-coded (CLAUDE.md). Do not change one in this task | n/a |
 | S2 | **Owner** reads credits in the Billing console | Not `aws ce`: Cost Explorer charges per request | Baseline recorded | n/a |
-| S3 | Check the schedule is still on | `aws scheduler get-schedule --name verity-crawl-daily` (add `--group-name` if it is not in the default group) **(unverified)** | `State` is `ENABLED`. A plain `tofu apply` resets it to `DISABLED` ([ADR 0028](../adr/0028-m8-review.md)). If it is `DISABLED`: stop. Turning it on is an APPROVE step, `cd infra && tofu apply -var schedule_state=ENABLED`, after a `tofu plan` the owner has read in full | Apply with `DISABLED` |
+| S3 | Check the schedule is still on | `aws scheduler get-schedule --name verity-crawl-daily` (the schedule is in the `default` group) | `State` is `ENABLED`. A plain `tofu apply` resets it to `DISABLED` ([ADR 0028](../adr/0028-m8-review.md)). If it is `DISABLED`: stop. Turning it on is an APPROVE step, `cd infra && tofu apply -var schedule_state=ENABLED`, after a `tofu plan` the owner has read in full | Apply with `DISABLED` |
 | S4 | Decide whether a crawl is needed | Crawler evidence lasts 30 days and is renewed about every 22 days, and only a crawl renews it (plan). Look at the date of the newest `DiscoveryRun` **(unverified: no command is written for this yet)** | Evidence younger than about 22 days: skip S5. Otherwise run S5 | n/a |
 | S5 | APPROVE: crawl now, if S4 says so | `uv run verity crawl` (invokes the deployed crawler once; it reads the account and writes the graph) | Counts printed, `crawl wrote:` line. Not between 02:50 and 03:10 UTC. The crawl took 17 to 22 s in M8 | n/a (the records are the point) |
 | S6 | APPROVE: assess | `uv run verity assess --target dynamodb` | Required after any crawl that wrote evidence, or the export refuses a stale graph. It took 41 minutes in M8, slowed by credential refreshes ([ADR 0028](../adr/0028-m8-review.md)). It may be faster if the `credential_process` fix has landed **(unverified)**. Do not start a second one | n/a |
@@ -39,7 +39,7 @@ All of these must be true. If one is not, stop.
 | S13 | Open the PR | Template, Conventional Commit (`chore(data): publish the final snapshot`), no attribution lines. Switch back to `main` and ask the owner to merge | The owner reviews and merges on GitHub. Never merge it yourself | Close the PR |
 | S14 | Watch the Pages workflow | GitHub Actions, workflow `Pages` | The build job scans with `--require-live`, then the deploy job runs. This is the first real deploy **(unverified)** | Revert the merge |
 | S15 | Check the Pages URL | Desktop and phone width, every route, a deep link, the timestamp | The timestamp is the new `as_of`. No fixture banner. `header.simulated_components` is reachable | n/a |
-| S16 | **Owner** reads credits at least 24 hours after the last write | Billing console | Unchanged ([ADR 0015](../adr/0015-account-baseline.md): credits can lag) | n/a |
+| S16 | **Owner** reads credits at least 24 hours after the latest one-off change; daily crawls do not restart the wait ([ADR 0032](../adr/0032-m8-scheduled-run.md), decision 3) | Billing console | Unchanged ([ADR 0015](../adr/0015-account-baseline.md): credits can lag) | n/a |
 | S17 | Record the results | A new ADR. Accepted ADRs are not edited | Measured times, sizes, the diff summary and anything surprising | n/a |
 
 ## Differences to expect
@@ -84,7 +84,7 @@ Teardown is **not** part of it, and no decision is made here. The plan records O
 
 - Whether a live export passes at all, and what the first live scan reports.
 - How long the assess takes after the `credential_process` fix, and whether that fix has landed.
-- The command to read the newest `DiscoveryRun` (S4), and the schedule's group name (S3).
+- The command to read the newest `DiscoveryRun` (S4).
 - Whether the Pages deploy job works (S14); the workflow has only ever skipped.
 - The live file's real size, against the 1.5 MiB estimate.
-- Whether the three ChangeEvents expected from L15 happened, and what the 2 Dec 2026 date changes do to the file.
+- What the 2 Dec 2026 date changes do to the file. The three ChangeEvents expected from L15 happened on 2026-11-07 ([ADR 0032](../adr/0032-m8-scheduled-run.md)); their first appearance in a live export is still untested.
