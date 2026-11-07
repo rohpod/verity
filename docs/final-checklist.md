@@ -2,7 +2,7 @@
 
 _Written 2026-11-06 at about 20:00 UTC, with `main` at PR 65. Work from top to bottom and tick items as they finish. Background: [why M3, M8 and M9 are open](open-milestones.md) and the [M10 and M11 plan](m10-m11-plan.md)._
 
-**Where things stand (2026-11-07).** M0 to M10 are ✅: M3 and M8 closed on the owner's early credit report ([ADR 0032](adr/0032-m8-scheduled-run.md) decision 5), M9 on the live snapshot ([ADR 0033](adr/0033-m9-live-snapshot.md)), and M10 on the Pages check, after one phone-width fix ([ADR 0034](adr/0034-m11-close-decisions.md)). M11 is ⬜: its decisions are recorded in [ADR 0034](adr/0034-m11-close-decisions.md), and Opus does the final review before it is marked done. The live site is https://rohpod.github.io/verity/.
+**Where things stand (2026-11-07).** M0 to M10 are ✅: M3 and M8 closed on the owner's early credit report ([ADR 0032](adr/0032-m8-scheduled-run.md) decision 5), M9 on the live snapshot ([ADR 0033](adr/0033-m9-live-snapshot.md)), and M10 on the Pages check, after one phone-width fix ([ADR 0034](adr/0034-m11-close-decisions.md)). M11 is ✅ once its final review PR merges ([ADR 0035](adr/0035-m11-final-review.md)). Its decisions are in [ADR 0034](adr/0034-m11-close-decisions.md). The live site is https://rohpod.github.io/verity/.
 
 **The path:** L15 → first scheduled run → credit read (closes M3 and M8) → live snapshot (closes M9) → Pages check (closes M10) → M11.
 
@@ -12,7 +12,7 @@ _Written 2026-11-06 at about 20:00 UTC, with `main` at PR 65. Work from top to b
 |---|---|---|
 | 03:00 UTC (08:30 IST), daily | The scheduled crawl, as configured. It has not run at this time yet: the only scheduled run so far was at 07:30 UTC under a temporary cron. Never run an assess across this time | Two writers at once ([ADR 0014](adr/0014-m2-measurements-and-evidence-cap.md)): wait and repeat the assess |
 | About 29 Nov 2026 | Evidence from 2026-11-06 would start expiring if the schedule were off, and goes stale around 6 Dec. The schedule is on, so crawls renew it. Confirm it is still `ENABLED` | Controls lose their fresh evidence |
-| 2 Dec 2026 | `euaia-art50-2-legacy` and `euaia-art5-new` take effect, so a later snapshot can differ | Nothing breaks: review the difference |
+| 2 Dec 2026 | `euaia-art50-2-legacy` takes effect, so a later snapshot can differ. `euaia-art5-new` takes effect too, but no rule reads it | Nothing breaks: review the difference |
 | 15 Mar 2027 | Start a refresh, only if the owner asks for one ([ADR 0034](adr/0034-m11-close-decisions.md) decision 11) | Less buffer |
 | **1 Apr 2027** | **Hard deadline** for the last live snapshot | |
 | **4 May 2027** | The Free plan ends | Finish any teardown before this |
@@ -112,7 +112,7 @@ Needs A2 merged and M8 ✅. A dry run on 2026-11-06 worked: read-only, clean sca
 
 Starts when M8, M9 and M10 are ✅. Steps match the [plan](m10-m11-plan.md).
 
-- [ ] **H1.** Close register, confirmed by Opus (step 1). Sonnet's draft arrives in A1
+- [x] **H1.** Close register, confirmed by Opus (step 1, [ADR 0035](adr/0035-m11-final-review.md))
 - [x] **H2.** `credential_process` fix and the CLI's "while it throttles" message (step 2). The message is fixed; the `credential_process` fix is deferred ([ADR 0034](adr/0034-m11-close-decisions.md) decision 9)
 - [x] **H3.** Opus decides the open notes (step 3). The decisions are in [ADR 0034](adr/0034-m11-close-decisions.md), and Opus confirms them in the final review:
   - [x] Bedrock's 8 other `Invoke*` actions in `ai_signals.yaml`: deferred, decision 1
@@ -122,12 +122,12 @@ Starts when M8, M9 and M10 are ✅. Steps match the [plan](m10-m11-plan.md).
   - [x] D15's overstated reason: corrected in the ADR, decision 5
   - [x] Re-seed pruning, and how long a re-seed takes: deferred, decision 6
 - [x] **H4.** README real-vs-simulated table matches what was built (step 4). Done in the M11 close PR
-- [ ] **H5.** Opus security review (step 5), including the 7 moderate `npm audit` advisories in dev tooling
-- [ ] **H6.** Opus ADR review against the code (step 6)
+- [x] **H5.** Opus security review (step 5), including the 7 moderate `npm audit` advisories in dev tooling. No blocker, three low findings accepted ([ADR 0035](adr/0035-m11-final-review.md))
+- [x] **H6.** Opus ADR review against the code (step 6). Corrections are in [ADR 0035](adr/0035-m11-final-review.md)
 - [x] **H7.** Final snapshot runbook (step 7). Now marked as the runbook for an optional refresh
 - [x] **H8.** Final snapshot (step 8). The snapshot from PR 72 (`as_of` 2026-11-07T12:20:39.767Z) is the final one unless the owner asks for a refresh ([ADR 0034](adr/0034-m11-close-decisions.md) decision 11). A refresh needs the owner's approval, and it would first confirm the schedule is still `ENABLED`, re-verify EU AI Act dates, and run an assess. Hard deadline for any last snapshot: 1 Apr 2027
 - [x] **H9.** Teardown plan (step 9). Keep the estate until after submission, then `tofu destroy` in the second half of April 2027, before the plan ends on 4 May 2027. This permanently deletes the table, and the committed snapshot stays as the record ([ADR 0034](adr/0034-m11-close-decisions.md) decision 12). The destroy still needs the owner's approval then
-- [ ] **H10.** M11 validation, then mark it ✅ (step 10)
+- [x] **H10.** M11 validation, then mark it ✅ (step 10). Passed ([ADR 0035](adr/0035-m11-final-review.md))
 
 ## Accepted limits (not pending)
 

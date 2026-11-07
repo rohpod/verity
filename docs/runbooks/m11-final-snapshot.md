@@ -17,7 +17,7 @@ All of these must be true. If one is not, stop.
 | P1 | M8, M9 and M10 are ✅. That means the L15 scheduled run was checked, the owner's credit read matched, a first live snapshot was reviewed and merged, and the Pages URL worked | [Plan](../m10-m11-plan.md), track F |
 | P2 | `main` is current, `git status` is empty, and CI is green on `main` | [CONTRIBUTING](../../CONTRIBUTING.md) |
 | P3 | Opus has re-verified the EU AI Act obligation dates and every `last_verified` value (S1), and any change is merged | Plan, "Before the final snapshot" |
-| P4 | The M11 close register in [Stage 4](../stage-4-milestones.md#m11-close-register-draft) has no row that would change what the file shows | Plan, step 1 |
+| P4 | The M11 close register in [Stage 4](../stage-4-milestones.md#m11-close-register) has no row that would change what the file shows | Plan, step 1 |
 
 ## Steps
 
@@ -44,7 +44,7 @@ All of these must be true. If one is not, stop.
 
 ## Differences to expect
 
-- **2 Dec 2026.** `euaia-art50-2-legacy` and `euaia-art5-new` take effect, so a later snapshot can differ from an earlier one in applicability and status. Review the difference. Do not assume it is a fault, and do not adjust it ([plan](../m10-m11-plan.md)).
+- **2 Dec 2026.** `euaia-art50-2-legacy` takes effect, so a later snapshot can differ from an earlier one in applicability and status. `euaia-art5-new` takes effect too, but no rule reads it. Review the difference. Do not assume it is a fault, and do not adjust it ([plan](../m10-m11-plan.md)).
 - **Evidence ages.** Each crawl renews evidence about every 22 days. Freshness values, and the findings that depend on them, move with it.
 - **Code changes.** A deployed function whose code changed produces a ChangeEvent on the next crawl ([open milestones](../open-milestones.md)).
 - **New decision commits.** `decision_commits` gains an entry for each decision file merged since the last snapshot.

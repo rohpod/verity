@@ -118,7 +118,7 @@ M11 is **Opus-led** in Stage 4, and it stays that way. Sonnet does the steps mar
 | 10 | M11 validation, and mark it ✅ | Opus |
 
 **Before the final snapshot.**
-- `euaia-art50-2-legacy` and `euaia-art5-new` take effect on 2 Dec 2026, so a later snapshot can differ from an earlier one. Review the difference and do not assume it is a fault.
+- `euaia-art50-2-legacy` takes effect on 2 Dec 2026, so a later snapshot can differ from an earlier one. `euaia-art5-new` takes effect too, but no rule reads it. Review the difference and do not assume it is a fault.
 - Re-verify EU AI Act dates and `last_verified` values, because the law may have changed. Any change is an Opus task.
 - Crawler evidence renews about every 22 days, and each renewal needs a fresh `verity assess --target dynamodb` before export. Confirm the schedule stayed `ENABLED`, because a plain `tofu apply` resets it.
 - Every step that writes to AWS needs its own approval.
