@@ -11,7 +11,7 @@ dev = [
     "moto[dynamodb,awslambda,iam,ssm,resourcegroupstaggingapi]>=5.2.5",
     "pytest>=8",
     "python-hcl2>=8.1.4",
-    "ruff>=0.8",
+    "ruff>=0.17.4",
 ]
 # Training only. The Lambda never imports it (ADR 0023, decision 10).
 train = ["scikit-learn"]
