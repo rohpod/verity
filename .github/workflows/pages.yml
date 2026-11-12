@@ -60,7 +60,7 @@ jobs:
       - name: Scan the exact bytes that will be published, and require a live snapshot
         if: steps.snapshot.outputs.present == 'true'
         run: uv run verity export --check web/dist/data/snapshot.json --require-live
-      - uses: actions/upload-pages-artifact@v4.0.0
+      - uses: actions/upload-pages-artifact@v5.0.0
         if: steps.snapshot.outputs.present == 'true'
         with:
           path: web/dist
