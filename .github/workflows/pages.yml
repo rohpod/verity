@@ -34,7 +34,7 @@ jobs:
             echo "present=false" >> "$GITHUB_OUTPUT"
             echo "::notice::web/public/data/snapshot.json is missing, so nothing is published. It arrives with the reviewed live snapshot PR (M9)."
           fi
-      - uses: astral-sh/setup-uv@v10.3.3
+      - uses: astral-sh/setup-uv@v10.4.0
         if: steps.snapshot.outputs.present == 'true'
       - uses: actions/setup-node@v7.1.0
         if: steps.snapshot.outputs.present == 'true'
